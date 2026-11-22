@@ -1018,18 +1018,18 @@ func _refresh_city() -> void:
 	_weather.text = Data.t("menu.weather.rain") if str(Game.race_opts.env) == "rainy" else Data.t("menu.weather.sun")
 	var city := race_city()
 	var open := race_city_open()
-	_city_title.text = Data.city_name(Progress.HOME_CITY if points else city)
-	var cities := Data.available_cities()
-	_city_prev.disabled = points or cities.size() < 2
-	_city_next.disabled = points or cities.size() < 2
-	_city_title.modulate = Color(1, 1, 1, 1.0 if open or points else 0.45)
-	if points:
-		_city_note.text = Data.t("menu.city.points")
+	_city_title.text = Data.city_name(city)
+	var cities := _selectable_cities()
+	_city_prev.disabled = cities.size() < 2
+	_city_next.disabled = cities.size() < 2
+	_city_title.modulate = Color(1, 1, 1, 1.0 if open else 0.45)
+	if points and open:
+		_city_note.text = Data.t("menu.city.points", Data.square_name(city))
 	elif open:
 		_city_note.text = Data.t("city.%s.blurb" % city)
 	else:
 		_city_note.text = Data.t("menu.city.locked", [int(Data.city(city).stars), Progress.total_stars()])
-	_play.disabled = not open and not points
+	_play.disabled = not open
 	var laps := Game.city_laps(city)
 	_lap_value.text = str(laps)
 	_lap_minus.disabled = laps <= 1 or points
@@ -1050,18 +1050,26 @@ func _change_laps(amount: int) -> void:
 ## The city the race page has chosen; one this build lacks reads as home.
 func race_city() -> String:
 	var id := str(Game.race_opts.city)
+	if str(Game.race_opts.mode) == "points":
+		return Data.points_city(id)
 	return id if Data.city_available(id) else Progress.HOME_CITY
 
 
-## Points rounds are always on Skanderbeg Square; races need an open city.
+func _selectable_cities() -> Array[String]:
+	var cities := Data.available_cities()
+	if str(Game.race_opts.mode) == "points":
+		cities = cities.filter(func(id: String) -> bool: return id in Data.POINTS_CITIES)
+	return cities
+
+
 func race_city_open() -> bool:
-	return str(Game.race_opts.mode) == "points" or Progress.city_open(race_city())
+	return Progress.city_open(race_city())
 
 
 ## Steps through every city this build carries, locked ones included, so the
 ## player sees what the cup stars will open next.
 func step_city(direction: int) -> void:
-	var cities := Data.available_cities()
+	var cities := _selectable_cities()
 	if cities.is_empty():
 		return
 	Sfx.ui_click()

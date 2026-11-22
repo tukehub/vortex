@@ -102,7 +102,10 @@ func _warm_paths(name: String) -> Array:
 			paths = [city + "buildings.glb", city + "roads.glb", city + "splat.png",
 				"res://assets/landmarks/skanderbeg_approx.glb", "res://assets/foliage/tree_small_02_mobile.glb"]
 		"arena":
-			paths = ["res://assets/landmarks/skanderbeg_approx.glb"]
+			if Data.points_city(str(race_opts.city)) == "vlore":
+				paths = [IndependenceMonument.FIGURES_PATH, "res://assets/hdri/sky_day.hdr", city + "buildings.glb"]
+			else:
+				paths = ["res://assets/landmarks/skanderbeg_approx.glb"]
 	return paths.filter(func(p: String) -> bool: return ResourceLoader.exists(p))
 
 
@@ -282,7 +285,7 @@ func _loading_info(name: String) -> String:
 			var weather := Data.t("env.rainy") if str(race_setting("env")) == "rainy" else Data.t("env.day")
 			return Data.t("loading.race_info", [Data.city_name(str(race_opts.city)), int(race_setting("laps")) if int(race_setting("laps")) > 0 else city_laps(str(race_opts.city)), weather])
 		"arena":
-			return Data.t("loading.arena_info", int(race_opts.points_minutes))
+			return Data.t("loading.arena_info", [Data.square_name(str(race_opts.city)), int(race_opts.points_minutes)])
 	return ""
 
 
@@ -383,6 +386,8 @@ func start_race() -> void:
 	if not str(race_opts.event).is_empty():
 		start_event(str(race_opts.event))
 		return
+	if race_opts.mode == "points":
+		race_opts.city = Data.points_city(str(race_opts.city))
 	Settings.city_id = race_opts.city
 	Settings.car_id = race_opts.car
 	Settings.difficulty = race_opts.diff

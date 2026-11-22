@@ -356,11 +356,7 @@ func _build_ui() -> void:
 	input.inventory_selected.connect(func(i: int): hud.slot_selected.emit(i))
 	input.inventory_hold_changed.connect(hud.inventory_hold)
 	input.action_denied.connect(_action_denied)
-	hud.slot_selected.connect(func(i: int):
-		if i > 0 and i < player.slots.size():
-			player.ctrl.select = i
-		elif i == 0 and player.slots.size() > 1:
-			player.ctrl.cycle = true)
+	hud.slot_selected.connect(input.queue_slot)
 	hud.pause_pressed.connect(toggle_pause)
 	_build_pause(layer)
 
@@ -1024,7 +1020,9 @@ func _online_frame(dt: float) -> void:
 	while acc >= DT and steps < 4:
 		for i in race.cars.size():
 			_previous_poses[i] = RenderPose.capture(race.cars[i])
-		var bytes := net.capture(func(car: CarState) -> void: input.apply(car)) if state == "race" else CarState.Ctrl.new().pack([])
+		var bytes := PackedByteArray()
+		if net.lockstep.needs_local_input():
+			bytes = net.capture(input.apply) if state == "race" else CarState.Ctrl.new().pack([])
 		if not net.step(bytes):
 			break
 		acc -= DT

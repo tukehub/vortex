@@ -44,11 +44,16 @@ func _init(p_players: int, p_local: int) -> void:
 	_sent_until = DELAY - 1
 
 
+## A stalled tick can be retried after its local input was already sent.
+func needs_local_input() -> bool:
+	return tick + DELAY > _sent_until
+
+
 ## Schedules this peer's input for tick + DELAY (once per tick).
 func submit(ctrl: PackedByteArray) -> void:
-	var target := tick + DELAY
-	if target <= _sent_until:
+	if not needs_local_input():
 		return
+	var target := tick + DELAY
 	_sent_until = target
 	_set_input(target, local, ctrl)
 	outbox.append(NetProto.input(local, target, ctrl))

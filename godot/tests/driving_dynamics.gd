@@ -23,8 +23,8 @@ func _ready() -> void:
 		race.physics(car, 1.0 / 60.0)
 		stop_time += 1.0 / 60.0
 	var stopping_distance := car.progress - start
-	assert(stop_time > 2.8 and stop_time < 4.5, "braking should take a plausible interval")
-	assert(stopping_distance > 35.0 and stopping_distance < 60.0, "braking distance should be plausible")
+	assert(stop_time > 2.2 and stop_time < 2.8, "braking should take a plausible interval")
+	assert(stopping_distance > 32.0 and stopping_distance < 39.0, "braking distance should be plausible")
 	# Parallel contact must not invent sideways speed; an actual closing
 	# collision should impart separation rather than a fixed kick.
 	var a := race.player

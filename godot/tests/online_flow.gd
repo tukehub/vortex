@@ -31,6 +31,29 @@ func scripted(tick: int) -> PackedByteArray:
 	return c.pack([])
 
 
+func tap(controls: RaceInput, zone: String) -> void:
+	var center := controls.get_global_transform_with_canvas() * controls.control_rect(zone).get_center()
+	for pressed in [true, false]:
+		var event := InputEventScreenTouch.new()
+		event.position = center
+		event.index = 1
+		event.pressed = pressed
+		get_viewport().push_input(event, true)
+
+
+func advance_peers(scene: RaceScene, client: NetSession, other: NetRace, ticks: int) -> void:
+	var target := maxi(scene.net.lockstep.tick, other.lockstep.tick) + ticks
+	for frame in 300:
+		client.poll()
+		for k in 2:
+			if not other.step(scripted(other.lockstep.tick)):
+				break
+		await get_tree().process_frame
+		if mini(scene.net.lockstep.tick, other.lockstep.tick) >= target:
+			return
+	check(false, "both peers advanced to tick %d" % target)
+
+
 func _ready() -> void:
 	Quality.set_preset("low")
 	var sound := Sfx.enabled
@@ -99,11 +122,17 @@ func _ready() -> void:
 
 	# --- racing: the other phone steps its own copy alongside the scene
 	var other: NetRace = null
+	var inventory_seeded := false
 	for i in 600:
 		for e in client.poll():
 			if e.t == "start":
 				var track := RaceTrack.load_city(str(client.config.city), bool(client.config.reverse))
 				other = NetRace.new(Race.new(track, NetRace.race_options(client.config)), client.lockstep)
+		if other != null and not inventory_seeded and Game.current == "race" and not Game._loading:
+			var host_scene: RaceScene = Game._root.get_child(0)
+			for driver: CarState in [host_scene.player, other.race.humans[0]]:
+				driver.slots = [{"type": "bolt", "ammo": 3}, {"type": "shield", "ammo": 1}]
+			inventory_seeded = true
 		if other != null:
 			for k in 2:
 				if not other.step(scripted(other.lockstep.tick)):
@@ -129,6 +158,22 @@ func _ready() -> void:
 	for i in 60:
 		await get_tree().process_frame
 	check(scene._net_badge.text == Data.t("online.badge.waiting", "Ben"), "a silent phone is named while the race waits: %s" % scene._net_badge.text)
+
+	# A tap arriving after we submitted the stalled tick must wait for the next input.
+	tap(scene.input, "slot1")
+	check(scene.player.ctrl.select == 0, "slot tap waits for a synchronized tick")
+	for i in 4:
+		await get_tree().process_frame
+	await advance_peers(scene, client, other, Lockstep.DELAY + 2)
+	check(scene.player.slot_type() == "shield" and other.race.humans[0].slot_type() == "shield", "both peers select the shield after a stall")
+	tap(scene.input, "slot0")
+	await advance_peers(scene, client, other, Lockstep.DELAY + 2)
+	check(scene.player.slot_type() == "bolt" and other.race.humans[0].slot_type() == "bolt", "tapping the active slot cycles once on both peers")
+	tap(scene.input, "slot1")
+	tap(scene.input, "fire")
+	await advance_peers(scene, client, other, Lockstep.HASH_EVERY + 2)
+	check(scene.player.shield_t > 0.0 and other.race.humans[0].shield_t > 0.0, "both peers fire the selected shield")
+	check(scene.net.lockstep.desync_tick < 0 and other.lockstep.desync_tick < 0, "inventory actions keep both peers in sync")
 
 	# --- the other phone leaves; a bot takes its car
 	client.close()
