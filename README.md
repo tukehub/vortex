@@ -128,7 +128,7 @@ processed track, terrain, buildings, side roads and props belong in
 The builder rejects routes that double back, and terrain validation fails if the
 ground intersects the road. No data is fabricated if access fails.
 
-Pipeline regression tests: `python3 tools/pipeline/test_terrain.py`, `test_water.py`, `test_seafront.py`.
+Pipeline regression tests: `python3 tools/pipeline/test_terrain.py`, `test_water.py`, `test_seafront.py`, `test_street_props.py`.
 
 Car source: Car Concept © 2024 Darmstadt Graphics Group GmbH and Eric Chadwick, CC BY 4.0; conversion instructions are in `tools/import_carconcept.py`. SFX: `python3 tools/gen_sfx.py`.
 The central lists and model paths live in `godot/scripts/data/data.gd`; every
@@ -311,11 +311,26 @@ work. An item below that needs a Forward+-only feature is desktop-only.
     ambient fill drops 15% (floors 0.36 day / 0.42 night, was 0.45 / 0.48;
     `SkyEnv.ambient_energy`); low keeps the old fill. Covered by
     `tests/reflections` on both renderers. Phone cost unmeasured.
-3.4 **Street dressing from OSM:** the pipeline emits traffic lights, bus stops,
-    benches, bins, bollards and parked-car slots into `props.json`;
-    `scripts/world/props.gd` draws each kind as one `MultiMeshInstance3D` with
-    visibility ranges. Low-poly CC0 props (< 500 tris each) under
-    `godot/assets/props/`.
+3.4 **Street dressing from OSM — done.** `tools/pipeline/street_props.py`
+    (also run by `build_city.py`) fetches the furniture mapped within 250 m
+    of the circuit, in 700 m Overpass tiles cached under
+    `tools/cache/osm/<city>_street/`, and writes `props.json` "street":
+    traffic lights (`highway=traffic_signals`, moved from the carriageway to
+    its right-hand kerb, head toward approaching traffic), bus stops
+    (shelter at the kerb, open side to the road), benches, bins and
+    bollards. Nothing stands on the race road (lights and stops step behind
+    its kerb, the rest are dropped), in a building, a landmark keepout or
+    open water; every item is a mapped node. Run it alone with
+    `python3 tools/pipeline/street_props.py tirane vlore`.
+    `scripts/world/street_props.gd` (`StreetProps`, built by `Props`) draws
+    each kind as a procedural, vertex-coloured mesh under 500 triangles,
+    one `MultiMeshInstance3D` per kind per 250 m chunk so the visibility
+    range culls by distance (450 / 350 / 160 / 140 / 140 m, capped by
+    `Quality.p.props_dist`), without shadows. Low quality and pressure
+    stage 2+ keep only lights and stops (`Quality.p.street_small`).
+    Parked-car slots were left out: only the six racers are on the street
+    (2.3). Covered by `tests/street_props` and
+    `tools/pipeline/test_street_props.py`.
 3.5 **Road decals** in `shaders/road.gdshader`: zebra crossings at OSM junction
     nodes, manholes and patches by hash, via a small decal atlas and a uniform
     list.

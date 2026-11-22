@@ -12,6 +12,8 @@ var light_slots := 0
 var lamp_emis: StandardMaterial3D
 var night := 1.0
 var landmarks: Array = []
+## OSM street furniture (3.4); null when the city has none.
+var street: StreetProps
 
 # A small near-camera 3D pool travels around the circuit; distant trees use
 # low-cost cutouts.  No per-tree nodes or 3D trees are created per frame.
@@ -62,6 +64,12 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 			clear.append([float(anchor.x), float(anchor.z)])
 		promenade.build(front, terrain, clear)
 	_build_lamps(p.get("lamps", []), track_lamps)
+	var furniture: Dictionary = p.get("street", {})
+	if not furniture.is_empty():
+		street = StreetProps.new()
+		street.name = "StreetProps"
+		add_child(street)
+		street.build(furniture, terrain.height_at)
 	_build_trees(p.get("trees", []), terrain, city_id)
 	light_slots = int(Quality.p.lamp_lights)
 	for i in light_slots:
