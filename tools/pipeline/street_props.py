@@ -24,6 +24,7 @@ a mapped OSM node.
 Only the street furniture near the circuit is fetched (Overpass, or the main
 OSM API for a tile Overpass will not serve), cached per tile in tools/cache/osm/<city>_street/:
   python3 tools/pipeline/street_props.py tirane vlore
+  (--api skips Overpass and reads the main OSM API, --force refetches)
 Data (c) OpenStreetMap contributors, ODbL.
 """
 import json
@@ -309,7 +310,7 @@ def api_elements(folder, bbox):
     return out
 
 
-def fetch(cid, proj, pts, force=False):
+def fetch(cid, proj, pts, force=False, api=False):
     """All tiles' elements, each tile cached under tools/cache/osm/<city>_street/.
     Overpass first; a tile it will not serve comes from the main OSM API."""
     folder = ensure_dir(os.path.join(CACHE, 'osm', f'{cid}_street'))
@@ -320,6 +321,8 @@ def fetch(cid, proj, pts, force=False):
         if not (os.path.exists(path) and os.path.getsize(path) > 100) or force:
             data = urllib.parse.urlencode({'data': query(bbox)}).encode()
             try:
+                if api:
+                    raise RuntimeError('--api')
                 log(f'[{cid}] tile {k + 1}/{len(boxes)} {ENDPOINT}')
                 blob = http_get(ENDPOINT, data=data, timeout=240, retries=2)
                 if not blob.lstrip().startswith(b'{'):
@@ -403,7 +406,7 @@ def water_test(out_dir):
     return wet
 
 
-def process_city(cid, force=False):
+def process_city(cid, force=False, api=False):
     city = CITIES[cid]
     out_dir = os.path.join(OUT, cid)
     lat0, lon0 = city['origin']
@@ -411,7 +414,7 @@ def process_city(cid, force=False):
     tj = json.load(open(os.path.join(out_dir, 'track.json')))
     props_path = os.path.join(out_dir, 'props.json')
     props = json.load(open(props_path))
-    items, segments, rings = from_osm(fetch(cid, proj, tj['pts'], force), proj)
+    items, segments, rings = from_osm(fetch(cid, proj, tj['pts'], force, api), proj)
     anchors = [(float(a['x']), float(a['z'])) for a in props.get('landmarks', [])]
     street = place(items, Track(tj['pts'], tj['hw']), Roads(segments), Buildings(rings),
                    keepouts_for(city, proj), anchors, water_test(out_dir))
@@ -426,4 +429,4 @@ def process_city(cid, force=False):
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     for cid in args or ['tirane', 'vlore']:
-        process_city(cid, force='--force' in sys.argv)
+        process_city(cid, force='--force' in sys.argv, api='--api' in sys.argv)

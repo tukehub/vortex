@@ -321,15 +321,19 @@ work. An item below that needs a Forward+-only feature is desktop-only.
     bollards. Nothing stands on the race road (lights and stops step behind
     its kerb, the rest are dropped), in a building, a landmark keepout or
     open water; every item is a mapped node. Run it alone with
-    `python3 tools/pipeline/street_props.py tirane vlore`.
+    `python3 tools/pipeline/street_props.py tirane vlore [--api]`.
     `scripts/world/street_props.gd` (`StreetProps`, built by `Props`) draws
     each kind as a procedural, vertex-coloured mesh under 500 triangles,
     one `MultiMeshInstance3D` per kind per 250 m chunk so the visibility
     range culls by distance (450 / 350 / 160 / 140 / 140 m, capped by
     `Quality.p.props_dist`), without shadows. Low quality and pressure
     stage 2+ keep only lights and stops (`Quality.p.street_small`).
-    Parked-car slots were left out: only the six racers are on the street
-    (2.3). Covered by `tests/street_props` and
+    Tirana carries 48 traffic lights, 30 bus stops, 333 benches, 48 bins
+    and 9 bollards; Vlorë's OSM maps only 18 bus stops and 2 benches near
+    its circuit (no signals), and nothing is invented to fill the gap. The
+    public Overpass servers time out on this region from here; `--api`
+    reads the main OSM API instead. Parked-car slots were left out: only
+    the six racers are on the street (2.3). Covered by `tests/street_props` and
     `tools/pipeline/test_street_props.py`.
 3.5 **Road decals** in `shaders/road.gdshader`: zebra crossings at OSM junction
     nodes, manholes and patches by hash, via a small decal atlas and a uniform

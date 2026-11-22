@@ -20,6 +20,9 @@ const MAX_TRIANGLES := 500
 const RANGE := {"traffic_light": 450.0, "bus_stop": 350.0, "bench": 160.0, "bin": 140.0, "bollard": 140.0}
 
 var counts := {}
+## kind -> [Transform3D] in world space, as placed (headless renderers keep no
+## MultiMesh data to read back).
+var placed := {}
 ## kind -> [MultiMeshInstance3D]
 var chunks := {}
 var meshes := {}
@@ -38,6 +41,7 @@ func build(street: Dictionary, height_at: Callable) -> void:
 	for kind in KINDS:
 		counts[kind] = 0
 		chunks[kind] = []
+		placed[kind] = []
 		var rows: Array = street.get(kind, [])
 		if rows.is_empty():
 			continue
@@ -50,7 +54,9 @@ func build(street: Dictionary, height_at: Callable) -> void:
 			if not buckets.has(key):
 				buckets[key] = []
 			var basis := Basis(Vector3.UP, float(row[2]))
-			buckets[key].append(Transform3D(basis, Vector3(x, float(height_at.call(x, z)), z)))
+			var t := Transform3D(basis, Vector3(x, float(height_at.call(x, z)), z))
+			buckets[key].append(t)
+			placed[kind].append(t)
 		var keys := buckets.keys()
 		keys.sort()
 		for key: Vector2i in keys:

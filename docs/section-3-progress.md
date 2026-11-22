@@ -114,3 +114,24 @@ Do not merge to `main`; the user requested a separate branch.
   after widening the probe; race frames show no probe artefacts. Phone cost
   of the follow probe is unmeasured.
 - **Next: 3.4 street dressing from OSM.**
+
+## Checkpoint: 3.4 street dressing (2026-11-22)
+
+- `tools/pipeline/street_props.py` adds props.json "street" (x, z, yaw per
+  item) from OSM nodes within 250 m of the circuit: traffic lights to the
+  right-hand kerb, bus stops at the kerb facing the road, benches/bins off
+  the carriageway, bollards as mapped. Off the race road, buildings,
+  landmark keepouts and water. 700 m tiles; Overpass first, the main OSM
+  API for a tile it will not serve (`--api` for every tile).
+- Tirana: 48 lights, 30 stops, 333 benches, 48 bins, 9 bollards. Vlorë:
+  18 stops, 2 benches (that is all OSM maps there). Other props.json keys
+  are unchanged.
+- `StreetProps` (built by `Props`): procedural vertex-coloured meshes under
+  500 triangles, one MultiMesh per kind per 250 m chunk, visibility ranges
+  capped by `props_dist`, no shadows; `Quality.p.street_small` drops benches,
+  bins and bollards on low and at pressure stage 2+.
+- **Passed:** `tests/street_props` on Mobile and Forward+,
+  `test_street_props.py`, the full runner. Rendered on lavapipe: shelters,
+  benches and signal masts sit on the pavement at Tirana junctions.
+- Parked-car slots skipped: only the six racers are on the street (2.3).
+- **Next: 3.5 road decals.**

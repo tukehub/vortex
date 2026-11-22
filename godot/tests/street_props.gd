@@ -31,8 +31,12 @@ func _ready() -> void:
 		var total := 0
 		for kind in StreetProps.KINDS:
 			total += (street.get(kind, []) as Array).size()
-		check(total > 50, "%s has mapped street furniture (%d)" % [city_id, total])
-		check((street.get("traffic_light", []) as Array).size() > 0 and (street.get("bus_stop", []) as Array).size() > 0, "%s has traffic lights and bus stops" % city_id)
+		check(total > 0, "%s has mapped street furniture (%d)" % [city_id, total])
+		# What OSM maps near each circuit (nothing is invented): Tirana has
+		# every kind; Vlorë maps bus stops and a few benches, no signals.
+		var expected: Array = StreetProps.KINDS if city_id == "tirane" else ["bus_stop"]
+		for kind in expected:
+			check((street.get(kind, []) as Array).size() > 0, "%s has mapped %s" % [city_id, kind])
 		var track := RaceTrack.load_city(city_id)
 		var tj: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/%s/track.json" % city_id))
 		var clear := float(tj.hw) + 2.0 - 0.05
@@ -62,10 +66,14 @@ func _ready() -> void:
 				drawn += node.multimesh.instance_count
 				check(node.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "street props cast no shadows")
 				check(node.visibility_range_end > 0.0 and node.visibility_range_end <= float(Quality.p.props_dist) + StreetProps.CHUNK * 0.71 + 0.01, "%s chunks cull by range" % kind)
-				var t := node.multimesh.get_instance_transform(0)
-				var at := node.position + t.origin
-				check(absf(at.y - terrain.height_at(at.x, at.z)) < 0.05, "%s stands on the ground" % kind)
 			check(drawn == rows.size(), "%s chunks hold every %s" % [city_id, kind])
+			var placed: Array = furniture.placed[kind]
+			check(placed.size() == rows.size(), "%s places every %s" % [city_id, kind])
+			for i in placed.size():
+				var at: Vector3 = (placed[i] as Transform3D).origin
+				if absf(at.x - float(rows[i][0])) > 0.01 or absf(at.z - float(rows[i][1])) > 0.01 or absf(at.y - terrain.height_at(at.x, at.z)) > 0.01:
+					check(false, "%s %s %d stands where mapped, on the ground" % [city_id, kind, i])
+					break
 		Quality.set_preset("low")
 		for kind in StreetProps.KINDS:
 			for node: MultiMeshInstance3D in furniture.chunks[kind]:
