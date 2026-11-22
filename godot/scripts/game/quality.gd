@@ -121,6 +121,8 @@ func _derive_budget() -> void:
 	p.landmark_probes = 6 if preset == "high" and stage < 2 else 0
 	# Street furniture (3.4): benches, bins and bollards only where there is room.
 	p.street_small = preset != "low" and stage < 2
+	# Supplied prop models (the 5k-triangle traffic light) near the camera.
+	p.street_detail = preset != "low" and stage < 2
 	# Road marks (3.5): crossings always; manholes, gullies and patches not on low.
 	p.road_detail = preset != "low" and stage < 3
 	if stage >= 2:

@@ -322,8 +322,22 @@ work. An item below that needs a Forward+-only feature is desktop-only.
     its kerb, the rest are dropped), in a building, a landmark keepout or
     open water; every item is a mapped node. Run it alone with
     `python3 tools/pipeline/street_props.py tirane vlore [--api]`.
+    Traffic lights are the supplied "Traffic Light - Complex" model (Urban
+    Mini Props Pack - Free: 8 m galvanised pole, 8.7 m mast arm, two
+    yellow-backed heads over the lanes, low heads on the pole, street lamp
+    and camera on top). `tools/build_traffic_light.gd` turns the FBX
+    (kept untracked in `raw_assets/traffic_light/`, like other third-party
+    sources) into `assets/props/traffic_light/traffic_light.res`: quarter
+    turn to the street convention, feet at y = 0, source colours as vertex
+    colours, green lens lit, 44 512 → about 5 600 triangles with Godot's
+    LOD simplifier and crease-angle normals. Within 130 m of the camera
+    each pole draws that model (shadows on high); beyond, and on low
+    quality or pressure stage 2+, a procedural stand-in with the same
+    outline (`Quality.p.street_detail`). Rebuild with
+    `godot --headless --path godot --script tools/build_traffic_light.gd --
+    "raw_assets/traffic_light/Traffic Light - Complex.fbx"`.
     `scripts/world/street_props.gd` (`StreetProps`, built by `Props`) draws
-    each kind as a procedural, vertex-coloured mesh under 500 triangles,
+    the other kinds as procedural, vertex-coloured meshes under 500 triangles,
     one `MultiMeshInstance3D` per kind per 250 m chunk so the visibility
     range culls by distance (450 / 350 / 160 / 140 / 140 m, capped by
     `Quality.p.props_dist`), without shadows. Low quality and pressure

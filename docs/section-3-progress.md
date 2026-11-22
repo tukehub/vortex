@@ -153,3 +153,20 @@ Do not merge to `main`; the user requested a separate branch.
 - **Passed:** `tests/road_marks`, `tests/street_props` (both renderers),
   pipeline unit tests, full runner.
 - **Next: 3.6 facade depth.**
+
+## Checkpoint: supplied traffic-light model (2026-11-23)
+
+- Source: "Traffic Light - Complex" FBX from Urban Mini Props Pack - Free,
+  supplied by the project owner; kept untracked in `raw_assets/` (the repo
+  ignores third-party FBX). Its two referenced Concrete030 textures were not
+  supplied and are not needed.
+- `tools/build_traffic_light.gd`: FBXDocument at runtime, quarter turn
+  (x, y, z) -> (z, y, -x), ground at the pole foot, vertex colours, lenses
+  split by height (green lit), every part rewound (its normals point
+  inward; checked with a cull-off render), weld by position+colour so
+  Godot's LOD generator can simplify (44 512 -> 5 236 + 344 lit), crease
+  normals at 40 degrees.
+- `StreetProps`: per-pole near/far MeshInstance3D pair, switch at 130 m;
+  the procedural far model now matches the outline. Shadows on high.
+- **Licence of the pack not confirmed in the file**; credited in
+  CREDITS.txt by name. Confirm before a store release.

@@ -7,6 +7,10 @@ extends Node3D
 ## MultiMeshInstance3D per CHUNK-metre square, so the visibility range culls
 ## what is out of reach instead of a whole city's worth at once.
 ##
+## Traffic lights are the exception: a supplied model (DETAILED_MESH, built
+## by tools/build_traffic_light.gd) within NEAR_RANGE, the procedural
+## stand-in beyond, one node pair per pole.
+##
 ## Models look down -Z: the pipeline's yaw turns that front toward the road.
 ## Low quality and pressure stage 2+ keep only the lights and stops
 ## (Quality.p.street_small); every range is capped by Quality.p.props_dist.
@@ -18,6 +22,12 @@ const CHUNK := 250.0
 const MAX_TRIANGLES := 500
 ## How far each kind is drawn, before the quality cap.
 const RANGE := {"traffic_light": 450.0, "bus_stop": 350.0, "bench": 160.0, "bin": 140.0, "bollard": 140.0}
+## Kinds drawn from a supplied model near the camera and the procedural
+## stand-in beyond NEAR_RANGE, one node pair per item (few, tall, and seen
+## from far away, so per-item ranges beat 250 m chunks switching at once).
+const DETAILED_MESH := {"traffic_light": "res://assets/props/traffic_light/traffic_light.res"}
+const NEAR_RANGE := 130.0
+const NEAR_MAX_TRIANGLES := 8000
 
 var counts := {}
 ## kind -> [Transform3D] in world space, as placed (headless renderers keep no
@@ -25,7 +35,10 @@ var counts := {}
 var placed := {}
 ## kind -> [MultiMeshInstance3D]
 var chunks := {}
+## kind -> [{"near": MeshInstance3D, "far": MeshInstance3D}] for DETAILED_MESH kinds.
+var detailed := {}
 var meshes := {}
+var near_meshes := {}
 var _body: StandardMaterial3D
 var _glass: StandardMaterial3D
 var _lamp: StandardMaterial3D
@@ -46,6 +59,10 @@ func build(street: Dictionary, height_at: Callable) -> void:
 		if rows.is_empty():
 			continue
 		meshes[kind] = make_mesh(kind)
+		if DETAILED_MESH.has(kind) and ResourceLoader.exists(DETAILED_MESH[kind]):
+			near_meshes[kind] = load(DETAILED_MESH[kind])
+			_build_detailed(kind, rows, height_at)
+			continue
 		var buckets := {}
 		for row in rows:
 			var x := float(row[0])
@@ -84,6 +101,27 @@ func build(street: Dictionary, height_at: Callable) -> void:
 	_apply_budget()
 
 
+func _build_detailed(kind: String, rows: Array, height_at: Callable) -> void:
+	detailed[kind] = []
+	for i in rows.size():
+		var row: Array = rows[i]
+		var x := float(row[0])
+		var z := float(row[1])
+		var t := Transform3D(Basis(Vector3.UP, float(row[2])), Vector3(x, float(height_at.call(x, z)), z))
+		placed[kind].append(t)
+		var pair := {}
+		for which in ["near", "far"]:
+			var node := MeshInstance3D.new()
+			node.name = "%s_%d_%s" % [kind, i, which]
+			node.mesh = near_meshes[kind] if which == "near" else meshes[kind]
+			node.transform = t
+			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(node)
+			pair[which] = node
+		detailed[kind].append(pair)
+	counts[kind] = rows.size()
+
+
 func _apply_budget() -> void:
 	var cap := float(Quality.p.props_dist)
 	var small := bool(Quality.p.get("street_small", true))
@@ -95,6 +133,23 @@ func _apply_budget() -> void:
 			node.visible = shown
 			node.visibility_range_end = reach
 			node.visibility_range_end_margin = 30.0
+	# The supplied model within NEAR_RANGE, the stand-in beyond it; low quality
+	# and pressure stage 2+ draw the stand-in all the way.
+	var near_ok := bool(Quality.p.get("street_detail", true))
+	var shadows := bool(Quality.p.get("car_shadows", false))
+	for kind in detailed:
+		var far_end := minf(float(RANGE[kind]), cap)
+		for pair: Dictionary in detailed[kind]:
+			var near: MeshInstance3D = pair.near
+			var far: MeshInstance3D = pair.far
+			near.visible = near_ok
+			near.visibility_range_end = NEAR_RANGE
+			near.visibility_range_end_margin = 8.0
+			near.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			far.visibility_range_begin = NEAR_RANGE if near_ok else 0.0
+			far.visibility_range_begin_margin = 8.0
+			far.visibility_range_end = far_end
+			far.visibility_range_end_margin = 30.0
 
 
 func _make_materials() -> void:
@@ -138,21 +193,25 @@ func make_mesh(kind: String) -> ArrayMesh:
 	var steel := Color(0.22, 0.24, 0.26)
 	match kind:
 		"traffic_light":
-			# Pole on the kerb, mast arm out over the road (+X), head facing -Z.
-			# The overhead head hangs ~4.8 m clear, 4.3 m out over the lanes.
-			_cyl(body, Vector3(0, 0, 0), 0.1, 6.1, 8, steel)
-			Props._box(body, Vector3(2.3, 5.9, 0), Vector3(4.6, 0.12, 0.12), steel)
-			Props._box(body, Vector3(0.6, 5.55, 0), Vector3(1.2, 0.06, 0.06), steel)
-			Props._box(body, Vector3(4.3, 5.3, 0), Vector3(0.36, 1.0, 0.3), Color(0.08, 0.08, 0.09))
-			Props._box(body, Vector3(4.3, 5.3, 0.02), Vector3(0.5, 1.12, 0.04), Color(0.9, 0.8, 0.12))
-			# A low head for the kerb lane, on the pole itself.
-			Props._box(body, Vector3(0, 2.55, -0.18), Vector3(0.3, 0.86, 0.26), Color(0.08, 0.08, 0.09))
-			Props._box(body, Vector3(4.3, 5.6, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.06, 0.05))
-			Props._box(body, Vector3(4.3, 5.3, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.25, 0.05))
-			Props._box(body, Vector3(0, 2.8, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.35, 0.06, 0.05))
-			Props._box(body, Vector3(0, 2.55, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.35, 0.25, 0.05))
-			Props._box(extra, Vector3(4.3, 5.0, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.02, 0.55, 0.22))
-			Props._box(extra, Vector3(0, 2.3, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.02, 0.55, 0.22))
+			# The far stand-in for DETAILED_MESH (tools/build_traffic_light.gd):
+			# its outline at the same size. Pole on the kerb, mast arm out over
+			# the road (+X) at 6.3 m, two yellow-backed heads facing -Z with
+			# about 5 m clearance, a low head on the pole, a street lamp on top.
+			var galv := Color(0.46, 0.48, 0.5)
+			var yellow := Color(0.66, 0.53, 0.0)
+			var dark := Color(0.06, 0.06, 0.065)
+			_cyl(body, Vector3.ZERO, 0.13, 8.0, 8, galv)
+			Props._box(body, Vector3(4.35, 6.35, 0), Vector3(8.7, 0.14, 0.14), galv)
+			Props._box(body, Vector3(1.5, 7.9, 0), Vector3(3.0, 0.08, 0.08), galv)
+			Props._box(body, Vector3(3.05, 7.82, 0), Vector3(0.6, 0.1, 0.25), dark)
+			for head in [Vector3(4.74, 5.55, 0), Vector3(8.17, 5.73, 0)]:
+				Props._box(body, head + Vector3(0, 0, 0.12), Vector3(0.6, 1.1, 0.04), yellow)
+				Props._box(body, head, Vector3(0.36, 0.95, 0.22), dark)
+				Props._box(body, head + Vector3(0, 0.3, -0.12), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.06, 0.05))
+				Props._box(body, head + Vector3(0, 0.0, -0.12), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.25, 0.05))
+				Props._box(extra, head + Vector3(0, -0.3, -0.12), Vector3(0.2, 0.2, 0.03), Color(0.02, 0.55, 0.22))
+			Props._box(body, Vector3(0, 3.4, -0.2), Vector3(0.3, 0.85, 0.24), dark)
+			Props._box(extra, Vector3(0, 3.15, -0.33), Vector3(0.16, 0.16, 0.03), Color(0.02, 0.55, 0.22))
 			extra_mat = _lamp
 		"bus_stop":
 			# Shelter open toward the road (-Z): roof, back and side glass,
