@@ -9,6 +9,11 @@ var page := "title"
 var back_to := "title"
 var garage_car: CarVisual
 var garage_pivot: Node3D
+var garage_env: Environment
+var garage_probe: ReflectionProbe
+const GARAGE_HDRI := "res://assets/hdri/sky_dusk.hdr"
+const GARAGE_SKY_ENERGY := 0.4
+const GARAGE_FLOOR_ROUGHNESS := 0.12
 const NO_POINTER := -2
 const MOUSE_POINTER := -1
 var _garage_pointer := NO_POINTER
@@ -76,19 +81,41 @@ func _ready() -> void:
 func _build_garage() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color("273445")
+	# An HDRI behind the car (3.3) instead of a flat colour: it is what the
+	# paint, glass and the glossy floor reflect.
+	e.background_mode = Environment.BG_SKY
+	var sky := Sky.new()
+	var pano := PanoramaSkyMaterial.new()
+	pano.panorama = load(GARAGE_HDRI)
+	pano.energy_multiplier = GARAGE_SKY_ENERGY
+	sky.sky_material = pano
+	sky.radiance_size = Sky.RADIANCE_SIZE_128 if Quality.preset == "low" else Sky.RADIANCE_SIZE_256
+	e.sky = sky
+	e.sky_rotation = Vector3(0.0, deg_to_rad(-100.0), 0.0)
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.78, 0.85, 1.0)
-	e.ambient_light_energy = 0.95
+	e.ambient_light_energy = 0.8
 	e.tonemap_mode = Environment.TONE_MAPPER_ACES
 	e.glow_enabled = true
 	e.glow_intensity = 0.5
 	e.glow_bloom = 0.1
 	e.glow_hdr_threshold = 1.1
 	e.ssao_enabled = bool(Quality.p.ssao)
+	# Forward+ only (Quality.p): the floor mirrors the car itself.
+	e.ssr_enabled = bool(Quality.p.ssr)
+	e.ssr_max_steps = int(Quality.p.ssr_steps)
+	# The floor's far edge melts into the sky's horizon.
+	e.fog_enabled = true
+	e.fog_mode = Environment.FOG_MODE_DEPTH
+	e.fog_light_color = Color("273445")
+	e.fog_aerial_perspective = 1.0
+	e.fog_depth_begin = 16.0
+	e.fog_depth_end = 40.0
+	e.fog_sky_affect = 0.0
 	env.environment = e
 	add_child(env)
+	garage_env = e
 	var key := DirectionalLight3D.new()
 	key.rotation_degrees = Vector3(-42, 35, 0)
 	key.light_energy = 2.7
@@ -108,15 +135,32 @@ func _build_garage() -> void:
 	fill.omni_range = 14.0
 	add_child(fill)
 	var ground := MeshInstance3D.new()
+	ground.name = "GarageFloor"
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(40, 40)
+	pm.size = Vector2(1200, 1200)
 	ground.mesh = pm
 	var fm := StandardMaterial3D.new()
-	fm.albedo_color = Color(0.22, 0.27, 0.33)
-	fm.roughness = 0.25
-	fm.metallic = 0.3
+	fm.albedo_color = Color(0.09, 0.11, 0.14)
+	fm.roughness = GARAGE_FLOOR_ROUGHNESS
+	fm.metallic = 0.0
+	fm.metallic_specular = 0.5
 	ground.material_override = fm
 	add_child(ground)
+	# One box-projected probe around the car: lights, floor and sky, never
+	# the car (it turns, and a frozen copy would turn with it).
+	garage_probe = ReflectionProbe.new()
+	garage_probe.name = "GarageProbe"
+	garage_probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	garage_probe.size = Vector3(90.0, 14.0, 90.0)
+	garage_probe.blend_distance = 30.0
+	garage_probe.origin_offset = Vector3(0.0, -5.0, 0.0)
+	garage_probe.position = Vector3(0.0, 6.2, 0.0)
+	garage_probe.box_projection = true
+	garage_probe.cull_mask = RaceReflections.PROBE_MASK
+	garage_probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	garage_probe.enable_shadows = false
+	garage_probe.visible = Quality.preset != "low"
+	add_child(garage_probe)
 	garage_pivot = Node3D.new()
 	garage_pivot.rotation.y = deg_to_rad(-122.0)
 	garage_pivot.position.x = 4.0
@@ -139,6 +183,7 @@ func _set_garage_car(id: String) -> void:
 	garage_pivot.add_child(garage_car)
 	garage_car.setup(def, Color.html(def.color), false, {"rim": garage_choice("rim"), "livery": garage_choice("livery")})
 	garage_car.set_night(0.0)
+	RaceReflections.hide_from_probes(garage_car)
 	for nm in garage_car.wheels:
 		var wheel: MeshInstance3D = garage_car.wheels[nm]
 		wheel.rotation.y = PI if String(nm).ends_with("l") else 0.0

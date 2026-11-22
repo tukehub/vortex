@@ -295,10 +295,22 @@ work. An item below that needs a Forward+-only feature is desktop-only.
     `scripts/game/fx_visual.gd` with caps in `POOL_CAPS`); fullscreen
     `shaders/speed_post.gdshader` (radial blur, vignette, slight chroma) driven
     by speed ratio and nitro, disabled on low.
-3.3 **Reflections:** one `ReflectionProbe` following the player (medium+),
-    static probes at landmarks on high; garage in `scripts/ui/menu.gd` gets an
-    HDRI background, a probe and a glossy floor. Lower the flat ambient floor in
-    `scripts/world/sky_env.gd`.
+3.3 **Reflections — implemented** (see [checkpoints](docs/section-3-progress.md)).
+    `scripts/world/reflections.gd` (`RaceReflections`): on medium and high
+    one `UPDATE_ONCE` probe follows the player, jumping half a step ahead
+    every `Quality.p.probe_step` metres (45 / 30), so Godot re-renders it
+    one cube face a frame only after a jump; high adds up to six static,
+    box-projected probes beside the landmarks nearest the road
+    (`Quality.p.landmark_probes`). Together they stay under Mobile's eight
+    probes per mesh (`Quality.REFLECTION_PROBES_PER_MESH`); pressure stage 2
+    drops the landmark probes, stage 3 the follow probe. Cars are on
+    `PLAYER_LAYER` / `CAR_LAYER`, outside the probes' cull mask, so nobody
+    is frozen into a reflection. The garage has the dusk HDRI behind the
+    car, a box-projected probe that ignores the turning car, a glossy floor
+    fading into fog, and SSR where Forward+ draws it. With a probe the flat
+    ambient fill drops 15% (floors 0.36 day / 0.42 night, was 0.45 / 0.48;
+    `SkyEnv.ambient_energy`); low keeps the old fill. Covered by
+    `tests/reflections` on both renderers. Phone cost unmeasured.
 3.4 **Street dressing from OSM:** the pipeline emits traffic lights, bus stops,
     benches, bins, bollards and parked-car slots into `props.json`;
     `scripts/world/props.gd` draws each kind as one `MultiMeshInstance3D` with

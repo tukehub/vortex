@@ -92,3 +92,25 @@ Do not merge to `main`; the user requested a separate branch.
   probes on high, HDRI/probe garage and ambient-floor adjustment. Read
   `sky_env.gd`, `menu.gd`, `race_scene.gd` and the renderer-budget tests first.
   Items 3.3–3.8 remain pending; no phone performance claim or release was made.
+
+## Checkpoint: 3.3 reflections (2026-11-22)
+
+- `scripts/world/reflections.gd` (`RaceReflections`): one `UPDATE_ONCE`
+  follow probe on medium/high that jumps half a `Quality.p.probe_step`
+  (45 m medium, 30 m high) ahead of the player, so it re-renders one cube
+  face a frame only after a jump; up to six static box-projected landmark
+  probes on unpressured high. `Quality.REFLECTION_PROBES_PER_MESH` (8)
+  bounds both. Pressure stage 2 drops landmark probes, stage 3 the follow
+  probe. Budget changes toggle the same probes; restart keeps them.
+- Cars live on `PLAYER_LAYER` / `CAR_LAYER`, outside `PROBE_MASK`; the race
+  camera and the mirror still draw them.
+- `SkyEnv.ambient_energy`: with a probe the flat fill is 85% of the preset,
+  floors 0.36 day / 0.42 night; low keeps 0.45 / 0.48.
+- Garage: dusk HDRI (energy 0.4), box-projected probe (90×14×90, blend 30)
+  that skips the turning car, glossy non-metallic floor out to the horizon,
+  aerial-perspective fog, SSR when Forward+ draws it.
+- **Passed:** `tests/reflections` on Mobile and Forward+ (headless) and the
+  full runner. Rendered on lavapipe (Mobile and Forward+): garage seam-free
+  after widening the probe; race frames show no probe artefacts. Phone cost
+  of the follow probe is unmeasured.
+- **Next: 3.4 street dressing from OSM.**

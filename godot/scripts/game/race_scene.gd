@@ -32,6 +32,7 @@ var input: RaceInput
 var effects: FxVisual
 var buildings: Buildings
 var props: Props
+var reflections: RaceReflections
 var pine_forest: Node3D
 var side_roads: Node3D
 var scenery_visible := true
@@ -209,6 +210,10 @@ func _build_world() -> void:
 	add_child(props)
 	props.load_city(city_id, terrain)
 	props.set_night(sky.night)
+	reflections = RaceReflections.new()
+	reflections.name = "Reflections"
+	add_child(reflections)
+	reflections.build_landmarks(track, props.landmarks)
 	pine_forest = get_node_or_null("PineForest") as Node3D
 	_setup_pines()
 	terrain.set_env(sky.wet, 0.0, sky.night)
@@ -314,6 +319,8 @@ func _build_race_visuals() -> void:
 		cv.setup(c.def, (Color.html(c.def.color) if c.is_player else c.color), c == player, Game.cosmetics() if c == player else {})
 		cv.set_night(sky.night)
 		cv.apply_state(c, track, DT)
+		if c != player:
+			RaceReflections.hide_from_probes(cv)
 		cars.append(cv)
 		_previous_poses.append(RenderPose.capture(c))
 	pickups = PickupVisual.new()
@@ -718,6 +725,7 @@ func _process(dt: float) -> void:
 	views.update_pose(player, view_pose, dt)
 	speed_feedback.update(player, state == "race", dt)
 	sky.follow(cam.global_position)
+	reflections.update_focus(track.pos(player.s, player.d), track.tangent(player.s))
 	if sky.wet > 0.01:
 		sky.set_rain_ground(track.pos(player.s, player.d), track.tangent(player.s))
 	Sfx.listener_pos = cam.global_position

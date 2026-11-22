@@ -22,6 +22,9 @@ const FORWARD_PLUS_ONLY: Array[String] = ["ssao", "sdfgi", "ssr", "vol_fog", "su
 const OMNI_LIGHTS_PER_MESH := 8
 const SPOT_LIGHTS_PER_MESH := 8
 const MESH_OMNI_SHARE := {"lamp_lights": 6, "fx_light_limit": 2}
+## Mobile and Compatibility also blend at most eight reflection probes into one
+## mesh: the follow probe plus the landmark probes must fit (3.3).
+const REFLECTION_PROBES_PER_MESH := 8
 
 const PRESETS := {
 	"low": {
@@ -110,6 +113,12 @@ func _derive_budget() -> void:
 	p.fx_sparks = stage < 2 and preset != "low"
 	p.lamp_lights = mini(int(p.lamp_lights), [14, 6, 3, 2][stage])
 	p.shadow_dist = maxf(50.0, float(p.shadow_dist) * (1.0 - stage * 0.15))
+	# Reflections (3.3): one probe follows the player on medium and high and
+	# re-renders (one cube face a frame) after every `probe_step` metres;
+	# high adds static probes at the landmarks nearest the road.
+	p.probe = bool(p.probe) and stage < 3
+	p.probe_step = 30.0 if preset == "high" else 45.0
+	p.landmark_probes = 6 if preset == "high" and stage < 2 else 0
 	if stage >= 2:
 		p.msaa = Viewport.MSAA_DISABLED
 		p.fxaa = true
@@ -153,7 +162,8 @@ func snapshot() -> Dictionary:
 		"rain_density": p.rain_density, "mirror_interval": p.mirror_interval,
 		"mirror_width": p.mirror_width, "fx_light_limit": p.fx_light_limit,
 		"lamp_lights": p.lamp_lights, "renderer": renderer}, true)
-	result.merge({"paint_flakes": p.paint_flakes, "speed_post": p.speed_post, "driving_cars": p.driving_cars})
+	result.merge({"paint_flakes": p.paint_flakes, "speed_post": p.speed_post, "driving_cars": p.driving_cars,
+		"probe": p.probe, "landmark_probes": p.landmark_probes})
 	# What the renderer was really asked to draw, for PROFILE comparisons.
 	for key in FORWARD_PLUS_ONLY:
 		result[key] = bool(p[key])

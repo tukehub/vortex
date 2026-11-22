@@ -23,6 +23,7 @@ var env_id := "day"
 var preset: Dictionary
 var wet := 0.0
 var night := 0.0
+var _is_night := false
 
 
 func _ready() -> void:
@@ -37,7 +38,19 @@ func _ready() -> void:
 	Quality.budget_changed.connect(_apply_quality)
 
 
+## The flat ambient fill. Preserve phone visibility at night, but let daytime
+## presets retain shade and surface detail instead of lifting every surface
+## toward white. Where a reflection probe lights glossy surfaces with the
+## street around them (3.3), the flat fill drops 15% and its floor with it.
+static func ambient_energy(preset_ambient: float, is_night: bool, probe: bool) -> float:
+	if probe:
+		return maxf(preset_ambient * 0.85, 0.42 if is_night else 0.36)
+	return maxf(preset_ambient, 0.48 if is_night else 0.45)
+
+
 func _apply_quality() -> void:
+	if not preset.is_empty() and _transition >= 1.0:
+		env.ambient_light_energy = ambient_energy(float(preset.ambient), _is_night, bool(Quality.p.probe))
 	Quality.apply_env(env, wet > 0.05)
 	env.volumetric_fog_enabled = env.volumetric_fog_enabled and night > 0.3
 	Quality.apply_sun(sun)
@@ -79,10 +92,8 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.64, 0.70, 0.80) if is_night else Color(0.78, 0.82, 0.88)
 	env.ambient_light_sky_contribution = 0.25
-	# Preserve phone visibility at night, but let daytime presets retain shade
-	# and surface detail instead of lifting every surface toward white.
-	var ambient_floor := 0.48 if is_night else 0.45
-	env.ambient_light_energy = maxf(float(preset.ambient), ambient_floor)
+	_is_night = is_night
+	env.ambient_light_energy = ambient_energy(float(preset.ambient), is_night, bool(Quality.p.probe))
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 
 	# tonemap + exposure
