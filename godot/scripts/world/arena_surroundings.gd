@@ -1,10 +1,8 @@
 class_name ArenaSurroundings
 extends Node3D
-## What stands around the points-mode square: the race's Tirana landmarks in
-## their real bearings from the statue, grandstands (CrowdSpawner fills them),
-## flags, lamps and trees. Everything sits outside the wall and the chase
-## camera's reach; repeated things are MultiMeshes so phones pay a handful of
-## draw calls for the crowd, flags, lamps and trees together.
+## Each city's landmarks keep their bearings from the central monument.
+## Grandstands, flags, lamps and trees sit outside the wall and clear of the
+## chase camera. Repeated scenery uses MultiMeshes to limit draw calls.
 
 const FLAG_SHADER := preload("res://shaders/flag_wave.gdshader")
 ## Landmarks of the race's Tirana that stand around Skanderbeg Square.
@@ -28,31 +26,42 @@ var rng := RandomNumberGenerator.new()
 var placed_landmarks: Array = []    # [{id, position, radius}]
 
 
-func build(half_x: float, half_z: float, corner: float) -> void:
+func build(half_x: float, half_z: float, corner: float, city_id := "tirane") -> void:
 	rng.seed = 7071912                # same square every round
-	_landmarks(half_x, half_z)
+	_landmarks(half_x, half_z, city_id)
 	var stands := stand_segments(half_x, half_z, corner)
 	_stands(stands)
 	_flags_and_lamps(stands)
-	_trees(half_x, half_z)
+	_trees(half_x, half_z, city_id)
+	if city_id == "vlore":
+		var entries := []
+		for side in [-1.0, 1.0]:
+			for index in range(-3, 4):
+				entries.append([index * 27.0, 0.0, side * (half_z + 23.0), rng.randf_range(1.1, 1.45), rng.randf() * TAU])
+		var palms := Palms.new()
+		add_child(palms)
+		palms.build(entries)
 
 
 # ------------------------------------------------------------------ landmarks
-func _landmarks(half_x: float, half_z: float) -> void:
-	var path := "res://assets/cities/tirane/props.json"
+func _landmarks(half_x: float, half_z: float, city_id: String) -> void:
+	var path := "res://assets/cities/%s/props.json" % city_id
 	if not FileAccess.file_exists(path):
 		return
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var by_id := {}
 	for anchor in data.get("landmarks", []):
 		by_id[str(anchor.id)] = anchor
-	if not by_id.has("skanderbeg"):
+	var centre_id := "independence" if city_id == "vlore" else "skanderbeg"
+	if not by_id.has(centre_id):
 		return
-	var centre: Dictionary = by_id.skanderbeg
-	var turn := deg_to_rad(LAYOUT_TURN)
+	var centre: Dictionary = by_id[centre_id]
+	var yaw_offset := IndependenceMonument.ARENA_YAW - float(centre.yaw) if city_id == "vlore" else LAYOUT_TURN
+	var turn := deg_to_rad(yaw_offset)
 	var anchors := []
 	var cluster_push := {}            # the clock tower follows its mosque
-	for id in LANDMARK_IDS:
+	var ids := ["muradie_mosque", "vlora_house", "flagpole_big"] if city_id == "vlore" else LANDMARK_IDS
+	for id in ids:
 		if not by_id.has(id):
 			continue
 		var a: Dictionary = by_id[id]
@@ -64,12 +73,37 @@ func _landmarks(half_x: float, half_z: float) -> void:
 		else:
 			pos = _clear_of_square(offset, radius, half_x + LANDMARK_CLEARANCE, half_z + LANDMARK_CLEARANCE)
 			cluster_push[id] = pos - offset
-		anchors.append({"id": id, "x": pos.x, "y": 0.0, "z": pos.y, "yaw": float(a.get("yaw", 0.0)) + LAYOUT_TURN})
+		anchors.append({"id": id, "x": pos.x, "y": 0.0, "z": pos.y, "yaw": float(a.get("yaw", 0.0)) + yaw_offset})
 		placed_landmarks.append({"id": id, "position": pos, "radius": radius})
 	var models := Landmarks.new()
 	models.name = "Landmarks"
 	add_child(models)
 	models.load_anchors(anchors)
+	if city_id == "vlore":
+		_vlore_backdrop(centre, turn, Vector2(half_x, half_z))
+
+
+## Keep mapped city blocks behind the arena park. Cull whole chunks so a cut
+## through a roof or facade cannot appear beside the playing boundary.
+func _vlore_backdrop(centre: Dictionary, turn: float, half_size: Vector2) -> void:
+	var city := Buildings.new()
+	city.name = "VloreSkyline"
+	add_child(city)
+	city.rotation.y = turn
+	city.position = -(city.transform.basis * Vector3(centre.x, centre.y, centre.z))
+	city.load_city("vlore")
+	var park := Rect2(-half_size, half_size * 2.0).grow(LANDMARK_CLEARANCE)
+	var skyline := park.grow(370.0)
+	for chunk in city.chunk_nodes.duplicate():
+		var bounds: AABB = chunk.global_transform * chunk.get_aabb()
+		var footprint := Rect2(bounds.position.x, bounds.position.z, bounds.size.x, bounds.size.z)
+		if park.intersects(footprint) or not skyline.intersects(footprint):
+			city.chunk_nodes.erase(chunk)
+			chunk.free()
+		else:
+			# The arena is level while the source blocks rest on surveyed terrain.
+			chunk.position.y -= maxf(0.0, bounds.position.y)
+
 
 
 ## Slides a footprint outward along its bearing until it clears the rectangle.
@@ -241,7 +275,7 @@ func _multimesh(node_name: String, mesh: Mesh, transforms: Array[Transform3D], p
 
 
 # ------------------------------------------------------------------ trees
-func _trees(half_x: float, half_z: float) -> void:
+func _trees(half_x: float, half_z: float, city_id: String) -> void:
 	var props := Props.new()
 	var mesh: Mesh = props._tree_meshes()[0]
 	props.free()
@@ -268,7 +302,12 @@ func _trees(half_x: float, half_z: float) -> void:
 				break
 		if blocked:
 			continue
-		var size := rng.randf_range(0.85, 1.2)
+		var size := rng.randf_range(1.6, 2.6) if city_id == "vlore" else rng.randf_range(0.85, 1.2)
 		var jitter := Vector3(rng.randf_range(-2.0, 2.0), 0.0, rng.randf_range(-2.0, 2.0))
 		transforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * size), Vector3(p.x, 0.0, p.y) + jitter))
+		if city_id == "vlore":
+			# Set a second, staggered canopy behind the mature trees around Flag Square.
+			var rear := Vector3(p.x, 0, p.y)
+			rear += rear.normalized() * 10.0 + Vector3(-jitter.z, 0, jitter.x) * 3.0
+			transforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * size * 1.15), rear))
 	_multimesh("Trees", mesh, transforms)

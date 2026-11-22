@@ -6,6 +6,14 @@ extends RefCounted
 
 const FANS := {"eagle": 100, "bolt": 35, "barge": 50, "mine": 60, "shock": 70, "wreck": 150, "place": 15, "intercept": 40}
 const BOT_ASSIST := 1.4
+const RACE_ACCEL_MULT := 1.08
+const BRAKE_DECEL := 11.5
+const BRAKE_RESPONSE := 8.0
+const DRIFT_GRIP_BONUS := 0.35
+const RACE_RESTITUTION := 0.08
+const WALL_SCRAPE_FREE_SPEED := 3.0
+const WALL_DRAG_GAIN := 1.2
+const WALL_MAX_DRAG := 18.0
 const PickupDirector = preload("res://scripts/sim/pickup_director.gd")
 const CombatRules = preload("res://scripts/sim/combat_rules.gd")
 
@@ -468,9 +476,9 @@ func physics(c: CarState, dt: float) -> void:
 		vmax *= 0.55
 	if c.health < c.max_hp * 0.25:
 		vmax *= 0.95
-	var acc: float = def.acc * (2.1 if c.nitro_t > 0.0 else 1.0)
+	var acc: float = def.acc * RACE_ACCEL_MULT * (2.1 if c.nitro_t > 0.0 else 1.0)
 	# Ramp pressure so braking takes effect progressively rather than as a jolt.
-	c.brake_force = move_toward(c.brake_force, 1.0 if brake else 0.0, dt * 5.0)
+	c.brake_force = move_toward(c.brake_force, 1.0 if brake else 0.0, BRAKE_RESPONSE * dt)
 	var drifting := brake and absf(c.steer) > 0.35 and c.v > 18.0
 	c.drift = minf(1.0, c.drift + dt * 4.0) if drifting else maxf(0.0, c.drift - dt * 3.0)
 	c.braking = brake and (not drifting or human_driver) and c.v > 1.0
@@ -496,7 +504,7 @@ func physics(c: CarState, dt: float) -> void:
 			else:
 				c.v -= 4.5 * dt
 		elif c.v > 0.5:
-			c.v = maxf(0.0, c.v - 9.0 * c.brake_force * dt)
+			c.v = maxf(0.0, c.v - BRAKE_DECEL * c.brake_force * dt)
 		elif started:
 			c.v = maxf(-9.0, c.v - 10.0 * dt)
 	if c.v > vmax * 1.02 and c.nitro_t <= 0.0:
@@ -529,7 +537,7 @@ func physics(c: CarState, dt: float) -> void:
 	# keeping the existing speed and lateral-displacement bounds intact.
 	var grip_accel := 29.0 if human_driver else 22.0
 	var human := c.is_player and not c.autopilot
-	var drift_grip := 0.5 * (float(handling.drift_grip) if human else 1.0)
+	var drift_grip := DRIFT_GRIP_BONUS * (float(handling.drift_grip) if human else 1.0)
 	var a_lat: float = def.grip * grip_accel * (1.0 + c.drift * drift_grip) * (1.8 if c.hbrake_t > 0.0 else 1.0) * (0.93 if wet else 1.0)
 	var c_max := minf(0.12, a_lat / (av * av))
 	var cc := c.steer * c_max
@@ -539,7 +547,7 @@ func physics(c: CarState, dt: float) -> void:
 	var dsdt := v * cos(c.yaw) / maxf(0.8, 1.0 - k * c.d)
 	var asst: float
 	if human:
-		asst = (UNASSISTED_STEERING_DAMPING if near_finish else assist) * float(handling.assist) * (1.5 if absf(c.steer) < 0.05 else 1.0)
+		asst = assist * float(handling.assist) * (1.5 if absf(c.steer) < 0.05 else 1.0)
 	else:
 		asst = BOT_ASSIST
 	c.yaw += (cc * v - k * dsdt - asst * c.yaw * minf(1.0, av / 10.0)) * dt
@@ -610,7 +618,8 @@ func physics(c: CarState, dt: float) -> void:
 			# Slide along the barrier instead of reflecting the heading and
 			# lateral velocity in a single fixed tick. Bound drag per second so
 			# sustained contact cannot repeatedly apply a full collision impulse.
-			c.v = move_toward(c.v, 0.0, minf(14.0, into * 1.2) * dt)
+			var wall_drag := clampf((into - WALL_SCRAPE_FREE_SPEED) * WALL_DRAG_GAIN, 0.0, WALL_MAX_DRAG)
+			c.v = move_toward(c.v, 0.0, wall_drag * dt)
 			if v * sin(c.yaw) * sd > 0.0:
 				c.yaw = move_toward(c.yaw, 0.0, 2.0 * dt)
 			if c.lat_v * sd > 0.0:
@@ -731,8 +740,11 @@ func collisions(dt: float = 1.0 / 60.0) -> void:
 				var rear := a if front == b else b
 				var dv := rear.v - front.v
 				if dv > 0.0:
-					rear.v -= dv * (0.55 * front.def.mass / tot + 0.2)
-					front.v += dv * 0.45 * rear.def.mass / tot
+					var rear_mass: float = rear.def.mass
+					var front_mass: float = front.def.mass
+					var impulse := (1.0 + RACE_RESTITUTION) * dv / (1.0 / rear_mass + 1.0 / front_mass)
+					rear.v -= impulse / rear_mass
+					front.v += impulse / front_mass
 					if dv > 14.0:
 						damage(rear, (dv - 14.0) * 0.6, front, "bump", Vector2(0.0, -1.0))
 						damage(front, (dv - 14.0) * 0.4, rear, "bump", Vector2(0.0, 1.0))

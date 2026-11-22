@@ -31,6 +31,7 @@ func _ready() -> void:
 	var saved_input := Settings.input_config()
 	Settings.load_input_config({"touch_steer": true, "auto_accel": true, "left_handed": false, "control_size": 1, "control_offset_x": 0.0, "control_offset_y": 0.0})
 	Game.race_opts.mode = "race"
+	Game.race_opts.city = "tirane"
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	await wait_scene("menu")
@@ -183,6 +184,56 @@ func _ready() -> void:
 	menu = Game._root.get_child(0)
 	check(menu._mode.text == "Mënyra: Pikë · 3 min" or menu._mode.text == "Mënyra: Pikë · 2 min", "the menu remembers the mode for the session")
 
+	# Both round lengths share the unlocked city's arena, including rematches.
+	menu.show_page("race")
+	var saved_cities := Progress.cities.duplicate()
+	var saved_stars := Progress.cup_stars.duplicate()
+	Progress.cities.erase("vlore")
+	Progress.cup_stars.clear()
+	menu.step_city(1)
+	check(menu.race_city() == "vlore" and menu._play.disabled, "Vlore points uses the city unlock")
+	menu.step_city(1)
+	check(menu.race_city() == "tirane", "points cycles only through the two playable squares")
+	Progress.cup_stars = {"tirana_0": 2, "tirana_1": 2}
+	menu.step_city(1)
+	menu._mode.pressed.emit()
+	check(not menu._play.disabled and menu._city_note.text.contains("Sheshi i Flamurit"), "the unlocked square is named before starting")
+	check(Game._loading_info("arena").contains("Sheshi i Flamurit"), "the loading screen names Flag Square")
+	menu._play.pressed.emit()
+	await wait_scene("arena")
+	scene = Game._root.get_child(0)
+	check(scene.statue is IndependenceMonument and scene.statue.position.slide(Vector3.UP).is_zero_approx(), "the Independence Monument occupies the central island")
+	check(scene.statue.has_node("MonumentDate") and scene.statue.has_node("MonumentBronze") and scene.get_node_or_null("Skanderbeg") == null, "the Vlore monument carries its inscription")
+	check(scene.get_node("Surroundings/Landmarks").has_node("muradie_mosque"), "Vlore landmarks surround the arena")
+	var skyline: Buildings = scene.get_node("Surroundings/VloreSkyline")
+	check(not skyline.chunk_nodes.is_empty(), "mapped Vlore buildings appear behind the park")
+	var playing_area := Rect2(-Arena.HALF_X, -Arena.HALF_Z, Arena.HALF_X * 2, Arena.HALF_Z * 2)
+	for block in skyline.chunk_nodes:
+		var bounds: AABB = block.global_transform * block.get_aabb()
+		check(not playing_area.intersects(Rect2(bounds.position.x, bounds.position.z, bounds.size.x, bounds.size.z)), "skyline clears the driving area")
+	check(scene.arena.time_limit == 180.0 and scene.pads.size() == Arena.PADS.size(), "three-minute Vlore round has all pickup pads")
+	scene.set_process(false)
+	scene.player.autopilot = true
+	for i in 360:
+		scene._process(ArenaScene.DT)
+	check(scene.arena.started and scene.arena.time > 1.0, "the Vlore countdown releases the cars")
+	for c in scene.arena.cars:
+		check(c.at().length() >= Arena.ISLAND, "the arena cars stay outside the monument")
+	scene.arena.time = scene.arena.time_limit - ArenaScene.DT
+	for i in 300:
+		scene._process(ArenaScene.DT)
+		if scene.state == "results":
+			break
+	await wait_scene("results")
+	results = Game._root.get_child(0)
+	texts = results.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(Game.last_result.city == "vlore" and texts.has("SHESHI I FLAMURIT · PIKË"), "Vlore results name the correct square")
+	button(results, "Përsërit").pressed.emit()
+	await wait_scene("arena")
+	scene = Game._root.get_child(0)
+	check(scene.city_id == "vlore" and scene.arena.time_limit == 180.0, "retry preserves city and duration")
+	Progress.cities = saved_cities
+	Progress.cup_stars = saved_stars
 	Game.race_opts = saved_opts
 	Settings.load_input_config(saved_input)
 	Settings.changed.emit()

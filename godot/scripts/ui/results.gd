@@ -41,7 +41,7 @@ func _ready() -> void:
 	var points := str(r.get("mode", "race")) == "points"
 	var event := Data.cup_event(str(r.get("event", "")))
 	if points:
-		v.add_child(UiTheme.label(Data.t("arena.title"), 23, UiTheme.CYAN))
+		v.add_child(UiTheme.label(Data.t("arena.title", Data.square_name(city.id).to_upper()), 23, UiTheme.CYAN))
 	elif not event.is_empty():
 		v.add_child(UiTheme.label(("%s · %s" % [Data.t("cup.tirana.name"), Data.t("cup.event.%s.name" % event.id)]).to_upper(), 23, UiTheme.CYAN))
 	else:
