@@ -21,8 +21,8 @@ water, or more than REACH metres from the track are dropped, as are repeats
 of the same kind closer than its spacing. No item is invented: every one is
 a mapped OSM node.
 
-Only the street furniture near the circuit is fetched (a small Overpass query
-around the track), cached per tile in tools/cache/osm/<city>_street/:
+Only the street furniture near the circuit is fetched (Overpass, or the main
+OSM API for a tile Overpass will not serve), cached per tile in tools/cache/osm/<city>_street/:
   python3 tools/pipeline/street_props.py tirane vlore
 Data (c) OpenStreetMap contributors, ODbL.
 """
@@ -47,7 +47,6 @@ KERB_GAP = {'traffic_light': 1.0, 'bus_stop': 1.6, 'bench': 1.0, 'bin': 0.7, 'bo
 LANDMARK_CLEAR = 30.0              # around every landmark anchor
 NO_CARS = {'footway', 'path', 'cycleway', 'pedestrian', 'steps', 'track', 'bridleway', 'corridor'}
 ENDPOINT = 'https://overpass.private.coffee/api/interpreter'
-ENDPOINTS = [ENDPOINT, 'https://overpass-api.de/api/interpreter']
 
 
 def kind_of(tags):
@@ -285,8 +284,34 @@ out skel qt;
 """
 
 
+def api_elements(folder, bbox):
+    """The same tile from the main OSM API (fetch_osm_api's 2x2 sub-tiles),
+    when Overpass will not answer. The API returns every node of a way that
+    crosses the box, so roads and buildings arrive whole."""
+    import fetch_osm_api
+    s_, w_, n_, e_ = bbox
+    saved = fetch_osm_api.TILES
+    fetch_osm_api.TILES = 2
+    try:
+        paths = fetch_osm_api.fetch_tiles(os.path.join(folder, 'api_%.5f_%.5f_%.5f_%.5f' % bbox), s_, w_, n_, e_)
+    finally:
+        fetch_osm_api.TILES = saved
+    nodes, ways, _ = fetch_osm_api.merge(paths)
+    out = []
+    for wid, w in ways.items():
+        if 'highway' in w['tags'] or 'building' in w['tags']:
+            out.append({'type': 'way', 'id': wid, 'nodes': w['nodes'], 'tags': w['tags']})
+    for nid, nd in nodes.items():
+        item = {'type': 'node', 'id': nid, 'lat': nd['lat'], 'lon': nd['lon']}
+        if nd['tags']:
+            item['tags'] = nd['tags']
+        out.append(item)
+    return out
+
+
 def fetch(cid, proj, pts, force=False):
-    """All tiles' elements, each tile cached under tools/cache/osm/<city>_street/."""
+    """All tiles' elements, each tile cached under tools/cache/osm/<city>_street/.
+    Overpass first; a tile it will not serve comes from the main OSM API."""
     folder = ensure_dir(os.path.join(CACHE, 'osm', f'{cid}_street'))
     elements = []
     boxes = tiles(proj, pts)
@@ -294,22 +319,17 @@ def fetch(cid, proj, pts, force=False):
         path = os.path.join(folder, '%.5f_%.5f_%.5f_%.5f.json' % bbox)
         if not (os.path.exists(path) and os.path.getsize(path) > 100) or force:
             data = urllib.parse.urlencode({'data': query(bbox)}).encode()
-            last = None
-            for ep in ENDPOINTS:
-                try:
-                    log(f'[{cid}] tile {k + 1}/{len(boxes)} {ep}')
-                    blob = http_get(ep, data=data, timeout=240, retries=6)
-                    if not blob.lstrip().startswith(b'{'):
-                        raise RuntimeError(blob[:200])
-                    with open(path, 'wb') as f:
-                        f.write(blob)
-                    last = None
-                    break
-                except Exception as e:  # noqa: BLE001
-                    last = e
-                    log(f'  {ep} failed: {e}')
-            if last is not None:
-                raise RuntimeError(f'no Overpass endpoint answered: {last}')
+            try:
+                log(f'[{cid}] tile {k + 1}/{len(boxes)} {ENDPOINT}')
+                blob = http_get(ENDPOINT, data=data, timeout=240, retries=2)
+                if not blob.lstrip().startswith(b'{'):
+                    raise RuntimeError(blob[:200])
+            except Exception as e:  # noqa: BLE001
+                log(f'  overpass failed ({e}); main OSM API instead')
+                blob = json.dumps({'elements': api_elements(folder, bbox)}).encode()
+            with open(path + '.part', 'wb') as f:
+                f.write(blob)
+            os.replace(path + '.part', path)
         with open(path, encoding='utf8') as f:
             elements += json.load(f)['elements']
     return elements
