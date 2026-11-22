@@ -113,8 +113,11 @@ func _make_materials() -> void:
 	_lamp = StandardMaterial3D.new()
 	_lamp.vertex_color_use_as_albedo = true
 	_lamp.emission_enabled = true
-	_lamp.emission = Color(0.25, 1.0, 0.45)
-	_lamp.emission_energy_multiplier = 2.5
+	_lamp.emission = Color(0.05, 1.0, 0.35)
+	_lamp.emission_energy_multiplier = 1.8
+	# Props._box winds its faces for a cull-free material, like the body's.
+	_lamp.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 
 static func triangles(mesh: ArrayMesh) -> int:
@@ -136,18 +139,20 @@ func make_mesh(kind: String) -> ArrayMesh:
 	match kind:
 		"traffic_light":
 			# Pole on the kerb, mast arm out over the road (+X), head facing -Z.
-			_cyl(body, Vector3(0, 0, 0), 0.09, 4.6, 8, steel)
-			Props._box(body, Vector3(1.4, 4.45, 0), Vector3(2.8, 0.1, 0.1), steel)
-			Props._box(body, Vector3(2.6, 3.95, 0), Vector3(0.36, 1.0, 0.3), Color(0.08, 0.08, 0.09))
-			Props._box(body, Vector3(2.6, 3.95, 0.02), Vector3(0.5, 1.12, 0.04), Color(0.9, 0.8, 0.12))
+			# The overhead head hangs ~4.8 m clear, 4.3 m out over the lanes.
+			_cyl(body, Vector3(0, 0, 0), 0.1, 6.1, 8, steel)
+			Props._box(body, Vector3(2.3, 5.9, 0), Vector3(4.6, 0.12, 0.12), steel)
+			Props._box(body, Vector3(0.6, 5.55, 0), Vector3(1.2, 0.06, 0.06), steel)
+			Props._box(body, Vector3(4.3, 5.3, 0), Vector3(0.36, 1.0, 0.3), Color(0.08, 0.08, 0.09))
+			Props._box(body, Vector3(4.3, 5.3, 0.02), Vector3(0.5, 1.12, 0.04), Color(0.9, 0.8, 0.12))
 			# A low head for the kerb lane, on the pole itself.
 			Props._box(body, Vector3(0, 2.55, -0.18), Vector3(0.3, 0.86, 0.26), Color(0.08, 0.08, 0.09))
-			Props._box(body, Vector3(2.6, 4.25, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.06, 0.05))
-			Props._box(body, Vector3(2.6, 3.95, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.25, 0.05))
+			Props._box(body, Vector3(4.3, 5.6, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.06, 0.05))
+			Props._box(body, Vector3(4.3, 5.3, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.35, 0.25, 0.05))
 			Props._box(body, Vector3(0, 2.8, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.35, 0.06, 0.05))
 			Props._box(body, Vector3(0, 2.55, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.35, 0.25, 0.05))
-			Props._box(extra, Vector3(2.6, 3.65, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.3, 1.0, 0.5))
-			Props._box(extra, Vector3(0, 2.3, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.3, 1.0, 0.5))
+			Props._box(extra, Vector3(4.3, 5.0, -0.16), Vector3(0.2, 0.2, 0.03), Color(0.02, 0.55, 0.22))
+			Props._box(extra, Vector3(0, 2.3, -0.32), Vector3(0.17, 0.17, 0.03), Color(0.02, 0.55, 0.22))
 			extra_mat = _lamp
 		"bus_stop":
 			# Shelter open toward the road (-Z): roof, back and side glass,

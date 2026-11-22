@@ -45,6 +45,9 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	_build_edge_barriers(track, hw)
 	_build_skirt(track, hw)
 	set_wet(wet)
+	apply_quality()
+	if not Quality.budget_changed.is_connected(apply_quality):
+		Quality.budget_changed.connect(apply_quality)
 
 
 func add_paved_median(track: RaceTrack, start: float, length_m: float) -> void:
@@ -75,6 +78,63 @@ func add_paved_median(track: RaceTrack, start: float, length_m: float) -> void:
 	var median := LandmarkKit.mesh_node(mesh, mat, "LungomarePavedMedian", 1400.0)
 	median.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(median)
+
+
+## Zebra crossings (plan 3.5) from props.json "road_marks": world [x, z,
+## width, inferred] rows, projected onto this lap (either direction). At most
+## MAX_CROSSINGS, nearest the start first; returns the (s, width) pairs used.
+const MAX_CROSSINGS := 24
+
+func set_crossings(track: RaceTrack, rows: Array) -> PackedVector2Array:
+	var marks := PackedVector2Array()
+	for row in rows:
+		if marks.size() >= MAX_CROSSINGS:
+			break
+		var x := float(row[0])
+		var z := float(row[1])
+		if track.dist_to(x, z) > track.half_w + 1.0:
+			continue
+		marks.append(Vector2(track.locate_xz(x, z).x, float(row[2])))
+	var padded := marks.duplicate()
+	padded.resize(MAX_CROSSINGS)
+	surface_mat.set_shader_parameter("crossings", padded)
+	surface_mat.set_shader_parameter("crossing_count", marks.size())
+	return marks
+
+
+## The shader's sin-free cell hash (road.gdshader cell_hash).
+static func cell_hash(c: float, salt: float) -> float:
+	var p3 := Vector3(fposmod(c * 0.1031, 1.0), fposmod(salt * 0.1031, 1.0), fposmod(c * 0.1031, 1.0))
+	var d := p3.dot(Vector3(p3.y, p3.z, p3.x) + Vector3.ONE * 33.33)
+	p3 += Vector3.ONE * d
+	return fposmod((p3.x + p3.y) * p3.z, 1.0)
+
+
+## Where road.gdshader sets hardware between lap positions s0 and s1:
+## [{"kind": "manhole" | "gully" | "patch", "s": metres, "d": metres across}].
+## Mirrors the shader's cell rules; lane_count is the shader default (4).
+static func hardware_near(s0: float, s1: float, hw: float, lane_count := 4.0) -> Array:
+	var out := []
+	var lane_w := 2.0 * hw / lane_count
+	for c in range(floori(s0 / 22.0), floori(s1 / 22.0) + 1):
+		if cell_hash(c, 6.1) < 0.5:
+			var lane := floorf(cell_hash(c, 3.7) * lane_count)
+			out.append({"kind": "manhole", "s": (c + 0.2 + 0.6 * cell_hash(c, 2.2)) * 22.0, "d": -hw + lane_w * (lane + 0.5)})
+	for c in range(floori(s0 / 24.0), floori(s1 / 24.0) + 1):
+		if cell_hash(c, 7.3) < 0.85:
+			var side := -1.0 if cell_hash(c, 1.9) < 0.5 else 1.0
+			out.append({"kind": "gully", "s": (c + 0.5) * 24.0, "d": side * (hw - 0.86)})
+	for c in range(floori(s0 / 31.0), floori(s1 / 31.0) + 1):
+		if cell_hash(c, 4.7) < 0.38:
+			var wid := 1.0 + cell_hash(c, 2.9) * 2.4
+			out.append({"kind": "patch", "s": (c + 0.15 + 0.7 * cell_hash(c, 8.1)) * 31.0,
+				"d": (cell_hash(c, 5.5) * 2.0 - 1.0) * maxf(0.0, hw - wid * 0.5 - 0.8)})
+	return out.filter(func(h): return float(h.s) >= s0 and float(h.s) <= s1)
+
+
+## Manholes, gullies and patches cost a few ALU ops a pixel; low skips them.
+func apply_quality() -> void:
+	surface_mat.set_shader_parameter("detail", 1.0 if bool(Quality.p.get("road_detail", true)) else 0.0)
 
 
 func set_wet(w: float) -> void:

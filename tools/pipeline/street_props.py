@@ -38,6 +38,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 from common import CACHE, OUT, Proj, ensure_dir, http_get, log  # noqa: E402
 from cities import CITIES, ROAD_WIDTH  # noqa: E402
+import street_infer  # noqa: E402
 
 KINDS = ('traffic_light', 'bus_stop', 'bench', 'bin', 'bollard')
 REACH = 250.0                      # metres from the track centreline
@@ -234,6 +235,29 @@ def place(items, track, roads, buildings, keepouts=(), anchors=(), water=None):
     return out
 
 
+def make_ok(track, roads, buildings, keepouts=(), anchors=(), water=None):
+    """The filter every added (inferred) item passes, as `place` applies to
+    mapped ones: off the race road and, for small items, off carriageways;
+    out of buildings, landmark keepouts and water."""
+    clear = track.hw + TRACK_KERB
+
+    def ok(kind, x, z):
+        if track.nearest(x, z)[0] < clear:
+            return False
+        if kind in ('bench', 'bin', 'bollard'):
+            road = roads.nearest(x, z)
+            if road is not None and road[0] < road[1] + 0.3:
+                return False
+        if buildings.contains(x, z):
+            return False
+        if any(x0 <= x <= x1 and z0 <= z <= z1 for x0, z0, x1, z1 in keepouts):
+            return False
+        if any((x - ax) ** 2 + (z - az) ** 2 < LANDMARK_CLEAR ** 2 for ax, az in anchors):
+            return False
+        return water is None or not water(x, z)
+    return ok
+
+
 # --------------------------------------------------------------------------- OSM
 TILE = 700.0                       # metres per Overpass call
 
@@ -383,6 +407,26 @@ def from_osm(elements, proj):
     return items, segments, rings
 
 
+def highway_lines(elements, proj):
+    """[(tags, [(x, z), ...])] for every highway way, and the mapped
+    highway=crossing nodes [(x, z)]."""
+    nodes, lines, crossing_nodes, seen = {}, [], [], set()
+    for el in elements:
+        if el['type'] == 'node':
+            if el['id'] not in nodes:
+                nodes[el['id']] = proj.to_xz(el['lat'], el['lon'])
+            if (el.get('tags') or {}).get('highway') == 'crossing':
+                crossing_nodes.append(tuple(float(v) for v in proj.to_xz(el['lat'], el['lon'])))
+    for el in elements:
+        if el['type'] != 'way' or el['id'] in seen or 'highway' not in el.get('tags', {}):
+            continue
+        seen.add(el['id'])
+        pts = [(float(nodes[n][0]), float(nodes[n][1])) for n in el.get('nodes', []) if n in nodes]
+        if len(pts) >= 2:
+            lines.append((el['tags'], pts))
+    return lines, sorted(set(crossing_nodes))
+
+
 def keepouts_for(city, proj):
     # Lazy: build_city pulls in the whole pipeline.
     from build_city import landmark_clearance_zones
@@ -414,15 +458,23 @@ def process_city(cid, force=False, api=False):
     tj = json.load(open(os.path.join(out_dir, 'track.json')))
     props_path = os.path.join(out_dir, 'props.json')
     props = json.load(open(props_path))
-    items, segments, rings = from_osm(fetch(cid, proj, tj['pts'], force, api), proj)
+    elements = fetch(cid, proj, tj['pts'], force, api)
+    items, segments, rings = from_osm(elements, proj)
     anchors = [(float(a['x']), float(a['z'])) for a in props.get('landmarks', [])]
-    street = place(items, Track(tj['pts'], tj['hw']), Roads(segments), Buildings(rings),
-                   keepouts_for(city, proj), anchors, water_test(out_dir))
+    track, roads, buildings = Track(tj['pts'], tj['hw']), Roads(segments), Buildings(rings)
+    keepouts, water = keepouts_for(city, proj), water_test(out_dir)
+    street = place(items, track, roads, buildings, keepouts, anchors, water)
+    mapped = {k: len(street[k]) for k in KINDS}
+    lines, crossing_nodes = highway_lines(elements, proj)
+    marks = street_infer.fill(street, lines, crossing_nodes, street_infer.Lap(tj['pts']), float(tj['hw']), roads,
+                              make_ok(track, roads, buildings, keepouts, anchors, water), REACH)
+    props['road_marks'] = {'crossings': marks}
     props['street'] = street
     with open(props_path, 'w', encoding='utf8') as f:
         json.dump(props, f, separators=(',', ':'))
-    log(f'[{cid}] street: ' + ', '.join(f'{len(street[k])} {k}' for k in KINDS)
-        + f' from {len(items)} mapped nodes')
+    log(f'[{cid}] street: ' + ', '.join(f'{mapped[k]} {k} (+{len(street[k]) - mapped[k]})' for k in KINDS)
+        + f' from {len(items)} mapped nodes; crossings: {sum(1 for c in marks if not c[3])} mapped'
+        + f' +{sum(1 for c in marks if c[3])}')
     return street
 
 

@@ -210,6 +210,7 @@ func _build_world() -> void:
 	add_child(props)
 	props.load_city(city_id, terrain)
 	props.set_night(sky.night)
+	road.set_crossings(track, props.road_marks.get("crossings", []))
 	reflections = RaceReflections.new()
 	reflections.name = "Reflections"
 	add_child(reflections)

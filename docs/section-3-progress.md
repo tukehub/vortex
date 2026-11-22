@@ -135,3 +135,21 @@ Do not merge to `main`; the user requested a separate branch.
   benches and signal masts sit on the pavement at Tirana junctions.
 - Parked-car slots skipped: only the six racers are on the street (2.3).
 - **Next: 3.5 road decals.**
+
+## Checkpoint: inferred furniture and 3.5 road decals (2026-11-22)
+
+- `tools/pipeline/street_infer.py` fills gaps OSM leaves (flagged rows,
+  `[x, z, yaw, 1]`): signals at major junctions, footway benches, bins by
+  shelters/benches, pedestrian-entry bollards, and crossings before
+  signalised junctions when none is mapped. Tirana data refetched through
+  the main OSM API so crossing nodes keep their tags.
+- Road shader: zebra crossings with stop lines and broken lane lines;
+  cast-iron manholes, gullies and patches from a sin-free hash mirrored by
+  `RoadMesh.hardware_near()`. Rendered on lavapipe and tuned: covers and
+  patches were first too pale (sRGB asphalt is ~0.1 linear, and glossy
+  patches mirrored the sky); gullies moved inboard of the edge line.
+- Signal model raised (6.1 m pole, 4.6 m mast arm, head 4.8 m clear) and
+  its lamp/glass surfaces made cull-free (the green lens was culled).
+- **Passed:** `tests/road_marks`, `tests/street_props` (both renderers),
+  pipeline unit tests, full runner.
+- **Next: 3.6 facade depth.**

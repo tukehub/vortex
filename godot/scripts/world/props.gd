@@ -14,6 +14,8 @@ var night := 1.0
 var landmarks: Array = []
 ## OSM street furniture (3.4); null when the city has none.
 var street: StreetProps
+## props.json "road_marks": {"crossings": [[x, z, width, inferred], ...]}.
+var road_marks := {}
 
 # A small near-camera 3D pool travels around the circuit; distant trees use
 # low-cost cutouts.  No per-tree nodes or 3D trees are created per frame.
@@ -38,6 +40,7 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 	var p: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	track_lamps = p.get("track_lamps", [])
 	landmarks = p.get("landmarks", [])
+	road_marks = p.get("road_marks", {})
 	var models := Landmarks.new()
 	add_child(models)
 	models.load_anchors(landmarks, terrain)

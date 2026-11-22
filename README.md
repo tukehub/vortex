@@ -128,7 +128,7 @@ processed track, terrain, buildings, side roads and props belong in
 The builder rejects routes that double back, and terrain validation fails if the
 ground intersects the road. No data is fabricated if access fails.
 
-Pipeline regression tests: `python3 tools/pipeline/test_terrain.py`, `test_water.py`, `test_seafront.py`, `test_street_props.py`.
+Pipeline regression tests: `python3 tools/pipeline/test_terrain.py`, `test_water.py`, `test_seafront.py`, `test_street_props.py`, `test_street_infer.py`.
 
 Car source: Car Concept © 2024 Darmstadt Graphics Group GmbH and Eric Chadwick, CC BY 4.0; conversion instructions are in `tools/import_carconcept.py`. SFX: `python3 tools/gen_sfx.py`.
 The central lists and model paths live in `godot/scripts/data/data.gd`; every
@@ -328,16 +328,34 @@ work. An item below that needs a Forward+-only feature is desktop-only.
     range culls by distance (450 / 350 / 160 / 140 / 140 m, capped by
     `Quality.p.props_dist`), without shadows. Low quality and pressure
     stage 2+ keep only lights and stops (`Quality.p.street_small`).
-    Tirana carries 48 traffic lights, 30 bus stops, 333 benches, 48 bins
-    and 9 bollards; Vlorë's OSM maps only 18 bus stops and 2 benches near
-    its circuit (no signals), and nothing is invented to fill the gap. The
+    Where OSM maps nothing, `tools/pipeline/street_infer.py` fills gaps
+    the way a real street would, and flags each added row with a trailing
+    1 (`[x, z, yaw, 1]`): signal poles on the right-hand kerb 12 m before
+    junctions with trunk–tertiary roads (none at roundabouts, 250 m apart,
+    none where a signal is mapped within 60 m), benches every 35 m along
+    footways on the side away from traffic, bins beside shelters and every
+    third bench, three bollards across pedestrian-street entries. Tirana:
+    48 lights, 30 stops, 340 benches (+80), 48 bins (+95), 9 bollards
+    (+41), all its signals mapped. Vlorë: 5 added signal poles, 18 stops,
+    2 benches (+80), 41 added bins, 49 added bollards. The
     public Overpass servers time out on this region from here; `--api`
     reads the main OSM API instead. Parked-car slots were left out: only
     the six racers are on the street (2.3). Covered by `tests/street_props` and
     `tools/pipeline/test_street_props.py`.
-3.5 **Road decals** in `shaders/road.gdshader`: zebra crossings at OSM junction
-    nodes, manholes and patches by hash, via a small decal atlas and a uniform
-    list.
+3.5 **Road decals — done.** `shaders/road.gdshader`, in lap coordinates:
+    zebra crossings (0.5 m bars across the carriageway, lane lines broken
+    around them, a stop line 2 m before on the lane that meets them) at up
+    to 24 positions from props.json "road_marks" (mapped
+    `highway=crossing` nodes on the race road; otherwise one 6 m before
+    each signalised junction), sent by `RoadMesh.set_crossings()` in either
+    race direction. Round ribbed cast-iron manholes mid-lane (about one per
+    44 m), gully grates inside the edge line (one per 28 m) and repaired
+    patches (black and matte when fresh, greyed with age, sealed seam; one
+    per 80 m) come from a sin-free cell hash, so `RoadMesh.hardware_near()`
+    knows where the GPU draws them. Procedural rather than a decal atlas:
+    no texture to load. Low quality skips the hardware
+    (`Quality.p.road_detail`). Covered by `tests/road_marks` and
+    `tools/pipeline/test_street_infer.py`.
 3.6 **Facade depth:** balcony/ledge boxes for buildings within ~60 m of the
     track (pipeline), or parallax-interior windows in `shaders/facade.gdshader`;
     start inside the existing `detail_preview` region, then extend to the whole

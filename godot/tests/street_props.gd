@@ -22,7 +22,7 @@ func _ready() -> void:
 		var tris := StreetProps.triangles(mesh)
 		check(tris > 0 and tris < StreetProps.MAX_TRIANGLES, "%s mesh is low-poly (%d triangles)" % [kind, tris])
 		var box := mesh.get_aabb()
-		check(box.position.y >= -0.01 and box.size.y < 5.0, "%s stands on its origin" % kind)
+		check(box.position.y >= -0.01 and box.size.y < 6.5, "%s stands on its origin" % kind)
 	builder.queue_free()
 
 	for city_id in ["tirane", "vlore"]:
