@@ -100,7 +100,25 @@ func _ready() -> void:
 			for id in ["mosque", "flagpole"]:
 				var at := (shk_marks.get_node(id) as Node3D).global_position
 				assert(scene.track.dist_to(at.x, at.z) > scene.track.half_w + 8.0, "landmark off the road: " + id)
-			print("SHKODER: ", snappedf(scene.track.L, 1.0), " m lap, ", street_trees.entries.size(), " street trees")
+			# Rozafa from its mapped outlines: curtain wall, gate, towers, ruins.
+			var castle := shk_marks.get_node_or_null("rozafa/RozafaCastle") as RozafaCastle
+			assert(castle != null, "Rozafa is built from its mapped outlines")
+			assert(castle.merlons > 300 and castle.slits > 100, "the curtain wall is crenellated with arrow slits")
+			for kind in ["gate", "tower", "citadel", "church", "minaret", "museum", "cistern", "ruin"]:
+				assert(int(castle.built.get(kind, 0)) > 0, "Rozafa has its " + kind)
+			assert(int(castle.built.tower) == 8 and int(castle.built.gate) == 1)
+			var masonry := castle.get_node("CastleMasonry") as MeshInstance3D
+			var box := masonry.get_aabb()
+			assert(box.size.x > 250.0 and box.size.z > 200.0, "the walls ring the whole hilltop")
+			assert(masonry.visibility_range_end >= 2500.0, "the castle stays in sight from the lap")
+			assert(castle.get_node_or_null("CastleFlag") != null, "the flag flies over the citadel")
+			var root := castle.get_parent() as Node3D
+			for p: Array in JSON.parse_string(FileAccess.get_file_as_string(RozafaCastle.DATA)).wall:
+				var world := root.position + Vector3(float(p[0]), 0, float(p[1]))
+				assert(scene.track.dist_to(world.x, world.z) > 1000.0, "the castle stands well off the lap")
+				break
+			print("SHKODER: ", snappedf(scene.track.L, 1.0), " m lap, ", street_trees.entries.size(), " street trees; Rozafa ",
+				castle.built, ", ", castle.merlons, " merlons")
 		if city.id == "vlore":
 			# Lungomare: palms on the sea side, on dry ground and clear of the
 			# road; café terraces on the land side.

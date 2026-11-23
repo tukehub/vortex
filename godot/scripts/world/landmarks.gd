@@ -216,6 +216,11 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			hill.name = "KuzumBaba"
 			root.add_child(hill)
 			hill.build(str(anchor.id), terrain)
+		elif str(anchor.id) == "rozafa" and FileAccess.file_exists(RozafaCastle.DATA):
+			var castle := RozafaCastle.new()
+			castle.name = "RozafaCastle"
+			root.add_child(castle)
+			castle.build(terrain)
 		elif str(anchor.id) == "flagpole_big":
 			_great_flag(root)
 		elif str(anchor.id) in ["national_museum", "prime_minister"]:
