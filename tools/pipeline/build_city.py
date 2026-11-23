@@ -31,6 +31,7 @@ import coastal_macro
 import coastal_vegetation
 import seafront  # noqa: E402
 import street_props  # noqa: E402
+import rozafa  # noqa: E402
 import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
 from showcase_facades import bake as bake_showcase_facades
@@ -1485,6 +1486,8 @@ def build(cid, route_only=False):
     build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.
     street_props.process_city(cid)
+    if cid == 'shkoder':
+        rozafa.process_city()
     if cid == "vlore":
         coastal_vegetation.bake(Path(out))
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_map.png'), span=map_span)
