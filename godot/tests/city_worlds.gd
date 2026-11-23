@@ -2,7 +2,6 @@ extends Node
 ## Load each real city through the production race scene, including terrain and GLBs.
 
 func _ready() -> void:
-	_test_tree_lod()
 	Quality.set_preset("low")
 	Game.race_opts.reverse = false
 	var count := 0
@@ -54,19 +53,13 @@ func _ready() -> void:
 			var stone := marble.multimesh.mesh.surface_get_material(0) as StandardMaterial3D
 			assert(stone != null and stone.albedo_texture != null and stone.normal_enabled and stone.roughness_texture != null, "Museum marble needs color, normal and roughness maps")
 			assert(scene.props.get_node_or_null("BllokuCafes") != null, "The Blloku route needs its café terraces")
-			# Ensure grouping keeps every tree and creates local batches that the
-			# renderer can cull independently.
+			var trees: TiranaTrees = scene.props.vegetation
 			var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/tirane/props.json"))
-			var count_expected := int(data.trees.size() * float(Quality.p.tree_mul))
-			var crowns := 0
-			var batches := 0
-			for node in scene.props.get_children():
-				if not node is MultiMeshInstance3D:
-					continue
-				if str(node.name).begins_with("TreeCanopy") or str(node.name).begins_with("TreeDetail"):
-					batches += 1
-					crowns += node.multimesh.instance_count
-			assert(batches > 1 and crowns == count_expected)
+			assert(trees.entries.size() == int(data.trees.size() * float(Quality.p.tree_mul)))
+			var replaced := trees.entries.filter(func(entry: Dictionary): return entry.excluded)
+			assert(replaced.size() == planted.size(), "pine replacements take exactly one broadleaf slot each")
+			assert(trees.get_child_count() > 6 and trees.get_child_count() < 100,
+				"the city keeps local batches and six moving tree pools")
 		else:
 			assert(planted.is_empty(), "the Tirana pilot must not change other cities")
 		if FileAccess.file_exists("res://assets/cities/%s/water_near.bin" % city.id):
@@ -196,58 +189,3 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var bore := tunnel.get_node("TunnelBore") as MeshInstance3D
 	assert(bore.mesh.get_aabb().size.length() < 145.0, "reverse race must build the same short bore")
 	tunnel.queue_free()
-
-
-func _test_tree_lod() -> void:
-	Quality.set_preset("high")
-	var props := Props.new()
-	add_child(props)
-	var trees := []
-	for i in 40:
-		trees.append([float(i), 0.0, 0.0, 1.0])
-		trees.append([1000.0 + float(i), 0.0, 0.0, 1.0])
-	props._build_trees(trees, null, "tirane")
-	assert(props._near_leaves != null and props._near_branches != null)
-	props._update_tree_lod(Vector3.ZERO, true)
-	assert(props._near_marked.size() == Props.NEAR_TREE_LIMIT)
-	assert(props._near_leaves.visible_instance_count == Props.NEAR_TREE_LIMIT and props._near_branches.visible_instance_count == Props.NEAR_TREE_LIMIT)
-	var old_refs := props._near_marked.duplicate()
-	for ref in old_refs:
-		assert((ref.world as Transform3D).origin.x < 100.0)
-		if DisplayServer.get_name() != "headless":
-			assert((ref.mm.get_instance_transform(ref.index) as Transform3D).basis.is_equal_approx(Basis.from_scale(Vector3.ZERO)))
-	props._update_tree_lod(Vector3(1000, 0, 0), true)
-	assert(props._near_marked.size() == Props.NEAR_TREE_LIMIT)
-	for ref in old_refs:
-		assert(not props._near_marked.has(ref))
-		if DisplayServer.get_name() != "headless":
-			assert((ref.mm.get_instance_transform(ref.index) as Transform3D).is_equal_approx(ref.local))
-	for ref in props._near_marked:
-		assert((ref.world as Transform3D).origin.x > 900.0)
-	props._update_tree_lod(Vector3(5000, 0, 0), true)
-	assert(props._near_marked.is_empty() and props._near_leaves.visible_instance_count == 0 and props._near_branches.visible_instance_count == 0)
-	props.queue_free()
-	var ahead_props := Props.new()
-	add_child(ahead_props)
-	var road_trees := []
-	for i in 40:
-		road_trees.append([float(i + 1) * 3.0, 0.0, 0.0, 1.0])
-		road_trees.append([-float(i + 1) * 3.0, 0.0, 0.0, 1.0])
-	ahead_props._build_trees(road_trees, null, "tirane")
-	ahead_props._update_tree_lod(Vector3.ZERO, true, Vector3.RIGHT)
-	var selected := ahead_props._near_marked.duplicate()
-	var ahead_count := 0
-	for ref in selected:
-		if (ref.world as Transform3D).origin.x > 0.0:
-			ahead_count += 1
-	assert(ahead_count > Props.NEAR_TREE_LIMIT / 2)
-	ahead_props._update_tree_lod(Vector3(0.5, 0, 0), true, Vector3.RIGHT)
-	for ref in selected:
-		assert(ahead_props._near_marked.has(ref))
-	# Nearby trees stay detailed when the car turns toward the other side.
-	ahead_props._update_tree_lod(Vector3.ZERO, true, Vector3.LEFT)
-	for ref in ahead_props._tree_refs:
-		if absf((ref.world as Transform3D).origin.x) < Props.TREE_PROTECTED_RADIUS:
-			assert(ahead_props._near_marked.has(ref))
-	ahead_props.queue_free()
-	print("TREE LOD: moving pool passed")

@@ -53,10 +53,7 @@ func place_camera(at: float) -> void:
 	world.sky.set_rain_ground(city_track.pos(at, 0.0), city_track.tangent(at))
 	var forward := city_track.tangent(at)
 	world.props.update_lights(camera.global_position, forward)
-	# Software Vulkan can take longer than the tree LOD cooldown per frame.
-	# Give the lamp pool its own update even when every frame rescored trees.
-	if world.sky.night > 0.05:
-		world.props.update_lights(camera.global_position, forward)
+	world.props.update_vegetation(camera.global_position, forward)
 
 
 func _process(_delta: float) -> void:

@@ -239,12 +239,12 @@ func _road_section(endpoints: Array, reverse: bool) -> Vector2:
 func _setup_pines() -> void:
 	# Replace a sparse selection of the existing mapped Tirana trees, instead of
 	# scattering trees randomly over the road, buildings, or other cities.
-	if city_id != "tirane" or pine_forest == null or not pine_forest.has_method("build_forest"):
+	if props.vegetation == null or pine_forest == null or not pine_forest.has_method("build_forest"):
 		return
 	var limit := 8 if Quality.preset == "low" else (24 if Quality.preset == "medium" else 32)
 	var candidates := {}
-	for ref: Dictionary in props._tree_refs:
-		var world: Transform3D = ref.world
+	for id in props.vegetation.entries.size():
+		var world: Transform3D = props.vegetation.entries[id].world
 		var p := world.origin
 		var idx := track.nearest(p.x, p.z, 60.0)
 		if idx < 0:
@@ -262,20 +262,14 @@ func _setup_pines() -> void:
 		var bucket := mini(limit - 1, int(float(idx) / float(track.M) * limit))
 		var score := absf(distance - 38.0)
 		if not candidates.has(bucket) or score < float(candidates[bucket].score):
-			candidates[bucket] = {"ref": ref, "score": score}
+			candidates[bucket] = {"id": id, "score": score}
 	var transforms: Array[Transform3D] = []
 	var buckets := candidates.keys()
 	buckets.sort()
 	for bucket in buckets:
-		var ref: Dictionary = candidates[bucket].ref
-		var hidden: Transform3D = ref.local
-		hidden.basis = Basis.from_scale(Vector3.ZERO)
-		ref.mm.set_instance_transform(ref.index, hidden)
-		var position: Vector3 = (ref.world as Transform3D).origin
-		var chunk := Vector2i(floori(position.x / Props.TREE_CHUNK_SIZE), floori(position.z / Props.TREE_CHUNK_SIZE))
-		props._tree_chunks[chunk].erase(ref)
-		props._tree_refs.erase(ref)
-		transforms.append(ref.world)
+		var id: int = candidates[bucket].id
+		props.vegetation.exclude(id)
+		transforms.append(props.vegetation.entries[id].world)
 	pine_forest.call("build_forest", transforms)
 
 
@@ -730,6 +724,7 @@ func _process(dt: float) -> void:
 	views.update_pose(player, view_pose, dt)
 	speed_feedback.update(player, state == "race", dt)
 	sky.follow(cam.global_position)
+	props.update_vegetation(cam.global_position, -cam.global_transform.basis.z)
 	reflections.update_focus(track.pos(player.s, player.d), track.tangent(player.s))
 	if sky.wet > 0.01:
 		sky.set_rain_ground(track.pos(player.s, 0.0 if city_id == "tirane" else player.d), track.tangent(player.s))
