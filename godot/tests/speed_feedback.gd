@@ -38,12 +38,36 @@ func _ready() -> void:
 	fx._process(0.0)
 	var counts := fx.driving.snapshot()
 	check(counts.smoke == 6 and counts.exhaust == 3 and counts.scrape == 3 and counts.spray == 0, "high shares six rear-wheel smoke emitters and three boost/scrape emitters")
+	check(counts.debris == 1, "only one severe player wall strike gets debris")
+	var capacity := 0
+	for kind in fx.driving.pools:
+		for slot: Dictionary in fx.driving.pools[kind]:
+			capacity += slot.node.amount
+	check(capacity == 102, "all driving pools including wet/dry tails have a fixed particle ceiling")
+	var player_visual := visuals[race.cars.find(race.player)]
+	var player_trail_found := false
+	for trail in fx.driving.trails:
+		if trail.owner_id == race.player.id:
+			player_trail_found = true
+			var previous := trail.left[trail.index]
+			player_visual.position.x += 1.0
+			fx._process(1.0 / 30.0)
+			check(trail.multimesh.visible_instance_count == 2 and trail.left[posmod(trail.index - 1, trail.SAMPLES)] == previous, "two ribbons retain the previous socket positions in world space")
+			player_visual.position.x -= 1.0
+	check(player_trail_found, "player has a prewarmed ribbon pair")
 	var player_key := "%d:" % race.player.id
 	for kind in ["smoke", "exhaust", "scrape"]:
 		var found := false
 		for slot: Dictionary in fx.driving.pools[kind]:
 			found = found or (str(slot.key).begins_with(player_key) and slot.claimed)
 		check(found, "player is prioritized in " + kind)
+	# Model a completed GPU burst while the boost and contact are still held.
+	for kind in ["exhaust", "scrape", "debris"]:
+		for slot: Dictionary in fx.driving.pools[kind]:
+			slot.node.emitting = false
+	fx._process(1.0 / 60.0)
+	counts = fx.driving.snapshot()
+	check(counts.exhaust == 0 and counts.scrape == 0 and counts.debris == 0, "sustained boost or contact cannot retrigger a finished burst")
 	race.wet = true
 	fx._process(1.0)
 	counts = fx.driving.snapshot()
@@ -130,6 +154,9 @@ func _ready() -> void:
 	get_tree().quit(1 if failures else 0)
 
 func all_stopped() -> bool:
+	for trail in fx.driving.trails:
+		if trail.visible or trail.multimesh.visible_instance_count > 0:
+			return false
 	for kind in fx.driving.pools:
 		for slot: Dictionary in fx.driving.pools[kind]:
 			var emitter: GPUParticles3D = slot.node

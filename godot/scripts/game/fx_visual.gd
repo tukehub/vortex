@@ -18,7 +18,7 @@ const MAX_SKIDS := 320
 const FLASH_POOL := 8
 const RING_POOL := 6
 const POOL_CAPS := {"bolt": 54, "eagle": 18, "mine": 24, "dome": 3,
-	"smoke": 6, "exhaust": 3, "spray": 6, "scrape": 3}
+	"smoke": 6, "exhaust": 3, "spray": 6, "scrape": 3, "debris": 1}
 const COMBAT_KINDS := ["bolt", "eagle", "mine", "dome"]
 const DrivingParticles = preload("res://scripts/game/driving_particles.gd")
 var driving: DrivingParticles
@@ -604,7 +604,7 @@ func _process(dt: float) -> void:
 	_update_skids(dt)
 	var cam := get_viewport().get_camera_3d()
 	_focus = cam.global_position if cam != null else (track.pos(race.player.s, race.player.d) if race.player != null else Vector3.ZERO)
-	driving.update(race, _driving_visuals, _focus, dt)
+	driving.update(race.cars, _driving_visuals, _focus, dt, race.started and (race.player == null or not race.player.finished), race.wet)
 	_lights_left = int(Quality.p.fx_light_limit)
 	for i in range(_flashes.size() - 1, -1, -1):
 		var f: Dictionary = _flashes[i]

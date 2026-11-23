@@ -27,6 +27,9 @@ var city_id: String
 var arena: Arena
 var player: ArenaCar
 var cars: Array[CarVisual] = []
+var driving: FxVisual.DrivingParticles
+var _driving_visuals := {}
+var _wall_contacts := {}
 var pads: Array[Sprite3D] = []
 var cam: Camera3D
 var statue: Node3D
@@ -72,6 +75,9 @@ func _ready() -> void:
 		visual.setup(c.def, (Color.html(c.def.color) if c.is_player else c.color), c.is_player, Game.cosmetics() if c.is_player else {})
 		visual.apply_world(c, DT)
 		cars.append(visual)
+		_driving_visuals[c] = visual
+	driving = FxVisual.DrivingParticles.new(self, FxVisual.POOL_CAPS, FxVisual._glow_texture())
+	Quality.budget_changed.connect(driving.reset)
 	for p in arena.pickups:
 		var sprite := Sprite3D.new()
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -447,12 +453,15 @@ func _process(dt: float) -> void:
 				return
 	for i in cars.size():
 		cars[i].apply_world(arena.cars[i], dt)
+		if arena.cars[i].scrape <= 0.0:
+			_wall_contacts.erase(arena.cars[i])
 	for i in pads.size():
 		var p: Dictionary = arena.pickups[i]
 		pads[i].visible = bool(p.alive)
 		pads[i].position.y = 1.5 + 0.18 * sin(arena.time * 2.4 + i)
 	_draw_weapons(dt)
 	_follow_camera(dt)
+	driving.update(arena.cars, _driving_visuals, cam.global_position, elapsed, state == "play", false, _wall_contacts)
 	_engine_audio()
 	Sfx.listener_pos = cam.global_position
 	# The walled square and its grandstands give a constant, modest echo.
@@ -672,6 +681,7 @@ func _events() -> void:
 				if c == player:
 					Sfx.haptic("fire")
 			"wall":
+				_wall_contacts[c] = Vector3(e.x, 0.35, e.z)
 				if c == player and _limited("wall", 0.4):
 					Sfx.play("wall_impact", "Impacts", -4.0)
 					_kick_camera(e.dir, minf(0.5, float(e.imp) / 40.0))

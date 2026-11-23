@@ -8,6 +8,7 @@ extends Node3D
 static var shared: Dictionary = {}
 static var _sport_checked := false
 static var _sport_scene: PackedScene
+static var _flame_mesh: ArrayMesh
 static var _flake_normal: NoiseTexture2D
 const CONTACT_SHADER := preload("res://shaders/car_contact.gdshader")
 const SPORT_SHADER := preload("res://shaders/sport_car.gdshader")
@@ -899,10 +900,8 @@ func _animate(c: CarState, dt: float, lateral_accel: float, full_lock := -1.0) -
 		mat_rear.emission_energy_multiplier = 3.5 if braking else base
 	if sport_paint:
 		sport_paint.set_shader_parameter("brake_light", 1.0 if (c.braking or c.v < -0.1) else (0.2 if night > 0.3 else 0.0))
-	# shield
 	for jet in nitro_jets:
-		jet.visible = c.nitro_t > 0.0
-		jet.scale.z = 0.8 + 0.2 * sin(spin * 4.0)
+		jet.visible = c.nitro_t > 0.0 and c.wreck_t <= 0.0 and not c.finished
 	shield.visible = c.shield_t > 0.0
 	if shield.visible:
 		# Energy shell: a quick shimmer over a slower breathing pulse.
@@ -933,30 +932,48 @@ func _pose_wheels() -> void:
 			pivot.basis = Basis(Vector3.UP, steer) * Basis(Vector3.RIGHT, -spin) * _wheel_rest[nm]
 
 
+## Two tapered shells in one shared surface. +Z points out of the exhaust.
+static func _nitro_mesh() -> ArrayMesh:
+	if _flame_mesh != null:
+		return _flame_mesh
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var radii := [0.72, 1.0, 0.53, 0.02]
+	var distances := [0.0, 0.17, 0.62, 1.0]
+	var corners := [Vector2i.ZERO, Vector2i.DOWN, Vector2i.RIGHT, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.ONE]
+	for core in [false, true]:
+		var radius := 0.085 if core else 0.15
+		var length_m := 0.42 if core else 1.15
+		for ring in 3:
+			for sector in 8:
+				for corner: Vector2i in corners:
+					var u := (sector + corner.x) / 8.0
+					var row := ring + corner.y
+					var r := float(radii[row]) * radius
+					st.set_uv(Vector2(u, distances[row]))
+					st.set_color(Color.WHITE if core else Color.BLACK)
+					st.add_vertex(Vector3(cos(TAU * u) * r, sin(TAU * u) * r, float(distances[row]) * length_m))
+	st.index()
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://shaders/nitro_flame.gdshader")
+	st.set_material(mat)
+	_flame_mesh = st.commit()
+	return _flame_mesh
+
+
 func _make_nitro() -> void:
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(0.2, 0.7, 1.0)
-	material.emission_enabled = true
-	material.emission = Color(0.2, 0.6, 1.0)
-	material.emission_energy_multiplier = 5.0
 	for side in [-1.0, 1.0]:
 		var jet := MeshInstance3D.new()
-		var mesh := CylinderMesh.new()
-		mesh.bottom_radius = 0.02
-		mesh.top_radius = 0.14
-		mesh.height = 1.6
-		mesh.radial_segments = 8
-		jet.mesh = mesh
-		jet.material_override = material
-		jet.rotation.x = PI / 2.0
-		jet.position = Vector3(side * def.size.x * 0.3, 0.3, def.size.z * 0.5 + 0.6)
+		jet.mesh = _nitro_mesh()
+		jet.visibility_range_end = 85.0
+		jet.position = Vector3(side * def.size.x * 0.3, 0.3, def.size.z * 0.5)
 		jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		jet.visible = false
 		# Bright bloom where the flame leaves the car.
-		var flare := FxVisual.glow_quad(FxVisual.glow_material(Color(0.25, 0.7, 1.0), 2.6), 1.1)
+		var flare := FxVisual.glow_quad(_shared("exhaust_glow", func(): return FxVisual.glow_material(Color(0.48, 0.84, 1.0), 1.35)), 0.42)
 		_nitro_flares.append(flare)
-		flare.position.y = -0.7
+		flare.visibility_range_end = 65.0
+		flare.position.z = 0.04
 		jet.add_child(flare)
 		if _legacy():
 			add_child(jet)
@@ -964,5 +981,5 @@ func _make_nitro() -> void:
 			var side_key := "left" if side < 0 else "right"
 			var socket_path: String = profile.get("nitro_sockets", {}).get(side_key, VehicleRig.SOCKETS[side_key])
 			rig_root.get_node(socket_path).add_child(jet)
-			jet.position = Vector3(0, 0, .7)
+			jet.position = Vector3.ZERO
 		nitro_jets.append(jet)

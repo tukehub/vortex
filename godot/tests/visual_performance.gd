@@ -71,7 +71,7 @@ func _ready() -> void:
 	var before := object_ids(fx)
 	var resources := resource_ids(fx)
 	fx._process(0.0)
-	check(fx._nodes.size() == 99 and int(fx.snapshot().allocated_units) == 131, "legal maximum inventory burst and driving emitters fit prewarmed hard pools")
+	check(fx._nodes.size() == 99 and int(fx.snapshot().allocated_units) == 135, "legal maximum inventory burst and driving emitters fit prewarmed hard pools")
 	for i in 100:
 		fx.powerup_used(c, Data.PW_KEYS[i % Data.PW_KEYS.size()], false)
 		fx.boom(race.track.pos(c.s, c.d), Color.ORANGE)
