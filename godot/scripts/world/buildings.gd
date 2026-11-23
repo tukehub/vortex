@@ -5,10 +5,13 @@ extends Node3D
 ## material, and applies per-chunk visibility ranges from the quality preset.
 
 const FACADE_SHADER := preload("res://shaders/facade.gdshader")
+const SHOWCASE_SHADER := preload("res://shaders/showcase_facade.gdshader")
 
 var facade_mat: ShaderMaterial
 var roof_mat: StandardMaterial3D
 var chunk_nodes: Array[MeshInstance3D] = []
+var showcase_mat: ShaderMaterial
+var showcase_chunks: Array[MeshInstance3D] = []
 
 
 func load_city(city_id: String) -> void:
@@ -24,14 +27,6 @@ func load_city(city_id: String) -> void:
 	facade_mat.set_shader_parameter("tex_plaster", load("res://assets/textures/plaster_diff.jpg"))
 	facade_mat.set_shader_parameter("tex_plaster_n", load("res://assets/textures/plaster_nor.jpg"))
 	facade_mat.set_shader_parameter("tex_concrete", load("res://assets/textures/concrete_wall_diff.jpg"))
-	if city_id == "tirane":
-		# Keep the material preview with the starting grid when the route changes.
-		facade_mat.set_shader_parameter("detail_preview", 1.0)
-		var track_path := "res://assets/cities/%s/track.json" % city_id
-		var track_data = JSON.parse_string(FileAccess.get_file_as_string(track_path))
-		if track_data is Dictionary and not track_data.get("pts", []).is_empty():
-			var first: Array = track_data.pts[0]
-			facade_mat.set_shader_parameter("detail_origin", Vector2(float(first[0]), float(first[2])))
 	roof_mat = StandardMaterial3D.new()
 	roof_mat.vertex_color_use_as_albedo = true
 	roof_mat.albedo_texture = load("res://assets/textures/rooftiles_diff.jpg")
@@ -43,8 +38,28 @@ func load_city(city_id: String) -> void:
 	var inst := scene.instantiate()
 	add_child(inst)
 	_collect(inst)
+	if city_id == "tirane":
+		_load_showcase()
 	apply_quality()
 	Quality.preset_changed.connect(func(_p): apply_quality())
+
+
+func _load_showcase() -> void:
+	var path := "res://assets/cities/tirane/showcase_facades.glb"
+	if not ResourceLoader.exists(path):
+		return
+	var scene: PackedScene = load(path)
+	var detail := scene.instantiate()
+	add_child(detail)
+	showcase_mat = ShaderMaterial.new()
+	showcase_mat.shader = SHOWCASE_SHADER
+	showcase_mat.set_shader_parameter("plaster_map", preload("res://assets/textures/plaster_diff.jpg"))
+	for child in detail.find_children("*", "MeshInstance3D", true, false):
+		var mesh := child as MeshInstance3D
+		mesh.material_override = showcase_mat
+		# The original building volumes already cast the large directional shadows.
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		showcase_chunks.append(mesh)
 
 
 func _collect(n: Node) -> void:
@@ -72,8 +87,17 @@ func apply_quality() -> void:
 		mi.visibility_range_end_margin = dist * 0.1
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 
+	var detail_dist := 120.0 if Quality.preset == "low" else (175.0 if Quality.preset == "medium" else 235.0)
+	for mesh in showcase_chunks:
+		mesh.visibility_range_end = detail_dist
+		mesh.visibility_range_end_margin = 18.0
+
 
 func set_env(night: float, wet: float) -> void:
 	if facade_mat:
 		facade_mat.set_shader_parameter("night", night)
 		facade_mat.set_shader_parameter("wetness", wet)
+
+	if showcase_mat:
+		showcase_mat.set_shader_parameter("night", night)
+		showcase_mat.set_shader_parameter("wetness", wet)
