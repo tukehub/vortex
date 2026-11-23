@@ -28,7 +28,7 @@ func _ready() -> void:
 			check(car.wheels.has(wheel_name), "named wheel " + def.id + " " + wheel_name)
 			if not car.wheels.has(wheel_name):
 				continue
-			var wheel: MeshInstance3D = car.wheels[wheel_name]
+			var wheel: Node3D = car.wheels[wheel_name]
 			var expected_left: bool = wheel_name.ends_with("l")
 			var expected_front: bool = wheel_name.begins_with("wheel_f")
 			check((wheel.position.x < -0.1 if expected_left else wheel.position.x > 0.1), "wheel left/right position " + wheel_name)
@@ -44,12 +44,12 @@ func _ready() -> void:
 			var initial_bases := {}
 			var contact_points := {}
 			for name in ["wheel_rl", "wheel_rr"]:
-				var wheel: MeshInstance3D = car.wheels[name]
+				var wheel: Node3D = car.wheels[name]
 				initial_bases[name] = wheel.transform.basis
 				contact_points[name] = wheel.transform.basis.inverse() * Vector3.DOWN
 			car.apply_state(state, visual_track, 0.01)
 			for name in ["wheel_rl", "wheel_rr"]:
-				var wheel: MeshInstance3D = car.wheels[name]
+				var wheel: Node3D = car.wheels[name]
 				var after_contact: Vector3 = wheel.transform.basis * contact_points[name]
 				var before_contact: Vector3 = initial_bases[name] * contact_points[name]
 				check(after_contact.z > before_contact.z, "rear tire rolls opposite forward motion " + name)
@@ -58,7 +58,7 @@ func _ready() -> void:
 			state.v = -12.0
 			car.apply_state(state, visual_track, 0.01)
 			for name in ["wheel_rl", "wheel_rr"]:
-				var wheel: MeshInstance3D = car.wheels[name]
+				var wheel: Node3D = car.wheels[name]
 				var after_contact: Vector3 = wheel.transform.basis * contact_points[name]
 				var before_contact: Vector3 = initial_bases[name] * contact_points[name]
 				check(after_contact.z < before_contact.z, "rear tire rolls opposite reverse motion " + name)
@@ -68,10 +68,10 @@ func _ready() -> void:
 			state.steer = 0.4
 			state.braking = true
 			car.apply_state(state, visual_track, 0.01)
-			var fl: MeshInstance3D = car.wheels.wheel_fl
-			var fr: MeshInstance3D = car.wheels.wheel_fr
-			var rl: MeshInstance3D = car.wheels.wheel_rl
-			var rr: MeshInstance3D = car.wheels.wheel_rr
+			var fl: Node3D = car.wheels.wheel_fl
+			var fr: Node3D = car.wheels.wheel_fr
+			var rl: Node3D = car.wheels.wheel_rl
+			var rr: Node3D = car.wheels.wheel_rr
 			check(fl.rotation.x > 0.1 and fr.rotation.x < -0.1, "front wheels spin " + def.id)
 			check(rl.rotation.x > 0.1 and rr.rotation.x < -0.1, "rear wheels spin " + def.id)
 			check(absf(fr.rotation.y) > 0.001 and absf(rr.rotation.y) < 0.001, "only front wheels steer " + def.id)
@@ -79,7 +79,7 @@ func _ready() -> void:
 			if car.calipers != null:
 				check(car.calipers.get_parent() == car.model and not car.calipers.get_parent() is MeshInstance3D, "calipers do not spin with the wheels " + def.id)
 				check(is_equal_approx(float(car.caliper_material.get_shader_parameter("steer")), car.steer_vis), "front calipers steer with the wheels " + def.id)
-			check(absf(car.spin - state.v * 0.01 / (rl.mesh.get_aabb().size.y * 0.5)) < 0.001, "wheel rotation matches tire radius " + def.id)
+			check(absf(car.spin - state.v * 0.01 / car.visual_wheel_radius) < 0.001, "wheel rotation matches tire radius " + def.id)
 			state.steer = 1.0
 			state.v = 4.0
 			car.apply_state(state, visual_track, 0.5)
@@ -91,7 +91,7 @@ func _ready() -> void:
 			car.apply_state(state, visual_track, 0.01)
 			check(car.contact_shadow.transparency > 0.99, "contact shadow fades when airborne " + def.id)
 		var triangles := 0
-		for mi in car.model.get_children():
+		for mi in car.model.find_children("*", "MeshInstance3D", true, false):
 			# Glow sprites (QuadMesh) are not part of the model's budget.
 			if mi is MeshInstance3D and mi.mesh is ArrayMesh:
 				for i in mi.mesh.get_surface_count():

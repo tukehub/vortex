@@ -16,7 +16,7 @@ func check(ok: bool, message: String) -> void:
 func _ready() -> void:
 	Quality.set_preset("medium")
 	var def: Dictionary = Data.CARS[0]
-	var source: Node3D = (load(str(def.model)) as PackedScene).instantiate()
+	var source: Node3D = (load(str(def.visual.model_path)) as PackedScene).instantiate()
 	var player := CarVisual.new()
 	add_child(player)
 	player.setup(def, Color.html(str(def.color)), true, {"rim": "gold"})

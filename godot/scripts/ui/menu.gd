@@ -184,9 +184,6 @@ func _set_garage_car(id: String) -> void:
 	garage_car.setup(def, Color.html(def.color), false, {"rim": garage_choice("rim"), "livery": garage_choice("livery")})
 	garage_car.set_night(0.0)
 	RaceReflections.hide_from_probes(garage_car)
-	for nm in garage_car.wheels:
-		var wheel: MeshInstance3D = garage_car.wheels[nm]
-		wheel.rotation.y = PI if String(nm).ends_with("l") else 0.0
 
 
 func _process(dt: float) -> void:

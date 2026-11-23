@@ -39,6 +39,11 @@ static var _wheel_cache: Dictionary = {}
 static var _lamp_bounds: Dictionary = {}
 static var _tyre_materials: Array[ShaderMaterial] = []
 
+var profile: Dictionary
+var rig_root: Node3D
+var _wheel_rest := {}
+var _front_lamps: Array[ShaderMaterial] = []
+var _rear_lamps: Array[ShaderMaterial] = []
 var def: Dictionary
 var is_player := false
 var color := Color.WHITE
@@ -96,29 +101,47 @@ func setup(p_def: Dictionary, p_color: Color, p_is_player: bool, cosmetics := {}
 	livery = Data.shop_item("livery", str(cosmetics.get("livery", "")))
 	if livery.is_empty():
 		livery = Data.LIVERIES[0]
-	var scene := _load_car_scene(str(def.model))
-	model = scene.instantiate()
+	profile = def.get("visual", VehicleRig.GT)
+	if not def.has("visual") and def.has("model"):
+		profile = VehicleRig.GT.duplicate()
+		profile.model_path = def.model
+		profile.allow_private = def.model == VehicleRig.GT.model_path
+	model = _instantiate_visual()
 	add_child(model)
+	rig_root = VehicleRig.root(model)
+	model.scale *= float(profile.get("visual_scale", 1.0))
+	body = rig_root.get_node_or_null("body" if _legacy() else "Body") as MeshInstance3D
 	var caliper_parts := []
-	for ch in model.get_children():
-		if ch is MeshInstance3D:
-			var wheel := String(ch.name).begins_with("wheel")
-			if ch.name == "body":
-				body = ch
-			elif wheel:
-				wheels[String(ch.name)] = ch
-				var part := _strip_caliper(ch)
-				if not part.is_empty():
-					caliper_parts.append(part)
-			ch.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
-			_override_materials(ch, wheel)
-	if wheels.has("wheel_rl"):
-		var rear: MeshInstance3D = wheels["wheel_rl"]
-		if rear.mesh != null:
-			visual_wheel_radius = maxf(0.05, rear.mesh.get_aabb().size.y * 0.5)
+	for key: String in VehicleRig.WHEELS:
+		var id := key.to_lower()
+		var pivot := rig_root.get_node_or_null(id if _legacy() else key) as Node3D
+		if pivot == null:
+			continue
+		wheels[id] = pivot
+		if profile.get("wheel_offsets", {}).has(key):
+			pivot.position = profile.wheel_offsets[key]
+		_wheel_rest[id] = pivot.basis
+		if _legacy() and pivot is MeshInstance3D:
+			var part := _strip_caliper(pivot)
+			if not part.is_empty():
+				caliper_parts.append(part)
+	for mi: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var wheel := false
+		for pivot: Node3D in wheels.values():
+			if pivot == mi or pivot.is_ancestor_of(mi):
+				wheel = true
+				break
+		mi.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
+		_override_materials(mi, wheel)
+	if _legacy() and wheels.has("wheel_rl"):
+		var rear: MeshInstance3D = wheels.wheel_rl
+		visual_wheel_radius = maxf(.05, rear.mesh.get_aabb().size.y * .5)
 		if wheels.has("wheel_fl"):
-			var front: MeshInstance3D = wheels["wheel_fl"]
-			visual_wheelbase = maxf(0.1, absf(front.position.z - rear.position.z))
+			visual_wheelbase = absf(wheels.wheel_fl.position.z - rear.position.z)
+	else:
+		visual_wheel_radius = profile.wheel_radius * profile.visual_scale
+		visual_wheelbase = profile.wheelbase * profile.visual_scale
+	_pose_wheels()
 	_apply_livery()
 	if caliper_parts.size() == 4:
 		_make_calipers(caliper_parts)
@@ -174,15 +197,45 @@ func _apply_car_shadows(_preset: String = "") -> void:
 	for root in [model, finish_driver]:
 		if root == null:
 			continue
-		for child in root.get_children():
-			if child is GeometryInstance3D and not child in halos:
+		for child in root.find_children("*", "GeometryInstance3D", true, false):
+			if child is GeometryInstance3D and not child in halos and not child in nitro_jets and not child in _nitro_flares:
 				child.cast_shadow = shadow_mode
 
 
-static func _load_car_scene(fallback: String) -> PackedScene:
+func _legacy() -> bool:
+	return bool(profile.get("legacy", false))
+
+
+func _instantiate_visual() -> Node3D:
+	var base := str(profile.model_path)
+	# Optional lower-cost GLBs are chosen at spawn. Godot's imported mesh
+	# LODs continue to adapt to camera distance within the selected model.
+	var selected := str(profile.get("lod_models", {}).get(Quality.preset, base))
+	for path in [selected, base] if selected != base else [base]:
+		if ResourceLoader.exists(path):
+			var scene := _load_car_scene(path, profile.get("allow_private", false))
+			if scene:
+				var instance := scene.instantiate() as Node3D
+				if instance:
+					var problems := PackedStringArray()
+					if not _legacy():
+						problems = VehicleRig.validate(VehicleRig.root(instance), profile)
+					if instance is CollisionObject3D or not instance.find_children("*", "CollisionObject3D", true, false).is_empty():
+						problems.append("visual contains gameplay physics objects")
+					if problems.is_empty():
+						return instance
+					push_warning("%s: %s" % [path, "; ".join(problems)])
+					instance.free()
+		else:
+			push_warning("Missing vehicle model " + path)
+	profile = VehicleRig.GT
+	return (load(profile.model_path) as PackedScene).instantiate()
+
+
+static func _load_car_scene(fallback: String, allow_private := true) -> PackedScene:
 	# Licensed car resources can be staged privately at build time. Load once
 	# for all six vehicles; public builds retain the existing open asset.
-	if not _sport_checked:
+	if allow_private and not _sport_checked:
 		_sport_checked = true
 		var path := "res://assets/private_car/vortex_sport.bin"
 		var key_path := "res://assets/private_car/car_key.gd"
@@ -199,7 +252,7 @@ static func _load_car_scene(fallback: String) -> PackedScene:
 						if packed.pack(node) == OK:
 							_sport_scene = packed
 						node.free()
-	if _sport_scene != null:
+	if allow_private and _sport_scene != null:
 		return _sport_scene
 	return load(fallback) as PackedScene
 
@@ -215,13 +268,13 @@ func _make_contact_shadow() -> void:
 	var tyres := PackedVector2Array()
 	for nm in ["wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]:
 		if wheels.has(nm):
-			var w: MeshInstance3D = wheels[nm]
-			tyres.append(Vector2(w.position.x, w.position.z))
+			var at := to_local((wheels[nm] as Node3D).global_position)
+			tyres.append(Vector2(at.x, at.z))
 	if tyres.size() != 4:
 		var sz: Vector3 = def.size
 		tyres = PackedVector2Array([Vector2(-sz.x * 0.42, -sz.z * 0.27), Vector2(sz.x * 0.42, -sz.z * 0.27),
 			Vector2(-sz.x * 0.42, sz.z * 0.33), Vector2(sz.x * 0.42, sz.z * 0.33)])
-	contact_shadow.material_override = _shared("contact_shadow_" + str(def.model) + str(tyres), func():
+	contact_shadow.material_override = _shared("contact_shadow_" + str(profile.model_path) + str(tyres), func():
 		var material := ShaderMaterial.new()
 		material.shader = CONTACT_SHADER
 		material.set_shader_parameter("plane_size", plane.size)
@@ -240,7 +293,7 @@ func _override_materials(mi: MeshInstance3D, wheel := false) -> void:
 		var m := mesh.surface_get_material(i)
 		var nm := m.resource_name if m else ""
 		var ov: Material = null
-		match nm:
+		match profile.get("material_slots", {}).get(nm, nm):
 			"paint": ov = _paint(m)
 			"sport_body":
 				if m is BaseMaterial3D and m.albedo_texture != null:
@@ -579,8 +632,10 @@ func _lamp(rear: bool, mesh: Mesh, surface: int) -> ShaderMaterial:
 	m.set_shader_parameter("lamp_color", Color(1.0, 0.05, 0.02) if rear else Color(1.0, 0.97, 0.92))
 	if rear:
 		lamp_rear = m
+		_rear_lamps.append(m)
 	else:
 		lamp_front = m
+		_front_lamps.append(m)
 	m.set_meta("bounds", box)
 	return m
 
@@ -588,12 +643,12 @@ func _lamp(rear: bool, mesh: Mesh, surface: int) -> ShaderMaterial:
 ## Lamp states for night and braking; only writes what changed.
 func _update_lamps() -> void:
 	var dark := night > 0.3
-	if lamp_front:
-		lamp_front.set_shader_parameter("running", DRL_NIGHT if dark else DRL_DAY)
-		lamp_front.set_shader_parameter("beam", BEAM_NIGHT if dark else 0.0)
-	if lamp_rear:
-		lamp_rear.set_shader_parameter("running", TAIL_NIGHT if dark else TAIL_DAY)
-		lamp_rear.set_shader_parameter("beam", BRAKE if braking_now else 0.0)
+	for lamp in _front_lamps:
+		lamp.set_shader_parameter("running", DRL_NIGHT if dark else DRL_DAY)
+		lamp.set_shader_parameter("beam", BEAM_NIGHT if dark else 0.0)
+	for lamp in _rear_lamps:
+		lamp.set_shader_parameter("running", TAIL_NIGHT if dark else TAIL_DAY)
+		lamp.set_shader_parameter("beam", BRAKE if braking_now else 0.0)
 	if halos.size() == 4:
 		for i in 2:
 			halos[i].visible = dark
@@ -618,21 +673,44 @@ static func _halo_material(tint: Color, lamp_dir: Vector3) -> ShaderMaterial:
 ## and around a brake light, independent of the screen glow pass (which
 ## daylight skips). Billboards, additive, depth-tested, and only toward the
 ## way each lamp points (car_halo.gdshader).
+func _light_box(role: String) -> AABB:
+	var node_path: String = profile.get("light_nodes", {}).get(role, VehicleRig.LIGHTS[role])
+	var anchor := rig_root.get_node(node_path) as Node3D
+	var meshes := anchor.find_children("*", "MeshInstance3D", true, false)
+	if anchor is MeshInstance3D:
+		meshes.append(anchor)
+	var box := AABB(to_local(anchor.global_position), Vector3.ZERO)
+	var first := true
+	for mi: MeshInstance3D in meshes:
+		if mi.mesh:
+			var bounds: AABB = (global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
+			box = bounds if first else box.merge(bounds)
+			first = false
+	return box
+
+
 func _make_halos() -> void:
 	var head_box: AABB = lamp_front.get_meta("bounds") if lamp_front else AABB(Vector3(-def.size.x * 0.5, def.size.y * 0.4, -def.size.z * 0.5), Vector3(def.size.x, 0.08, 0.05))
 	var tail_box: AABB = lamp_rear.get_meta("bounds") if lamp_rear else AABB(Vector3(-def.size.x * 0.5, def.size.y * 0.5, def.size.z * 0.5 - 0.05), Vector3(def.size.x, 0.06, 0.05))
+	if not _legacy():
+		head_box = _light_box("front")
+		tail_box = _light_box("rear")
 	var head_mat := _halo_material(Color(0.85, 0.9, 1.0), Vector3(0, 0, -1))
 	var tail_mat := _halo_material(Color(1.0, 0.05, 0.02), Vector3(0, 0, 1))
 	for side in [-1.0, 1.0]:
 		var q := FxVisual.glow_quad(head_mat, 0.55)
 		q.position = Vector3(side * (head_box.end.x - 0.22), head_box.get_center().y, head_box.position.z - 0.08)
 		q.visible = false
+		if not _legacy():
+			q.position = model.transform.affine_inverse() * q.position
 		model.add_child(q)
 		halos.append(q)
 	for side in [-1.0, 1.0]:
 		var q := FxVisual.glow_quad(tail_mat, 0.42)
 		q.position = Vector3(side * (tail_box.end.x - 0.1), tail_box.get_center().y, tail_box.end.z + 0.06)
 		q.visible = false
+		if not _legacy():
+			q.position = model.transform.affine_inverse() * q.position
 		model.add_child(q)
 		halos.append(q)
 	_update_lamps()
@@ -671,6 +749,9 @@ func _make_headlights() -> void:
 	for side in [-1.0, 1.0]:
 		var l := SpotLight3D.new()
 		l.position = Vector3(side * (sz.x * 0.5 - 0.3), sz.y * 0.42, -sz.z * 0.5 + 0.05)
+		if not _legacy():
+			var bounds := _light_box("front")
+			l.position = Vector3(bounds.get_center().x + side * bounds.size.x * .39, bounds.get_center().y, bounds.position.z)
 		# Dipped-beam aim: a few degrees down, so the pool reaches well down
 		# the road, with soft edges instead of a hard disc.
 		l.rotation = Vector3(deg_to_rad(-4.0), side * deg_to_rad(-3.0), 0)
@@ -806,14 +887,7 @@ func _animate(c: CarState, dt: float, lateral_accel: float, full_lock := -1.0) -
 	if full_lock >= 0.0:
 		target_steer = -c.steer * full_lock
 	steer_vis = lerpf(steer_vis, target_steer, minf(1.0, dt * 12.0))
-	for nm in wheels:
-		var w: MeshInstance3D = wheels[nm]
-		var left: bool = nm.ends_with("l")
-		var front: bool = nm.begins_with("wheel_f")
-		var side := -1.0 if left else 1.0
-		# In model space the car faces -Z, so forward rolling turns the bottom
-		# of each tire toward +Z relative to the car.
-		w.rotation = Vector3(-spin * side, (PI if left else 0.0) + (steer_vis if front else 0.0), 0.0)
+	_pose_wheels()
 	if caliper_material:
 		caliper_material.set_shader_parameter("steer", steer_vis)
 	# lights
@@ -849,6 +923,17 @@ func _animate(c: CarState, dt: float, lateral_accel: float, full_lock := -1.0) -
 	visible = not (c.wreck_t > 0.0 and c.wreck_t < 0.05)
 
 
+func _pose_wheels() -> void:
+	for nm: String in wheels:
+		var pivot: Node3D = wheels[nm]
+		var steer := steer_vis if nm.begins_with("wheel_f") else 0.0
+		if _legacy():
+			var left := nm.ends_with("l")
+			pivot.rotation = Vector3(spin if left else -spin, steer + (PI if left else 0.), 0.)
+		else:
+			pivot.basis = Basis(Vector3.UP, steer) * Basis(Vector3.RIGHT, -spin) * _wheel_rest[nm]
+
+
 func _make_nitro() -> void:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -874,5 +959,11 @@ func _make_nitro() -> void:
 		_nitro_flares.append(flare)
 		flare.position.y = -0.7
 		jet.add_child(flare)
-		add_child(jet)
+		if _legacy():
+			add_child(jet)
+		else:
+			var side_key := "left" if side < 0 else "right"
+			var socket_path: String = profile.get("nitro_sockets", {}).get(side_key, VehicleRig.SOCKETS[side_key])
+			rig_root.get_node(socket_path).add_child(jet)
+			jet.position = Vector3(0, 0, .7)
 		nitro_jets.append(jet)

@@ -65,31 +65,31 @@ const CITIES := [
 # body/glass/lights/wheel_fl/wheel_fr/wheel_rl/wheel_rr.
 const CARS := [
 	{"id": "benxi", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#e63138",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "uragani", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#246be8",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "kercyesi", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#e9eff5",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "shigjeta", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#536476",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "gelendvagen", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#f6c82a",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "sprinteri", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#26b69b",
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	# Shop paints (6.3): the same car, bought with fans. Paints without a
 	# price are every player's from the start.
 	{"id": "ari", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#c9a227", "price": 600,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "smerald", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#0f7a4f", "price": 500,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "nata", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#45526e", "price": 700,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "bakri", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#b8653a", "price": 600,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "neoni", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#ff2d8f", "price": 900,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 	{"id": "akulli", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#9fd7f2", "price": 800,
-		"model": "res://assets/cars/vortex_gt.glb", "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
 ]
 # Shop (6.3). Rims colour the wheel rims; liveries are drawn in a second
 # colour from assets/cars/livery_atlas.png (tile = column in the atlas, -1
