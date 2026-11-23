@@ -16,6 +16,10 @@ uniform float lane_count = 4.0;
 uniform float start_s = 0.0;
 uniform vec2 stone_section = vec2(0.0); // start and length in metres
 
+uniform float showcase_length = 0.0;
+uniform float showcase_direction = 1.0;
+uniform vec3 showcase_crossings = vec3(0.0);
+
 varying vec2 ruv;
 varying vec3 wpos;
 
@@ -37,6 +41,8 @@ void vertex() {
 void fragment() {
 	float across = ruv.x;
 	float along = ruv.y;
+	float city_s = mod(along * showcase_direction, track_len);
+	float detail = smoothstep(0.0, 8.0, min(city_s, showcase_length - city_s));
 	vec2 tuv = vec2(across, along) / 5.0;
 	// second asphalt sample rotated to kill repetition
 	vec2 tuv2 = vec2(along, -across) / 7.3;
@@ -46,7 +52,8 @@ void fragment() {
 	// The second sample's UVs are rotated 90 degrees; rotate its tangent-space
 	// direction back before blending or the surface grain lights incorrectly.
 	vec3 nrm = mix(n1, vec3(1.0 - n2.g, n2.r, n2.b), 0.5);
-	float rough = texture(tex_asphalt_r, tuv).r * 0.45 + 0.5;
+	float aggregate = texture(tex_asphalt_r, tuv).r;
+	float rough = aggregate * 0.45 + 0.5;
 	// A darker, matte gutter ties the asphalt to the physical curb. The outer
 	// edge blends toward the shoulder instead of reading as a bright raised slab.
 	float gutter = smoothstep(half_w - 1.0, half_w + 0.3, abs(across));
@@ -60,6 +67,22 @@ void fragment() {
 	float wear = exp(-pow((lane_pos - 0.3) * 6.0, 2.0)) + exp(-pow((lane_pos - 0.7) * 6.0, 2.0));
 	asphalt *= 1.0 - 0.09 * wear;
 
+	// Patch seams use broad, staggered cells. Mipmapped asphalt roughness
+	// breaks up the edge without introducing a second detail map.
+	if (detail > 0.0) {
+		vec2 patch_uv = vec2(wpos.x / 4.7, wpos.z / 8.3);
+		patch_uv.x += mod(floor(patch_uv.y), 2.0) * 0.5;
+		vec2 joints = abs(fract(patch_uv) - 0.5);
+		vec2 widths = vec2(0.42, 0.41) + (aggregate - 0.5) * 0.085;
+		float seam = max(joints.x - widths.x, joints.y - widths.y);
+		float patch_aa = max(0.018, max(fwidth(patch_uv.x), fwidth(patch_uv.y)));
+		float repaired = (1.0 - smoothstep(-patch_aa, patch_aa, seam))
+			* step(0.76, hash(floor(patch_uv))) * detail;
+		asphalt *= 1.0 - detail * (0.17 + 0.10 * gutter + 0.042 * wear);
+		asphalt *= 1.0 - repaired * (0.12 + aggregate * 0.15);
+		rough = mix(rough, 0.63, repaired * 0.7);
+	}
+
 	// lane markings: dashed white between lanes, solid yellow centre, solid white edges
 	float edge = 1.0 - smoothstep(0.15, 0.25, abs(abs(across) - (half_w - 0.35)));
 	float centre = 1.0 - smoothstep(0.12, 0.22, abs(across));
@@ -70,14 +93,31 @@ void fragment() {
 		if (abs(float(i) * 2.0 - lane_count) < 0.5) continue; // centre handled separately
 		lane_line = max(lane_line, (1.0 - smoothstep(0.1, 0.18, abs(across - lx))) * dash);
 	}
+	float crossing = 0.0;
+	if (detail > 0.0) {
+		vec3 crossing_offsets = abs(city_s - showcase_crossings);
+		float crossing_s = min(crossing_offsets.x, min(crossing_offsets.y, crossing_offsets.z));
+		float across_aa = clamp(fwidth(across) * 0.65, 0.014, 0.23);
+		float along_aa = clamp(fwidth(city_s) * 0.65, 0.024, 0.55);
+		float bars = 1.0 - smoothstep(0.24 - across_aa, 0.24 + across_aa,
+			abs(fract(abs(across) / 0.92) - 0.5) * 0.92);
+		crossing = bars * (1.0 - smoothstep(1.7 - along_aa, 1.7 + along_aa, crossing_s))
+			* (1.0 - smoothstep(half_w - 0.74, half_w - 0.42, abs(across)));
+		float junction = mix(1.0, smoothstep(2.1, 3.9, crossing_s), detail);
+		edge *= junction;
+		centre *= junction;
+		lane_line *= junction;
+	}
 	vec3 col = asphalt;
-	float mark = max(edge, max(lane_line, centre));
+	float mark = max(crossing, max(edge, max(lane_line, centre)));
 	// Paint wear noise is only evaluated on the markings themselves.
 	if (mark > 0.0) {
 		float worn = 0.78 + 0.20 * vnoise(vec2(across, along) * 1.7);
 		col = mix(col, line_white * worn, edge * 0.9);
 		col = mix(col, line_white * worn, lane_line * 0.85);
-		col = mix(col, line_yellow * worn, centre * 0.9);
+		vec3 centre_tint = mix(line_yellow, line_white * vec3(0.95, 0.94, 0.9), detail);
+		col = mix(col, centre_tint * worn, centre * 0.9);
+		col = mix(col, line_white * (0.69 + 0.24 * aggregate), crossing * 0.95);
 		rough = mix(rough, 0.55, mark);
 	}
 
@@ -115,9 +155,15 @@ void fragment() {
 		float puddle = smoothstep(0.62 - 0.25 * wetness, 0.72 - 0.25 * wetness, pud) * wetness;
 		puddle *= 0.5 + 0.5 * smoothstep(0.2, 0.8, abs(across) / half_w);
 		wet = clamp(wetness * 0.75 + puddle, 0.0, 1.0);
+		if (detail > 0.0) {
+			// Wheel paths shed water. The gutter keeps a smoother film and
+			// catches sky and lamp highlights through the Mobile BRDF.
+			puddle *= mix(1.0, 0.53 + 0.38 * gutter - 0.22 * wear, detail);
+			wet = clamp(wetness * (0.62 + gutter * 0.14) + puddle, 0.0, 1.0);
+		}
 		// Damp asphalt stays dark and textured; only puddles become smooth.
-		col *= 1.0 - 0.40 * wet;
-		rough = mix(rough, 0.22, wet);
+		col *= 1.0 - mix(0.40, 0.56, detail) * wet;
+		rough = mix(rough, mix(0.22, 0.31, detail), wet);
 		rough = mix(rough, 0.07, puddle);
 		nrm = mix(nrm, vec3(0.5, 0.5, 1.0), puddle);
 	}
@@ -132,7 +178,7 @@ void fragment() {
 	ALBEDO = col;
 	ROUGHNESS = rough;
 	METALLIC = 0.0;
-	SPECULAR = 0.5;
+	SPECULAR = mix(0.5, 0.66, wet * detail);
 	NORMAL_MAP = nrm;
 	NORMAL_MAP_DEPTH = mix(0.45, 0.2, clamp(wet, 0.0, 1.0));
 }

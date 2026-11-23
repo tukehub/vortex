@@ -170,7 +170,7 @@ func _build_world() -> void:
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
-	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at)
+	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
 	if tj.has("tunnel"):
 		var tunnel := preload("res://scripts/world/vlore_tunnel.gd").new()
 		tunnel.name = "UjiIFtohteTunnel"
