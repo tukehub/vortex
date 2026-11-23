@@ -16,6 +16,22 @@ func build_forest(transforms: Array[Transform3D]) -> void:
     var root := TREE_SCENE.instantiate()
     var parts: Array = []
     _collect_meshes(root, Transform3D.IDENTITY, parts)
+    # Every spatial batch shares the prepared surfaces of its tree part.
+    for part in parts:
+        var mesh: ArrayMesh = part[0].duplicate()
+        for surface in mesh.get_surface_count():
+            var source := mesh.surface_get_material(surface)
+            if source is BaseMaterial3D:
+                var material: BaseMaterial3D = source.duplicate()
+                var material_name := material.resource_name.to_lower()
+                if "needle" in material_name or "foliage" in material_name or material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+                    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+                    material.alpha_scissor_threshold = 0.5
+                    # MSAA (medium/high) resolves cut-out leaf edges only through coverage.
+                    material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
+                    material.cull_mode = BaseMaterial3D.CULL_DISABLED
+                mesh.surface_set_material(surface, material)
+        part[0] = mesh
     var chunks := {}
     for tree in transforms:
         var key := Vector2i(floori(tree.origin.x / CHUNK_SIZE), floori(tree.origin.z / CHUNK_SIZE))
@@ -25,19 +41,7 @@ func build_forest(transforms: Array[Transform3D]) -> void:
     for key: Vector2i in chunks:
         var origin := Vector3((key.x + 0.5) * CHUNK_SIZE, 0, (key.y + 0.5) * CHUNK_SIZE)
         for part in parts:
-            var mesh: ArrayMesh = part[0].duplicate(true)
-            for surface in mesh.get_surface_count():
-                var source := mesh.surface_get_material(surface)
-                if source is BaseMaterial3D:
-                    var material: BaseMaterial3D = source.duplicate()
-                    var material_name := material.resource_name.to_lower()
-                    if "needle" in material_name or "foliage" in material_name or material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
-                        material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-                        material.alpha_scissor_threshold = 0.5
-                        # MSAA (medium/high) resolves cut-out leaf edges only through coverage.
-                        material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
-                        material.cull_mode = BaseMaterial3D.CULL_DISABLED
-                    mesh.surface_set_material(surface, material)
+            var mesh: ArrayMesh = part[0]
             var mm := MultiMesh.new()
             mm.transform_format = MultiMesh.TRANSFORM_3D
             mm.mesh = mesh
