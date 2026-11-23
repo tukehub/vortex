@@ -56,6 +56,11 @@ func _ready() -> void:
 				var key := found.get_string(2)
 				keys[key] = true
 				patterns.append(reference_checks(table, found.get_string(1), key, found.get_string(3), where))
+			# Rig validation collects warning fragments before logging them together.
+			if path == "res://scripts/cars/vehicle_rig.gd" and code.strip_edges().begins_with("errors.append("):
+				continue
+			if path == "res://scripts/cars/car_visual.gd" and code.strip_edges().begins_with("problems.append("):
+				continue
 			if DIAGNOSTICS.any(func(call: String) -> bool: return code.contains(call)):
 				continue
 			for text: String in parsed.literals:
