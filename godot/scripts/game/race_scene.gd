@@ -210,7 +210,7 @@ func _build_world() -> void:
 	bld.set_env(sky.night, sky.wet)
 	props = Props.new()
 	add_child(props)
-	props.load_city(city_id, terrain)
+	props.load_city(city_id, terrain, track, reverse)
 	props.set_night(sky.night)
 	pine_forest = get_node_or_null("PineForest") as Node3D
 	_setup_pines()
