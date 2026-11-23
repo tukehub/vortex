@@ -3,9 +3,17 @@ render_mode cull_disabled, specular_schlick_ggx;
 #include "res://shaders/tree_dither.gdshaderinc"
 
 uniform sampler2D sprays : source_color, repeat_disable, filter_linear_mipmap;
+uniform float wind_m = 0.0;
 
 void vertex() {
 	tree_data = INSTANCE_CUSTOM;
+	// The branch mesh stays still. Fine stems in each spray travel with its leaves.
+	if (wind_m > 0.0) {
+		float distance_to_eye = distance(MODEL_MATRIX[3].xyz, MAIN_CAM_INV_VIEW_MATRIX[3].xyz);
+		float strength = wind_m * (1.0 - smoothstep(35.0, 112.0, distance_to_eye));
+		float phase = TIME * 1.55 + tree_data.y * TAU + VERTEX.y * 0.48;
+		VERTEX.xz += vec2(0.92, 0.41) * (sin(phase) * strength);
+	}
 }
 
 void fragment() {

@@ -53,6 +53,13 @@ const PRESETS := {
 	},
 }
 
+## Vegetation scales independently from the baked city density.
+const TREE_QUALITY := {
+	"low": [28.0, 76.0, 9, 45, 0.0],
+	"medium": [50.0, 125.0, 20, 92, 0.033],
+	"high": [70.0, 160.0, 30, 144, 0.058],
+}
+
 var preset := "medium"
 var p: Dictionary = PRESETS.medium
 var detected := "medium"
@@ -113,6 +120,14 @@ func _derive_budget() -> void:
 	p.fx_sparks = stage < 2 and preset != "low"
 	p.lamp_lights = mini(int(p.lamp_lights), [14, 6, 3, 2][stage])
 	p.shadow_dist = maxf(50.0, float(p.shadow_dist) * (1.0 - stage * 0.15))
+	var tree: Array = TREE_QUALITY[preset]
+	var distance_scale: float = [1.0, 0.92, 0.81, 0.70][stage]
+	p.tree_near_m = float(tree[0]) * distance_scale
+	p.tree_mid_m = float(tree[1]) * distance_scale
+	p.tree_near_limit = maxi(4, roundi(int(tree[2]) * distance_scale))
+	p.tree_mid_limit = maxi(22, roundi(int(tree[3]) * distance_scale))
+	p.tree_wind_m = float(tree[4]) * (1.0 if stage == 0 else (0.65 if stage == 1 else 0.0))
+	p.tree_near_shadows = preset == "high" and stage == 0
 	# Reflections (3.3): one probe follows the player on medium and high and
 	# re-renders (one cube face a frame) after every `probe_step` metres;
 	# high adds static probes at the landmarks nearest the road.

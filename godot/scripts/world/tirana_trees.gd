@@ -5,15 +5,11 @@ extends Node3D
 const SPECIES := ["plane", "linden", "acacia"]
 const ASSET := preload("res://assets/foliage/tirana/broadleaf_trees.glb")
 const SEARCH_CELL := 76.0
-const FAR_CELL := 240.0
+const FAR_CELL := 320.0
 const FADE_MS := 180
 const MAX_CHANGES := 24
 const EXTRA_SLOTS := 24
 const MAX_MID := 144
-const NEAR_METRES := Vector3(28.0, 50.0, 70.0)
-const MID_METRES := Vector3(76.0, 125.0, 160.0)
-const NEAR_LIMITS := Vector3i(9, 20, 30)
-const MID_LIMITS := Vector3i(45, 92, MAX_MID)
 const MAX_NEAR := 30
 const FAR := 2
 
@@ -87,7 +83,7 @@ func _create_meshes() -> void:
 		for species in SPECIES:
 			var item := source.find_child("%s_lod%d" % [species, lod], true, false) as MeshInstance3D
 			var node := MultiMeshInstance3D.new()
-			node.name = "%sLOD%d" % [species, lod]
+			node.name = "%s_lod%d" % [species, lod]
 			var mesh := item.mesh.duplicate() as ArrayMesh
 			mesh.surface_set_material(0, bark)
 			mesh.surface_set_material(1, _foliage)
@@ -98,6 +94,7 @@ func _create_meshes() -> void:
 			# Dynamic bounds cover all possible positions in the current pool.
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(node)
+			RaceReflections.hide_detail(node)
 			_pools.append(TreePool.new(node))
 	source.free()
 
@@ -144,11 +141,14 @@ func _build_far_chunk(key: Vector2i, ids: PackedInt32Array) -> void:
 
 
 func _apply_budget() -> void:
-	var tier := ["low", "medium", "high"].find(Quality.preset)
-	_near_radius = NEAR_METRES[tier]
-	_mid_radius = MID_METRES[tier]
-	_near_limit = NEAR_LIMITS[tier]
-	_mid_limit = MID_LIMITS[tier]
+	_near_radius = float(Quality.p.tree_near_m)
+	_mid_radius = float(Quality.p.tree_mid_m)
+	_near_limit = int(Quality.p.tree_near_limit)
+	_mid_limit = int(Quality.p.tree_mid_limit)
+	_foliage.set_shader_parameter("wind_m", float(Quality.p.tree_wind_m))
+	for i in SPECIES.size():
+		_pools[i].node.cast_shadow = (GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if bool(Quality.p.tree_near_shadows) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 	var reach := float(Quality.p.props_dist) * 1.3
 	for node in _far_batches:
 		node.visibility_range_end = reach + FAR_CELL * 0.71
@@ -241,12 +241,15 @@ func _select(pos: Vector3, forward: Vector3, now: int, snap: bool) -> void:
 			if added >= _mid_limit:
 				break
 	# Remove or downgrade stale assignments before filling newly available slots.
+	if not snap:
+		_set_clock(now)
 	var changes := 0
 	for id: int in _detailed.keys():
 		var lod := int(desired.get(id, FAR))
 		if lod > entries[id].lod and _set_lod(id, lod, now, snap):
 			changes += 1
 			if not snap and changes >= MAX_CHANGES:
+				_next_scan = now + 34
 				_scan_pending = true
 				return
 	for id: int in desired:
@@ -283,7 +286,6 @@ func _set_lod(id: int, lod: int, now: int, snap: bool) -> bool:
 	else:
 		entry.from = current
 		_fades[id] = now + FADE_MS
-		_set_clock(now)
 		var stamp := fposmod(float(now) * 0.001, 256.0)
 		_show(id, current, 2.0, stamp)
 		_show(id, lod, 1.0, stamp)
