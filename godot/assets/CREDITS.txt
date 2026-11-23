@@ -66,3 +66,5 @@ https://sketchfab.com/3d-models/equestrian-statue-of-napoleon-ad3fe0536f4f40c5a2
 “Bust of Scanderbeg, Parco del Dono, Parma” nga xorgol, CC BY 4.0.
 https://sketchfab.com/3d-models/bust-of-scanderbeg-parco-del-dono-parma-283ae202d8804c618d5af3a637155d97
 creativecommons.org/licenses/by/4.0/
+
+Grupi i bronztë i Monumentit të Pavarësisë është një interpretim për lojën. Anatomia bazë përdor modelin rp_nathan_animated_003 nga Renderpeople, të ripunuar me poza, veshje dhe materiale skulpturore.

@@ -23,6 +23,7 @@ const STEP_HEIGHT := 0.6
 const CORNICE := 0.4
 const SURROUNDINGS := 280.0      # paving beyond the wall, out to the landmarks
 
+var city_id: String
 var arena: Arena
 var player: ArenaCar
 var cars: Array[CarVisual] = []
@@ -50,6 +51,7 @@ var _snd_t := {}
 
 
 func _ready() -> void:
+	city_id = Data.points_city(str(Game.race_opts.city))
 	_build_world()
 	var seed_value := randi() % 100000
 	var minutes := float(Game.race_opts.get("points_minutes", 2))
@@ -103,7 +105,13 @@ func _build_world() -> void:
 	sky_material.ground_bottom_color = Color(0.32, 0.3, 0.28)
 	sky_material.sun_angle_max = 20.0
 	sky_material.sun_curve = 0.1
-	sky.sky_material = sky_material
+	if city_id == "vlore":
+		var panorama := PanoramaSkyMaterial.new()
+		panorama.panorama = load("res://assets/hdri/sky_day.hdr")
+		panorama.energy_multiplier = 0.58
+		sky.sky_material = panorama
+	else:
+		sky.sky_material = sky_material
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = sky
 	# Mostly warm fill, a little of the sky's blue: the stone keeps its colours.
@@ -111,6 +119,10 @@ func _build_world() -> void:
 	environment.ambient_light_color = Color(0.84, 0.8, 0.76)
 	environment.ambient_light_sky_contribution = 0.35
 	environment.ambient_light_energy = 0.75
+	if city_id == "vlore":
+		environment.ambient_light_color = Color(0.71, 0.78, 0.86)
+		environment.ambient_light_energy = 0.42
+		environment.ambient_light_sky_contribution = 0.18
 	environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	# Depth fog: nothing on the cars, the far paving melts into the warm horizon.
 	environment.fog_enabled = true
@@ -133,7 +145,11 @@ func _build_world() -> void:
 	# Low, warm sun (22 degrees up): long shadows and a glancing sheen on the slabs.
 	sun.rotation_degrees = Vector3(-22.0, 38.0, 0.0)
 	sun.light_color = Color(1.0, 0.84, 0.66)
-	sun.light_energy = 1.45
+	if city_id == "vlore":
+		sun.rotation_degrees = Vector3(-38, 62, 0)
+		sun.light_color = Color(1.0, 0.94, 0.84)
+		environment.fog_light_color = Color(0.68, 0.77, 0.86)
+	sun.light_energy = 1.05 if city_id == "vlore" else 1.45
 	sun.light_specular = 0.8
 	sun.shadow_enabled = true
 	Quality.apply_sun(sun)
@@ -151,12 +167,19 @@ func _build_world() -> void:
 	ground.mesh = plane
 	# Honed limestone slabs, each turned and toned on its own, damp in patches.
 	var paving := ShaderMaterial.new()
-	paving.shader = GROUND_SHADER
-	paving.set_shader_parameter("albedo_tex", load(TILE_DIR + "skanderbeg_tiles_diff_1k.jpg"))
-	paving.set_shader_parameter("roughness_tex", load(TILE_DIR + "skanderbeg_tiles_rough_1k.jpg"))
-	paving.set_shader_parameter("normal_tex", load(TILE_DIR + "skanderbeg_tiles_nor_gl_1k.jpg"))
-	paving.set_shader_parameter("sub_grid_divisions", TILE_GRID)
-	paving.set_shader_parameter("tile_scale", 1.0 / (SLAB_SIZE * TILE_GRID))
+	if city_id == "vlore":
+		paving.shader = preload("res://shaders/flag_square.gdshader")
+		paving.set_shader_parameter("albedo_tex", load("res://assets/textures/museum_marble_diff.jpg"))
+		paving.set_shader_parameter("normal_tex", load("res://assets/textures/museum_marble_nor.jpg"))
+		paving.set_shader_parameter("roughness_tex", load("res://assets/textures/museum_marble_rough.jpg"))
+		paving.set_shader_parameter("island_radius", Arena.ISLAND)
+	else:
+		paving.shader = GROUND_SHADER
+		paving.set_shader_parameter("albedo_tex", load(TILE_DIR + "skanderbeg_tiles_diff_1k.jpg"))
+		paving.set_shader_parameter("roughness_tex", load(TILE_DIR + "skanderbeg_tiles_rough_1k.jpg"))
+		paving.set_shader_parameter("normal_tex", load(TILE_DIR + "skanderbeg_tiles_nor_gl_1k.jpg"))
+		paving.set_shader_parameter("sub_grid_divisions", TILE_GRID)
+		paving.set_shader_parameter("tile_scale", 1.0 / (SLAB_SIZE * TILE_GRID))
 	ground.material_override = paving
 	ground.name = "SquarePaving"
 	add_child(ground)
@@ -177,6 +200,37 @@ func _build_world() -> void:
 	stone.uv1_scale = Vector3(0.17, 0.17, 0.17)
 	island.material_override = stone
 	add_child(island)
+	if city_id == "vlore":
+		var turf := MeshInstance3D.new()
+		var lawn := CylinderMesh.new()
+		lawn.top_radius = Arena.ISLAND - 0.42
+		lawn.bottom_radius = lawn.top_radius
+		lawn.height = 0.08
+		lawn.radial_segments = drum.radial_segments
+		turf.mesh = lawn
+		turf.position.y = 1.0
+		var grass := StandardMaterial3D.new()
+		grass.albedo_texture = preload("res://assets/textures/grass_diff.jpg")
+		grass.uv1_triplanar = true
+		grass.uv1_scale = Vector3.ONE * 0.36
+		grass.albedo_color = Color("#698254")
+		grass.roughness = 0.96
+		turf.material_override = grass
+		add_child(turf)
+		statue = IndependenceMonument.new()
+		statue.name = "IndependenceMonument"
+		statue.position.y = 1.08
+		statue.rotation_degrees.y = IndependenceMonument.ARENA_YAW
+		add_child(statue)
+	else:
+		_build_skanderbeg(stone)
+	var surroundings := ArenaSurroundings.new()
+	surroundings.name = "Surroundings"
+	add_child(surroundings)
+	surroundings.build(Arena.HALF_X, Arena.HALF_Z, Arena.CORNER, city_id)
+
+
+func _build_skanderbeg(stone: StandardMaterial3D) -> void:
 	# Skanderbeg on a tall plinth, well above the cars, the landmark of the square:
 	# a broad step, the block, and a cornice the horse stands on.
 	var top := 1.0
@@ -200,11 +254,6 @@ func _build_world() -> void:
 		statue.position.y = top
 		statue.scale = Vector3.ONE * STATUE_SCALE
 		add_child(statue)
-	# Landmarks, grandstands, the crowd, flags, lamps and trees outside the wall.
-	var surroundings := ArenaSurroundings.new()
-	surroundings.name = "Surroundings"
-	add_child(surroundings)
-	surroundings.build(Arena.HALF_X, Arena.HALF_Z, Arena.CORNER)
 
 
 ## The barrier: the rounded rectangle of Arena.wall(), as a striped band.
@@ -227,19 +276,34 @@ func _wall_mesh() -> MeshInstance3D:
 		var quad := [Vector3(a.x, 0.0, a.y), Vector3(b.x, 0.0, b.y), Vector3(b.x, WALL_HEIGHT, b.y), Vector3(a.x, WALL_HEIGHT, a.y)]
 		var uvs := [Vector2(run / 6.0, 1.0), Vector2((run + length) / 6.0, 1.0), Vector2((run + length) / 6.0, 0.0), Vector2(run / 6.0, 0.0)]
 		for index in [0, 1, 2, 0, 2, 3]:
+			st.set_color(Color.WHITE)
 			st.set_normal(normal)
 			st.set_uv(uvs[index])
 			st.add_vertex(quad[index])
+		if city_id == "vlore":
+			var outside := -normal * 0.48
+			var top_a := Vector3(a.x, WALL_HEIGHT, a.y)
+			var top_b := Vector3(b.x, WALL_HEIGHT, b.y)
+			LandmarkKit.quad_facing(st, top_a, top_b, top_b + outside, top_a + outside, Color.WHITE, Vector3.UP)
 		run += length
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = st.commit()
 	var material := StandardMaterial3D.new()
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.albedo_texture = _stripes()
-	material.roughness = 0.7
-	material.emission_enabled = true
-	material.emission = Color(0.9, 0.15, 0.3)
-	material.emission_energy_multiplier = 0.25
+	if city_id == "vlore":
+		material.albedo_texture = preload("res://assets/textures/concrete_wall_diff.jpg")
+		material.normal_enabled = true
+		material.normal_texture = preload("res://assets/textures/concrete_wall_nor.jpg")
+		material.normal_scale = 0.45
+		material.uv1_triplanar = true
+		material.uv1_scale = Vector3.ONE * 0.32
+		material.roughness = 0.86
+	else:
+		material.albedo_texture = _stripes()
+		material.roughness = 0.7
+		material.emission_enabled = true
+		material.emission = Color(0.9, 0.15, 0.3)
+		material.emission_energy_multiplier = 0.25
 	mesh.material_override = material
 	return mesh
 
@@ -670,4 +734,4 @@ func _show_results() -> void:
 	var rows := []
 	for c in arena.order:
 		rows.append({"name": c.name, "color": c.color.to_html(false), "is_player": c == player, "score": c.score, "hits": c.hits_n, "wrecks": c.kills})
-	Game.finish_race({"mode": "points", "city": "tirane", "place": player.place, "n": arena.cars.size(), "score": player.score, "rows": rows})
+	Game.finish_race({"mode": "points", "city": city_id, "place": player.place, "n": arena.cars.size(), "score": player.score, "rows": rows})

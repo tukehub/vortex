@@ -65,8 +65,7 @@ func _ready() -> void:
 	controls.inventory_hold_changed.connect(hud.inventory_hold)
 	controls.inventory_selected.connect(func(i: int):
 		selections.append(i)
-		if i > 0: car.ctrl.select = i
-		elif car.slots.size() > 1: car.ctrl.cycle = true)
+		controls.queue_slot(i))
 	slots()
 	await get_tree().process_frame
 	# Real viewport dispatch with an inset/scaled UI and two independent fingers.
@@ -74,6 +73,8 @@ func _ready() -> void:
 	touch(2, "slot1", true, false, true)
 	touch(2, "slot1", false, false, true)
 	check(controls._touches.size() == 1 and controls._steer_finger == 1 and selections == [1], "second thumb selects inventory through real input while steering stays owned")
+	check(car.ctrl.select == 0, "touch leaves the simulated car alone until input capture")
+	controls.apply(car)
 	race.step(1.0 / 60.0)
 	check(car.slot_type() == "repair", "inventory selection reaches fixed-step simulation")
 	controls.reset_controls()

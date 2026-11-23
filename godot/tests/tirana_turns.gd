@@ -120,7 +120,7 @@ func _check_finish_assist() -> void:
 	for reverse in [false, true]:
 		var track := RaceTrack.load_city("tirane", reverse)
 		# Force a bend even where the actual finishing straight is flat, so
-		# the check proves the assistant is suppressed rather than unneeded.
+		# the check proves automatic braking is suppressed on the approach.
 		track.K.fill(0.04)
 		for laps in [1, 2]:
 			for distance in [151.0, 150.0, 50.0, 1.0, -1.0, track.L + 50.0, laps * track.L + 25.0]:
@@ -145,7 +145,7 @@ func _check_finish_assist() -> void:
 						assert(race.take_events().is_empty(), "finish approach must not emit automatic braking feedback")
 				if distance <= 150.0:
 					assert(is_equal_approx(states[0].v, states[1].v) and states[1].v > 40.0, "finish approach must allow acceleration through a bend")
-					assert(is_equal_approx(states[0].yaw, states[1].yaw), "finish approach must use the unassisted steering response")
+					assert(states[1].yaw < states[0].yaw, "finish approach must retain the selected steering assist")
 					assert(not states[1].braking, "finish approach must release automatic brake lights")
 				else:
 					assert(states[1].v < states[0].v and states[1].braking, "assistance must remain active outside the final approach, including earlier laps and the start")

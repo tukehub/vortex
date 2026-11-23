@@ -49,6 +49,7 @@ const ENV_ORDER := ["night", "dusk", "sunset", "day", "golden", "rainy", "rain",
 # horizon: "flat" | "mountains" | "sea" picks the HDRI family and far terrain treatment.
 # stars: Tirana cup stars that open the city (Progress.city_open). A city whose
 # track.json is not in this build (left out of the APK) is not offered at all.
+const POINTS_CITIES := ["tirane", "vlore"]
 const CITIES := [
 	{"id": "tirane", "env": "day", "laps": 2, "neon": "#ff2d6f", "horizon": "flat", "hdri": "day", "stars": 0},
 	{"id": "vlore", "env": "sunset", "laps": 2, "neon": "#ffd23a", "horizon": "sea", "hdri": "sunset", "stars": 4},
@@ -306,6 +307,14 @@ func available_cities() -> Array[String]:
 		if city_available(str(c.id)):
 			ids.append(str(c.id))
 	return ids
+
+
+func points_city(id: String) -> String:
+	return id if id in POINTS_CITIES and city_available(id) else "tirane"
+
+
+func square_name(id: String) -> String:
+	return t("arena.square.%s" % points_city(id))
 
 
 func car(id: String) -> Dictionary:

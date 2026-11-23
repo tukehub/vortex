@@ -172,6 +172,7 @@ var _wheel_acc := 0.0
 var _steer_last := Vector2.ZERO
 var _desktop := false
 var _cycle := false
+var _select := 0
 var _driving_enabled := false
 var _suspended := false
 var _car: CarState
@@ -233,6 +234,15 @@ func bind_inventory(buttons: Array[Button]) -> void:
 	# same pointer-ID route as steering so the other thumb can select/discard.
 	for button in buttons:
 		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func queue_slot(index: int) -> void:
+	if not _can_drive() or index < 0 or index >= _car.slots.size():
+		return
+	if index > 0:
+		_select = index
+	elif _car.slots.size() > 1:
+		_cycle = true
 
 
 func set_driving_enabled(enabled: bool) -> void:
@@ -796,12 +806,15 @@ func apply(car: CarState) -> void:
 	car.ctrl.fire = car.ctrl.fire or (fire and _can_act())
 	car.ctrl.back = car.ctrl.back or (back and _can_act())
 	car.ctrl.cycle = car.ctrl.cycle or _cycle
+	if _select > 0:
+		car.ctrl.select = _select
 	car.ctrl.boost = car.ctrl.boost or (_boost and _can_act())
 	if not _discard.is_empty() and _can_act():
 		car.ctrl.discard = _discard
 	fire = false
 	back = false
 	_cycle = false
+	_select = 0
 	_boost = false
 	_discard = {}
 
@@ -817,6 +830,7 @@ func reset_controls() -> void:
 	fire = false
 	back = false
 	_cycle = false
+	_select = 0
 	_boost = false
 	_discard = {}
 	inventory_hold_changed.emit(-1, 0.0)

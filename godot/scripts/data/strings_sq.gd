@@ -33,7 +33,7 @@ const T := {
 	"menu.cup_stars": "%d/%d yje",
 	"menu.card.race": "Garë e lirë",
 	"menu.card.race_sub": "Zgjidh qytetin dhe xhirot",
-	"menu.city.points": "Raundi me pikë luhet në Sheshin Skënderbej.",
+	"menu.city.points": "Pikë · %s",
 	"menu.city.locked": "Mbyllur · hapet me %d yje nga Kupa e Tiranës (ke %d)",
 	"menu.card.online": "Online",
 	"menu.card.online_sub": "Me miqtë",
@@ -197,7 +197,7 @@ const T := {
 	"online.you_mark": "  (ti)",
 	"online.left": "%s doli nga gara: e drejton një bot",
 	"online.host_left": "Hosti doli. Gara mbaroi.",
-	"loading.arena_info": "Sheshi Skënderbej · %d min",
+	"loading.arena_info": "%s · %d min",
 	# ------------ race: touch controls
 	"input.auto_gas": "GAZ AUTO",
 	"input.gas_cut": "GAZI NDALUR",
@@ -294,7 +294,9 @@ const T := {
 	"race.tip.manual_gas": "mbaj GAZ për të përshpejtuar",
 	"intro.grid": "RRESHTIMI I NISJES",
 	# ------------ points mode (the square)
-	"arena.title": "SHESHI SKËNDERBEJ · PIKË",
+	"arena.title": "%s · PIKË",
+	"arena.square.tirane": "Sheshi Skënderbej",
+	"arena.square.vlore": "Sheshi i Flamurit",
 	"arena.points": "PIKË",
 	"arena.place": "Vendi %d/%d",
 	"arena.goal": "Godit të tjerët. Kush ka më shumë pikë, fiton.",
