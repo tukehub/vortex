@@ -45,7 +45,7 @@ Updates use package `al.tukehub.rruga` and the existing signing key at `android/
 
 ## Profiling on the target phones
 
-The [Tirana boulevard showcase](docs/tirana-showcase.md) includes paired Mobile-renderer captures, measurements and the Lungomare follow-up.
+The [Tirana boulevard showcase](docs/tirana-showcase.md) includes paired Mobile-renderer captures, measurements and the Lungomare follow-up. The [Tirana vegetation report](docs/tirana-trees.md) covers the three tree LODs and their render cost.
 
 Build a benchmark APK with `--profile-seconds 60 --quality medium` and read its `PROFILE:` output with `adb logcat -s godot`. Measure the Galaxy A56 and S25 FE at Medium and the S25 Ultra at High with rain and combat active. The A56 Medium target is a p95 frame time under 16 ms. Physical-device results are pending. [Visual performance](docs/visual-performance.md)
 

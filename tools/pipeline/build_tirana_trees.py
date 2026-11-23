@@ -4,6 +4,7 @@ Uses the repository's NumPy GLB writer and Pillow. Bark colour and normal are
 from Poly Haven Tree Small 02 (CC0). Sprays, branching and silhouettes are
 generated here. No network or DCC project is required.
 """
+import argparse
 from pathlib import Path
 import math
 import random
@@ -190,10 +191,11 @@ def tree(species, near):
     return bark, leaf
 
 
-def impostors(models, bark_texture, leaf_atlas):
+def impostors(models, bark_texture, leaf_atlas, coverage=None):
     """Orthographic z-buffer bake with four azimuths per species."""
     result = Image.new("RGBA", (512, 512))
     tile_width, tile_height = TILE
+    ratios, layers = [], []
     for species, (bark, leaves) in enumerate(models):
         for angle_index in range(4):
             angle = angle_index * math.tau / 4
@@ -201,6 +203,8 @@ def impostors(models, bark_texture, leaf_atlas):
             eye = np.array((math.sin(angle), 0., math.cos(angle)))
             depth = np.full((tile_height, tile_width), -np.inf)
             rgba = np.zeros((tile_height, tile_width, 4), np.uint8)
+            footprint = np.zeros(depth.shape, np.uint16) if coverage else None
+            accepted = np.zeros(depth.shape, np.uint16) if coverage else None
             rgba[:, :, :3] = (70, 95, 46)
             for part, texture in ((bark, bark_texture), (leaves, leaf_atlas)):
                 points = np.asarray(part.pos)
@@ -230,17 +234,33 @@ def impostors(models, bark_texture, leaf_atlas):
                     z = weights @ pz[ids]
                     sample_uv = (weights @ uv[ids]) % 1.
                     sample = texture[(sample_uv[..., 1] * ty).astype(int), (sample_uv[..., 0] * tx).astype(int)]
-                    valid = np.all(weights >= 0., axis=2) & (z > depth[y0:y1, x0:x1]) & (sample[..., 3] >= 108)
+                    inside = np.all(weights >= 0., axis=2)
+                    opaque = inside & (sample[..., 3] >= 108)
+                    if coverage and part is leaves:
+                        footprint[y0:y1, x0:x1] += inside
+                        accepted[y0:y1, x0:x1] += opaque
+                    valid = opaque & (z > depth[y0:y1, x0:x1])
                     altitude = np.clip((weights @ nrm[ids])[..., 1], -1, 1)
                     shade = (.81 + .19 * altitude) * np.sqrt(weights @ tint[ids])
                     rgba[y0:y1, x0:x1, :3][valid] = np.clip(sample[..., :3] * shade[..., None], 0, 255)[valid]
                     rgba[y0:y1, x0:x1, 3][valid] = 255
                     depth[y0:y1, x0:x1][valid] = z[valid]
             result.paste(Image.fromarray(rgba), (angle_index * tile_width, species * tile_height))
+            if coverage:
+                ratios.append(accepted.sum() / max(footprint.sum(), 1))
+                layers.append(accepted[accepted > 0])
+    if coverage:
+        all_layers = np.concatenate(layers)
+        print(f"{coverage}: alpha passes {100 * np.mean(ratios):.1f}% of card fragments; "
+              f"layers p50/p95/max = {np.percentile(all_layers, 50):.0f}/"
+              f"{np.percentile(all_layers, 95):.0f}/{all_layers.max()}")
     return result
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--coverage", action="store_true", help="report four orthographic alpha-test views per species")
+    args = parser.parse_args()
     OUT.mkdir(exist_ok=True)
     leaf = sprays()
     leaf.save(OUT / "leaf_sprays.png")
@@ -252,18 +272,20 @@ def main():
     normal.resize((256, 256), Image.Resampling.LANCZOS).save(OUT / "bark_normal.png")
     glb = GLB()
     bark_id, leaf_id = glb.material("Bark"), glb.material("Leaves")
-    mid = []
+    lods = [[], []]
     for species, name in enumerate(SPECIES):
         for lod in (0, 1):
             trunk, crown = tree(species, lod == 0)
             mesh_name = f"{name}_lod{lod}"
             mesh = glb.mesh(mesh_name, [trunk.primitive(bark_id), crown.primitive(leaf_id)])
             glb.node(mesh_name, mesh)
-            if lod == 1:
-                mid.append((trunk, crown))
+            lods[lod].append((trunk, crown))
             print(f"{mesh_name}: {len(trunk.idx)} bark + {len(crown.idx)} leaf triangles")
     glb.write(OUT / "broadleaf_trees.glb")
-    impostors(mid, np.asarray(bark.convert("RGBA")), np.asarray(leaf)).save(OUT / "impostors.png")
+    bark_data, leaf_data = np.asarray(bark.convert("RGBA")), np.asarray(leaf)
+    impostors(lods[1], bark_data, leaf_data, "LOD1" if args.coverage else None).save(OUT / "impostors.png")
+    if args.coverage:
+        impostors(lods[0], bark_data, leaf_data, "LOD0")
 
 
 if __name__ == "__main__":
