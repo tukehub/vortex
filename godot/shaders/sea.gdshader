@@ -1,8 +1,6 @@
 shader_type spatial;
-// Open water for coastal and lake cities. Opaque, one flat plane: the waves
-// are analytic normals only (no displacement, no textures, no depth read), so
-// it costs the same on the Mobile renderer as on Forward+. Reflections come
-// from the sky radiance like every other glossy surface.
+// Opaque GGX water uses the environment radiance and existing probes.
+// The directional light and view-dependent microfacet response provide glitter.
 render_mode cull_back, depth_draw_opaque, specular_schlick_ggx;
 
 uniform vec3 deep_color : source_color = vec3(0.015, 0.075, 0.13);
@@ -20,10 +18,16 @@ uniform float wave_strength : hint_range(0.0, 2.0) = 1.0;
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;   // rain roughens the surface
 uniform float night : hint_range(0.0, 1.0) = 0.0;
 
+uniform int tier = 1;
 varying vec3 wpos;
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	if (tier == 2) {
+		float edge = 1.0 - smoothstep(40.0, 63.0, max(abs(VERTEX.x), abs(VERTEX.z)));
+		VERTEX.y += edge * (0.07 * sin(dot(wpos.xz, vec2(.18,.09)) + TIME)
+			+ .035 * sin(dot(wpos.xz, vec2(-.13,.28)) - TIME*.84));
+	}
 }
 
 // Slope of one travelling sine swell: d(height)/d(x,z).
@@ -44,25 +48,6 @@ float vnoise(vec2 p) {
 	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
 }
 
-// Distance to the nearest cell edge of a drifting Voronoi pattern: the lace
-// network foam forms on the water after a wave breaks.
-float lace(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	float d1 = 8.0;
-	float d2 = 8.0;
-	for (int y = -1; y <= 1; y++) {
-		for (int x = -1; x <= 1; x++) {
-			vec2 g = vec2(float(x), float(y));
-			vec2 o = vec2(hash(i + g), hash(i + g + 17.3));
-			o = 0.5 + 0.4 * sin(TIME * 0.35 + 6.2831853 * o);
-			float d = length(g + o - f);
-			if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
-		}
-	}
-	return d2 - d1;
-}
-
 void fragment() {
 	float dist = length(wpos - CAMERA_POSITION_WORLD);
 	// Small waves fade out with distance before they can alias into sparkle.
@@ -73,11 +58,16 @@ void fragment() {
 	float far_rough = smoothstep(250.0, 2500.0, dist);
 	vec2 p = wpos.xz;
 	vec2 slope = vec2(0.0);
-	slope += swell(p, normalize(vec2(0.8, 0.6)), 37.0, 0.32, 1.6) * mid_w;
-	slope += swell(p, normalize(vec2(-0.3, 0.95)), 21.0, 0.16, 1.2) * mid_w;
-	slope += swell(p, normalize(vec2(0.95, -0.2)), 9.0, 0.05, 0.9) * near_w;
-	slope += swell(p, normalize(vec2(-0.7, -0.7)), 4.3, 0.018, 0.7) * near_w;
-	slope += swell(p, normalize(vec2(0.2, -0.98)), 2.1, 0.006, 0.55) * near_w;
+	if (dist < 1100.0) {
+		slope += swell(p, vec2(.8,.6), 37., .34, 1.6) * mid_w;
+		slope += swell(p, vec2(-.3,.95), 21., .19, 1.2) * mid_w;
+		if (tier > 0 && dist < 320.) {
+			vec2 warped = p + 1.4 * sin(p.yx * .12 + TIME * .28);
+			slope += swell(warped, vec2(.95,-.2), 5.6, .09, .9) * near_w;
+			slope += swell(warped, vec2(-.7,-.7), 2.7, .032, .7) * near_w;
+			if (tier == 2) slope += swell(warped, vec2(.2,-.98), .87, .012, .45) * (1. - smoothstep(20.,100.,dist));
+		}
+	}
 	slope *= wave_strength * (1.0 + wetness * 0.6);
 
 	vec2 suv = (p - shore_origin) / shore_size;
@@ -90,29 +80,12 @@ void fragment() {
 	vec3 n_world = normalize(vec3(-slope.x, 1.0, -slope.y));
 	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
 
-	float lap = sin(TIME * 0.9 + d * 0.35) * 0.5 + 0.5;
-	float foam_n = vnoise(p * 0.45 + vec2(TIME * 0.12, TIME * 0.07));
-	float foam = step(0.5, d) * (1.0 - smoothstep(0.5, 5.0 + 6.0 * lap, d)) * smoothstep(0.35, 0.75, foam_n + 0.25 * lap) * inside;
-	float surf = (1.0 - smoothstep(1.0, 22.0, d)) * inside;
-	if (surf > 0.0 && dist < 260.0) {
-		// Sets of waves run in to the shore; behind each one the broken water
-		// spreads out as a lace that thins seaward and fades as it ages.
-		float age = fract(TIME * 0.11 - d * 0.045 + vnoise(p * 0.02) * 0.6);
-		// Warped so the cells stretch and bend instead of tiling.
-		vec2 warp = vec2(vnoise(p * 0.21), vnoise(p * 0.21 + 7.3)) - 0.5;
-		vec2 q = p * 0.8 + warp * 3.2 + vec2(TIME * 0.05, -TIME * 0.03);
-		float web = 1.0 - smoothstep(0.03, 0.09 + 0.07 * age, lace(q) + 0.16 * vnoise(p * 2.3));
-		// Strands are strings of bubbles, not lines.
-		web *= smoothstep(0.2, 0.55, vnoise(p * 4.1 + vec2(TIME * 0.2, 0.0)));
-		// Foam drifts in rafts with open water between them.
-		float patchy = smoothstep(0.3, 0.65, vnoise(p * 0.09 + warp + vec2(TIME * 0.015)));
-		float lace_foam = web * (1.0 - age) * surf * patchy;
-		// The white wash where the surge meets the rocks.
-		// Only where the mask says water: inland of its waterline the bank
-		// may still be under the surface, and there the lace alone shows.
-		float broken = smoothstep(0.5, 0.85, vnoise(p * 0.3 + vec2(TIME * 0.05, 0.0)) + 0.25 * lap);
-		float wash = step(0.5, d) * (1.0 - smoothstep(0.5, 1.5 + 2.0 * lap, d)) * smoothstep(0.3, 0.7, foam_n + 0.4 * lap) * broken * 0.85;
-		foam = max(foam, max(lace_foam, wash) * (1.0 - smoothstep(120.0, 260.0, dist)));
+	float surf = (1.0 - smoothstep(1., 22., d)) * inside;
+	float foam = 0.;
+	if (surf > 0. && dist < 260.) {
+		float breakup = vnoise(p * .23 + TIME * vec2(.06,.04));
+		float runup = sin(d * 1.3 + TIME * 1.5 + breakup * 5.);
+		foam = smoothstep(.4,.92, runup) * smoothstep(.22,.65,breakup) * surf * (1.-smoothstep(100.,260.,dist));
 	}
 	// Wave crests catch a little light in the distance as well.
 	float crest = smoothstep(0.12, 0.3, length(slope)) * 0.12 * near_w;

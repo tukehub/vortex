@@ -109,7 +109,7 @@ func _ready() -> void:
 					var l := look_at + Vector3(0, scene.terrain.height_at(look_at.x, look_at.z), 0)
 					cam.look_at_from_position(e, l, Vector3.UP)
 					cam.far = 4000.0
-				"seafront":
+				"seafront", "bay", "bay_race":
 					# Vlorë: from the kerb by the waterfront courts, out over
 					# the rock armour, with a wave breaking on it.
 					var rocks: SeaRocks = scene.sea_rocks
@@ -127,10 +127,23 @@ func _ready() -> void:
 					var eye := best - dir * 3.5 + Vector3(0, 2.6, 0)
 					cam.look_at_from_position(eye, best + dir * 9.0 + tangent * 22.0 + Vector3(0, -0.8, 0), Vector3.UP)
 					cam.fov = 62.0
+					if view == "bay":
+						cam.look_at_from_position(eye + Vector3.UP * 2, best + Vector3(-140, 2, -25), Vector3.UP)
+					if view == "bay_race":
+						player.s = n * track.ds
+						player.v = 42.0
+						scene.cam.intro = false
+						scene.cam._snap = true
 					rocks._spray_t = 0.0
 					rocks.update(eye + dir * 30.0, 0.0)
 			cam.current = true
 			for i in 14:
+				if view == "bay_race":
+					player.s = track.mod_s(player.s + player.v / 60.0)
+					player_visual.apply_state(player, track, 1.0 / 60.0)
+					scene.cam.follow(player, 1.0 / 60.0)
+					cam.global_transform = scene.cam.global_transform
+					cam.fov = scene.cam.fov
 				await get_tree().process_frame
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s_%s.png" % [out, env, q, view])
 			var vp := get_viewport().get_viewport_rid()

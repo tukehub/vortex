@@ -158,7 +158,7 @@ func _build_world() -> void:
 	add_child(terrain)
 	terrain.load_city(city_id, splat)
 	sea = Sea.new()
-	if sea.build(terrain):
+	if sea.build(terrain, city_id == "vlore"):
 		add_child(sea)
 	else:
 		sea.free()

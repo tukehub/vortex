@@ -17,6 +17,15 @@ func _ready() -> void:
 	add_child(terrain)
 	terrain.load_city("vlore", null)
 	check(terrain.has_water, "Vlorë has a baked sea")
+	var sea := Sea.new()
+	add_child(sea)
+	check(sea.build(terrain, true), "sea accepts the shoreline grid")
+	for preset in ["low", "medium", "high"]:
+		Quality.set_preset(preset)
+		check(sea.mesh.get_faces().size() / 3 == (2056 if preset == "high" else 2), "water triangle budget on " + preset)
+	Quality.set_pressure_stage(1)
+	check(sea.mesh == sea.flat_grid, "pressure drops vertex waves")
+	Quality.set_preset("medium")
 	var track := RaceTrack.load_city("vlore", false)
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
 	var anchors := []
