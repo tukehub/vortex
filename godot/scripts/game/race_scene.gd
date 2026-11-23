@@ -261,7 +261,7 @@ func _road_section(endpoints: Array, reverse: bool) -> Vector2:
 func _setup_pines() -> void:
 	# Replace a sparse selection of the existing mapped Tirana trees, instead of
 	# scattering trees randomly over the road, buildings, or other cities.
-	if props.vegetation == null or pine_forest == null or not pine_forest.has_method("build_forest"):
+	if city_id != "tirane" or props.vegetation == null or pine_forest == null or not pine_forest.has_method("build_forest"):
 		return
 	var limit := 8 if Quality.preset == "low" else (24 if Quality.preset == "medium" else 32)
 	var candidates := {}

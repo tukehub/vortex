@@ -55,6 +55,9 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 		shore_tex = ImageTexture.create_from_image(Image.create_from_data(n, n, false, Image.FORMAT_R8, water_mask))
 	mat = ShaderMaterial.new()
 	mat.shader = SHADER
+	if city_id == "vlore":
+		mat.set_shader_parameter("coastal_ground", true)
+		mat.set_shader_parameter("ground_macro", load(dir + "ground_macro.png"))
 	mat.set_shader_parameter("splat", splat)
 	mat.set_shader_parameter("two_scale", Quality.preset != "low" and Quality.pressure_stage < 2)
 	Quality.budget_changed.connect(_apply_budget)

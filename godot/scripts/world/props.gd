@@ -64,7 +64,20 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 		street.name = "StreetProps"
 		add_child(street)
 		street.build(furniture, terrain.height_at)
-	_build_trees(p.get("trees", []), terrain, city_id)
+	var trees: Array = p.get("trees", [])
+	if city_id == "vlore" and p.has("tree_exclusions"):
+		# Indices are baked in ascending order. Removing from the end keeps
+		# the original mapped anchors available for future road/building bakes.
+		trees = trees.duplicate()
+		var excluded: Array = p.tree_exclusions
+		for i in range(excluded.size() - 1, -1, -1):
+			trees.remove_at(int(excluded[i]))
+	_build_trees(trees, terrain, city_id)
+	if city_id == "vlore":
+		var cover := preload("res://scripts/world/coastal_cover.gd").new()
+		cover.name = "CoastalVegetation"
+		add_child(cover)
+		cover.build()
 	if _tirana and track != null and terrain != null:
 		var showcase_street := preload("res://scripts/world/showcase_street_props.gd").new()
 		showcase_street.name = "TiranaStreetProps"
@@ -230,9 +243,9 @@ func _tree_meshes() -> Array:
 
 func _build_trees(trees: Array, terrain: Terrain, city_id: String) -> void:
 	var keep := int(trees.size() * float(Quality.p.tree_mul))
-	if city_id == "tirane":
+	if city_id in ["tirane", "vlore"]:
 		vegetation = TiranaTrees.new()
-		vegetation.name = "TiranaTrees"
+		vegetation.name = "TiranaTrees" if city_id == "tirane" else "CoastalStreetTrees"
 		add_child(vegetation)
 		vegetation.build(trees.slice(0, keep), terrain)
 		return

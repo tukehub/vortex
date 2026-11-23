@@ -27,11 +27,14 @@ from common import CACHE, OUT, Proj, ensure_dir, load_json, log, save_json  # no
 from cities import CITIES, ROAD_WIDTH, ROUTABLE, ROUTE_COST  # noqa: E402
 from glb import GLB, earcut  # noqa: E402
 from water import process_city as build_water_mask  # noqa: E402
+import coastal_macro
+import coastal_vegetation
 import seafront  # noqa: E402
 import street_props  # noqa: E402
 import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
 from showcase_facades import bake as bake_showcase_facades
+from vlore_facades import bake as bake_vlore_facades
 from side_roads import build_side_roads
 
 SAMPLE = 2.0          # m, centreline sample spacing used for smoothing
@@ -1471,10 +1474,15 @@ def build(cid, route_only=False):
     build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS))
     if cid == 'tirane':
         bake_showcase_facades(Path(out))
+    elif cid == "vlore":
+        bake_vlore_facades(Path(out))
+        coastal_macro.bake(Path(out))
     build_side_roads(osm, ref, hw, terrain_sample, os.path.join(out, 'roads.glb'), radius=city.get('osm_radius', 2600))
     build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.
     street_props.process_city(cid)
+    if cid == "vlore":
+        coastal_vegetation.bake(Path(out))
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_map.png'), span=map_span)
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_zoom.png'), span=1800, size=1800)
     log(f'  done -> {out}')

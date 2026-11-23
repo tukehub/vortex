@@ -90,7 +90,7 @@ func _create_meshes() -> void:
 			# A snap can exchange pools while some old slots are still present.
 			var capacity := (MAX_NEAR + EXTRA_SLOTS if lod == 0
 				else MAX_MID + MAX_NEAR + EXTRA_SLOTS * 2)
-			node.multimesh = _make_mm(mesh, capacity)
+			node.multimesh = make_batch_mesh(mesh, capacity)
 			# Dynamic bounds cover all possible positions in the current pool.
 			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(node)
@@ -99,7 +99,7 @@ func _create_meshes() -> void:
 	source.free()
 
 
-static func _make_mm(mesh: Mesh, capacity: int) -> MultiMesh:
+static func make_batch_mesh(mesh: Mesh, capacity: int) -> MultiMesh:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_custom_data = true
@@ -120,7 +120,7 @@ func _build_far_chunk(key: Vector2i, ids: PackedInt32Array) -> void:
 	var node := MultiMeshInstance3D.new()
 	node.name = "Impostors_%d_%d" % [key.x, key.y]
 	node.position = Vector3((key.x + 0.5) * FAR_CELL, 0, (key.y + 0.5) * FAR_CELL)
-	node.multimesh = _make_mm(quad, ids.size())
+	node.multimesh = make_batch_mesh(quad, ids.size())
 	node.material_override = _materials[FAR]
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)
