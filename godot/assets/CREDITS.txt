@@ -68,3 +68,8 @@ https://sketchfab.com/3d-models/bust-of-scanderbeg-parco-del-dono-parma-283ae202
 creativecommons.org/licenses/by/4.0/
 
 Grupi i bronztë i Monumentit të Pavarësisë është një interpretim për lojën. Anatomia bazë përdor modelin rp_nathan_animated_003 nga Renderpeople, të ripunuar me poza, veshje dhe materiale skulpturore.
+
+Tirana broadleaf set (plane, linden and acacia silhouettes): original procedural
+branches, leaf sprays and impostor bakes by the Vortex project. Bark colour and
+normal are resized from Poly Haven Tree Small 02 (Rico Cilliers and Rob Tuytel,
+CC0 1.0, https://polyhaven.com/a/tree_small_02).
