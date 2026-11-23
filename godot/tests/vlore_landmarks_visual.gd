@@ -5,7 +5,7 @@ extends Node
 ##   godot --path godot --rendering-method mobile res://tests/vlore_landmarks_visual.tscn
 
 const IDS := ["flamurtari", "independence", "independence_museum", "flagpole_big", "muradie_mosque", "vlora_house",
-	"petro_marko", "vlore_municipality", "skela_roundabout", "lungomare_gateway", "waterfront_courts"]
+	"petro_marko", "skela_roundabout", "lungomare_gateway", "waterfront_courts"]
 
 var scene: RaceScene
 var camera: Camera3D
@@ -29,7 +29,6 @@ func _ready() -> void:
 		"independence_museum": [Vector3(0, 5, -6), Vector3.FORWARD], "flagpole_big": [Vector3(0, 20, 0), Vector3.FORWARD],
 		"muradie_mosque": [Vector3(0, 5, -6), Vector3.FORWARD], "vlora_house": [Vector3(0, 5, -7), Vector3.FORWARD],
 		"petro_marko": [Vector3(0, 5, -12), Vector3.FORWARD],
-		"vlore_municipality": [Vector3(0, 7, -10), Vector3.FORWARD],
 		"skela_roundabout": [Vector3(0, 9, 0), Vector3.LEFT],
 		"lungomare_gateway": [Vector3(0, 8, -10), Vector3.FORWARD],
 		"waterfront_courts": [Vector3(0, 2, 0), Vector3.RIGHT]}
@@ -48,11 +47,24 @@ func _ready() -> void:
 		print("LANDMARK: ", id, " front ", snappedf(Vector2(face.x - road.x, face.z - road.z).length(), 0.1), " m from the race line")
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	var portal := scene.track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
-	var stone_street := scene.track.locate_xz(data.stone_street[0][0], data.stone_street[0][1]).x
 	var turn := scene.track.locate_xz(data.turnaround[0][0], data.turnaround[0][1]).x
-	var median := scene.track.locate_xz(data.median[0][0], data.median[0][1]).x
-	var route_views := {"tunnel_approach": portal - 37.0, "inside_tunnel": portal + 35.0,
-		"muradie_return": stone_street - 5.0, "lungomare_median": median + 125.0, "turnaround": turn - 9.0}
+	# Out-and-back: the split round Sheshi Pavarsia on both passes, the
+	# Dhimitër Konomi merge, and the turn round the Flag Square island.
+	var skela := (landmarks.get_node("skela_roundabout") as Node3D).global_position
+	var flag := (landmarks.get_node("flag_square_island") as Node3D).global_position
+	var skela_passes := []
+	var best := INF
+	for k in scene.track.M:
+		var p := scene.track.pos(k * scene.track.ds, 0.0)
+		best = minf(best, Vector2(p.x - skela.x, p.z - skela.z).length())
+	for k in scene.track.M:
+		var p := scene.track.pos(k * scene.track.ds, 0.0)
+		if Vector2(p.x - skela.x, p.z - skela.z).length() < best + 1.0 and (skela_passes.is_empty() or k * scene.track.ds - float(skela_passes[-1]) > 200.0):
+			skela_passes.append(k * scene.track.ds)
+	var merge := scene.track.locate_xz(240.0, -40.0).x
+	var route_views := {"tunnel_approach": portal - 37.0, "inside_tunnel": portal + 35.0, "turnaround": turn - 9.0,
+		"skela_out": float(skela_passes[0]) - 60.0, "skela_back": float(skela_passes[-1]) - 60.0,
+		"konomi_merge": merge - 80.0, "flag_square_turn": scene.track.locate_xz(flag.x, flag.z).x - 70.0}
 	for view_name in route_views:
 		var s: float = route_views[view_name]
 		var eye := scene.track.pos(s, 0.0) + Vector3.UP * 2.4

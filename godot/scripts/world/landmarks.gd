@@ -201,16 +201,21 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			heritage.name = "VloreHeritage"
 			root.add_child(heritage)
 			heritage.build(str(anchor.id), terrain)
-		elif str(anchor.id) in ["vlore_municipality", "petro_marko", "lungomare_gateway", "skela_corner", "skela_roundabout"]:
+		elif str(anchor.id) in ["vlore_municipality", "petro_marko", "lungomare_gateway", "skela_corner", "skela_roundabout", "flag_square_island"]:
 			var model := preload("res://scripts/world/vlore_civic.gd").new()
 			model.name = "VloreCivic"
 			root.add_child(model)
-			model.build(str(anchor.id))
+			model.build(str(anchor.id), anchor)
 		elif str(anchor.id) == "waterfront_courts":
 			var courts := preload("res://scripts/world/vlore_sports_courts.gd").new()
 			courts.name = "WaterfrontCourts"
 			root.add_child(courts)
 			courts.build()
+		elif str(anchor.id) in ["kuzum_baba_tekke", "kuzum_baba_turbe"]:
+			var hill := KuzumBaba.new()
+			hill.name = "KuzumBaba"
+			root.add_child(hill)
+			hill.build(str(anchor.id), terrain)
 		elif str(anchor.id) == "flagpole_big":
 			_great_flag(root)
 		elif str(anchor.id) in ["national_museum", "prime_minister"]:

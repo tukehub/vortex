@@ -23,6 +23,7 @@ var sky: SkyEnv
 var terrain: Terrain
 ## Open water (Vlorë's bay); null for inland cities.
 var sea: Sea
+var sea_rocks: SeaRocks
 var road: RoadMesh
 var route_guide: RouteGuide
 var cam: ChaseCam
@@ -175,6 +176,7 @@ func _build_world() -> void:
 	road = RoadMesh.new()
 	add_child(road)
 	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
+	road.set_layout(int(tj.get("lanes", 4)), bool(tj.get("one_way", false)))
 	if tj.has("tunnel"):
 		var tunnel := preload("res://scripts/world/vlore_tunnel.gd").new()
 		tunnel.name = "UjiIFtohteTunnel"
@@ -218,6 +220,7 @@ func _build_world() -> void:
 	reflections.name = "Reflections"
 	add_child(reflections)
 	reflections.build_landmarks(track, props.landmarks)
+	_build_sea_rocks()
 	if props.street != null:
 		RaceReflections.hide_detail(props.street)
 	pine_forest = get_node_or_null("PineForest") as Node3D
@@ -226,6 +229,25 @@ func _build_world() -> void:
 	if sea != null:
 		sea.set_env(sky.wet, sky.night)
 	road.set_wet(sky.wet)
+
+
+## Rock armour on the shore beside the race road, where a city's landmarks
+## name a seafront (SeaRocks.ANCHORS).
+func _build_sea_rocks() -> void:
+	if sea == null or not terrain.has_water:
+		return
+	var anchors := []
+	for anchor: Dictionary in props.landmarks:
+		if SeaRocks.ANCHORS.has(anchor.get("id", "")):
+			anchors.append({"x": anchor.x, "z": anchor.z, "radius": SeaRocks.ANCHORS[anchor.id]})
+	if anchors.is_empty():
+		return
+	sea_rocks = SeaRocks.new()
+	sea_rocks.name = "SeaRocks"
+	add_child(sea_rocks)
+	sea_rocks.build(terrain, track, anchors)
+	sea_rocks.set_wet(sky.wet)
+	RaceReflections.hide_detail(sea_rocks)
 
 
 func _road_section(endpoints: Array, reverse: bool) -> Vector2:
@@ -725,6 +747,8 @@ func _process(dt: float) -> void:
 	speed_feedback.update(player, state == "race", dt)
 	sky.follow(cam.global_position)
 	props.update_vegetation(cam.global_position, -cam.global_transform.basis.z)
+	if sea_rocks != null:
+		sea_rocks.update(cam.global_position, dt)
 	reflections.update_focus(track.pos(player.s, player.d), track.tangent(player.s))
 	if sky.wet > 0.01:
 		sky.set_rain_ground(track.pos(player.s, 0.0 if city_id == "tirane" else player.d), track.tangent(player.s))
@@ -997,6 +1021,8 @@ func _update_weather(dt: float) -> void:
 		terrain.set_env(sky.wet, 0.0, sky.night)
 		if sea != null:
 			sea.set_env(sky.wet, sky.night)
+		if sea_rocks != null:
+			sea_rocks.set_wet(sky.wet)
 		buildings.set_env(sky.night, sky.wet)
 		props.set_night(sky.night)
 		for car in cars:

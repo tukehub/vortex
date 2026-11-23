@@ -13,6 +13,9 @@ uniform vec3 asphalt_tint : source_color = vec3(0.90, 0.92, 0.96);
 uniform vec3 line_white : source_color = vec3(0.9, 0.9, 0.86);
 uniform vec3 line_yellow : source_color = vec3(0.95, 0.75, 0.2);
 uniform float lane_count = 4.0;
+// A one-way carriageway has a dashed white lane line down its middle
+// instead of the yellow centre line of a two-way road.
+uniform bool one_way = false;
 uniform float start_s = 0.0;
 uniform vec2 stone_section = vec2(0.0); // start and length in metres
 // Road marks (plan 3.5): zebra crossings as (s, width) along the lap, from
@@ -115,15 +118,22 @@ void fragment() {
 	float aa_s = max(fwidth(along), 0.002);
 	float edge = line_mask(abs(abs(across) - (half_w - 0.35)), 0.2, aa_x);
 	float centre = line_mask(abs(across), 0.17, aa_x);
+	float centre_dash = 0.0;
+	if (one_way) {
+		centre_dash = line_mask(abs(across), 0.12, aa_x);
+		centre = 0.0;
+	}
 	// 3 m dashes, 3 m gaps, with filtered ends.
 	float dash_pos = fract(along / 6.0) * 6.0;
 	float dash = smoothstep(3.0 - aa_s, 3.0 + aa_s, dash_pos) * (1.0 - smoothstep(6.0 - aa_s, 6.0, dash_pos));
 	float lane_line = 0.0;
 	for (int i = 1; i < 4; i++) {
+		if (float(i) >= lane_count) break; // dividers only, never on an edge
 		float lx = -half_w + float(i) * lane_w;
 		if (abs(float(i) * 2.0 - lane_count) < 0.5) continue; // centre handled separately
 		lane_line = max(lane_line, line_mask(abs(across - lx), 0.14, aa_x) * dash);
 	}
+	lane_line = max(lane_line, centre_dash * dash);
 	// Street hardware set into the asphalt.
 	float grate = 0.0;
 	if (detail > 0.5) {

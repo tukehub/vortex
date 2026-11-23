@@ -150,6 +150,17 @@ static func crossing_lookup(marks: PackedVector2Array, lap: float) -> Image:
 	return Image.create_from_data(cells, 1, false, Image.FORMAT_R8, data)
 
 
+## Lanes per carriageway and whether traffic is one-way (track.json
+## "lanes" / "one_way"): an out-and-back circuit races each direction on its
+## own two-lane carriageway, marked with a dashed white centre.
+var lane_count := 4
+
+func set_layout(lanes: int, one_way: bool) -> void:
+	lane_count = maxi(1, lanes)
+	surface_mat.set_shader_parameter("lane_count", float(lane_count))
+	surface_mat.set_shader_parameter("one_way", one_way)
+
+
 ## The shader's sin-free cell hash (road.gdshader cell_hash).
 static func cell_hash(c: float, salt: float) -> float:
 	var p3 := Vector3(fposmod(c * 0.1031, 1.0), fposmod(salt * 0.1031, 1.0), fposmod(c * 0.1031, 1.0))

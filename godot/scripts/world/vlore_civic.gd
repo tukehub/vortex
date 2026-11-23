@@ -8,7 +8,8 @@ const GLASS := Color("#426577")
 const TIMBER := Color("#44332c")
 
 
-func build(id: String) -> void:
+## `anchor` (props.json): an island's `radius` is baked to clear the road.
+func build(id: String, anchor: Dictionary = {}) -> void:
 	match id:
 		"vlore_municipality":
 			_municipality()
@@ -19,7 +20,13 @@ func build(id: String) -> void:
 		"skela_corner":
 			_skela_frontage()
 		"skela_roundabout":
-			_roundabout()
+			# The island between the race's two carriageways, which circle it
+			# on the mapped ring (Sheshi Pavarsia, radius ~26 m).
+			_roundabout(float(anchor.get("radius", 20.5)), true)
+		"flag_square_island":
+			# The turning island where the return leg comes round into the
+			# outbound leg at Sheshi i Flamurit (ring radius 18 m).
+			_roundabout(float(anchor.get("radius", 13.0)), false)
 
 
 func _municipality() -> void:
@@ -134,27 +141,30 @@ func _apartment(st: SurfaceTool, at: Vector3, width: float, depth: float, floors
 	LandmarkKit.box(st, at + Vector3(0, h + 0.36, 0.0), Vector3(width + 0.37, 0.74, depth + 0.47), wall)
 
 
-func _roundabout() -> void:
-	const RADIUS := 7.3
+func _roundabout(RADIUS := 7.3, flag := true) -> void:
 	var st := LandmarkKit.begin()
 	LandmarkKit.tube(st, Vector3.DOWN * 0.30, Vector3.UP * 0.31, RADIUS, RADIUS, IVORY.darkened(0.22), 48)
 	LandmarkKit.tube(st, Vector3.UP * 0.30, Vector3.UP * 0.49, RADIUS - 0.20, RADIUS - 0.51, Color("#697849"), 48)
-	for i in 19:
+	var shrubs := int(19.0 * (RADIUS / 7.3) * (RADIUS / 7.3) * 0.5) + 10
+	for i in shrubs:
 		var angle := i * 2.399963
-		var r := 3.95 + 1.85 * (0.5 + 0.5 * sin(i * 3.6))
+		var r := (RADIUS - 3.35) * (0.62 + 0.38 * (0.5 + 0.5 * sin(i * 3.6)))
 		var at := Vector3(cos(angle) * r, 0.48, sin(angle) * r)
 		LandmarkKit.sphere(st, at, Vector3(0.89, 0.59 + 0.14 * sin(i), 0.88), Color("#3f552e"), 4, 6)
-	LandmarkKit.tube(st, Vector3.ZERO, Vector3.UP * 16.3, 0.095, 0.052, Color("#92989d"), 10)
+	if flag:
+		LandmarkKit.tube(st, Vector3.ZERO, Vector3.UP * 16.3, 0.095, 0.052, Color("#92989d"), 10)
 	add_child(LandmarkKit.mesh_node(st, LandmarkKit.material(), "SkelaPlantedIsland", 620.0))
 	var grove := Palms.new()
 	add_child(grove)
 	var entries := []
-	for i in 14:
+	var palms := int(14.0 * RADIUS / 7.3)
+	for i in palms:
 		var angle := i * 2.399963
-		var radius := sqrt((i + 1) / 14.0) * 5.65
+		var radius := sqrt((i + 1) / float(palms)) * (RADIUS - 1.65)
 		entries.append([cos(angle) * radius, 0.49, sin(angle) * radius, 0.57 + 0.65 * (0.5 + 0.5 * cos(i * 6.0)), angle])
 	grove.build(entries)
-	_flag(Vector3(0, 15.58, 0), 2.7)
+	if flag:
+		_flag(Vector3(0, 15.58, 0), 2.7)
 
 
 func _window(st: SurfaceTool, at: Vector3, width: float, height: float, trim: Color, fill: Color, basis := Basis.IDENTITY) -> void:

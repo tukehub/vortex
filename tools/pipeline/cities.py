@@ -86,45 +86,54 @@ CITIES = {
             (40.4220, 40.4267, 0.62),  # approach to the coastal tunnel
         ),
         'building_radius': 3900, 'prop_radius': 3800,
-        'half_width': 8.0,
+        # Each direction on its own two-lane carriageway (out_and_back).
+        'half_width': 4.5,
+        'lanes': 2,
         'exclude_pedestrian': True,
         # The mapped coastal tunnel carries the outbound leg under the headland.
         'race_ways': (228375726, 177181139),
         # A short closed-course connector from Celo Picari to Irfan Shehu.
         'race_connectors': ((2584087207, 1876295954),),
+        # Out and back on the same roads: south from Sheshi i Flamurit down
+        # Bulevardi Ismail Qemali, round Sheshi Pavarsia and along Lungomare to
+        # where the inland road from Dhimitër Konomi meets it; through the
+        # tunnel, up Dhimitër Konomi and back to that merge; then the same
+        # roads home on the other carriageway, round the island at the square
+        # into the outbound leg. Each roundabout ring is (centre, radius m).
+        'out_and_back': {
+            'offset': 6.0,
+            'roundabouts': [((40.470724, 19.491154), 18.0),            # Sheshi i Flamurit turn
+                            ((40.454514, 19.486624), 26.0)],  # Sheshi Pavarsia (OSM ring)
+            'shared': [
+                (40.470724, 19.491154),                   # the turning island at the square
+                (40.4688450, 19.4912131),  # Muradie Mosque
+                (40.4628, 19.4894),        # Bulevardi Ismail Qemali
+                (40.4574, 19.4876),        # Flamurtari stadium
+                (40.454514, 19.486624),    # Sheshi Pavarsia
+                (40.4530, 19.4865),        # Independence Museum approach
+                (40.4500, 19.4904),        # Rruga Çamëria, Lungomare
+                (40.4462743, 19.4943573),  # seaside boulevard
+                (40.4321612, 19.4944346),  # Murat Tërbaçi on the waterfront
+                (40.4308271, 19.493864),   # Murat Tërbaçi, where the return merges
+            ],
+            'loop': [
+                (40.4308271, 19.493864),   # the merge
+                (40.4212347, 19.4876934),  # Uji i Ftohtë, north portal
+                (40.4205612, 19.4869312),  # south portal
+                (40.4169588, 19.4870453),  # the climb inland, Dhimitër Konomi
+                (40.4238856, 19.4935304),  # back north on Dhimitër Konomi
+                (40.4289664, 19.4932962),  # its last stretch, into the shore road
+            ],
+        },
         'waypoints': [
-            (40.4704777, 19.4912006),  # Sheshi i Flamurit, north of the monument
-            (40.4698724, 19.4911927),  # Boulevard beside the house
-            (40.4688450, 19.4912131),  # Muradie Mosque, then toward Skelë
-            (40.4628, 19.4894),       # Bulevardi Ismail Qemali, southbound
-            (40.4574, 19.4876),       # Flamurtari stadium
-            (40.4545, 19.4866),       # Sheshi Pavarësia
-            (40.4530, 19.4865),       # Independence Museum approach
-            (40.4500, 19.4904),       # Rruga Çamëria, Lungomare
-            (40.4462743, 19.4943573), # seaside boulevard
-            (40.4321612, 19.4944346), # Murat Tërbaçi on the waterfront
-            (40.4212347, 19.4876934), # Uji i Ftohtë, north portal
-            (40.4205612, 19.4869312), # south portal
-            (40.4169588, 19.4870453), # the climb inland, Dhimitër Konomi
-            (40.4238856, 19.4935304),
-            (40.4345345, 19.4958724), # Duro Shaska toward Centrale
-            (40.4526699, 19.4973512), # Centrale return via Zenel Murra
-            (40.4593455, 19.4960511), # Sulejman Delvina
-            (40.47066, 19.49496),
-            (40.4707020, 19.4928220),
-            (40.4714072, 19.4931028),
-            (40.4714889, 19.4919095), # Justin Godard in Muradie
-            (40.4728369, 19.4926983),
-            (40.4733250, 19.4939970),
-            (40.4747170, 19.4939030), # approach the Municipality from the east
-            (40.4748120, 19.4933420), # Bashkia Vlorë
-            (40.4748120, 19.4929890),
-            (40.4713892, 19.4910000), # back across Flag Square
+            (40.470724, 19.491154), (40.4688450, 19.4912131), (40.4628, 19.4894), (40.4574, 19.4876),
+            (40.454514, 19.486624), (40.4530, 19.4865), (40.4500, 19.4904), (40.4462743, 19.4943573),
+            (40.4321612, 19.4944346), (40.4308271, 19.493864), (40.4212347, 19.4876934),
+            (40.4205612, 19.4869312), (40.4169588, 19.4870453), (40.4238856, 19.4935304),
+            (40.4289664, 19.4932962),
         ],
         'tunnel': ((40.4212347, 19.4876934), (40.4205612, 19.4869312)),
         'turnaround': ((40.4191404, 19.4866541), (40.4197696, 19.4902821)),
-        'median': ((40.4523, 19.4874), (40.4473, 19.4929)),
-        'stone_street': ((40.47165, 19.49202), (40.47258, 19.49256)),
         'scenery_clearances': [
             ((40.47210, 19.49228), (42, 66)),  # the modeled Muradie street fronts
             ((40.42090, 19.48733), (63, 67)),  # rock and tunnel portals
@@ -145,7 +154,8 @@ CITIES = {
             # west across its plaza to the boulevard (OSM axis 96.8 deg).
             {'id': 'petro_marko', 'll': (40.46488, 19.49068), 'yaw': 72,
              'offset_x': -9, 'clear_half': (29, 26)},
-            {'id': 'skela_roundabout', 'll': (40.454502, 19.486624), 'yaw': 0},
+            {'id': 'skela_roundabout', 'll': (40.454502, 19.486624), 'yaw': 0, 'island': 20.5},
+            {'id': 'flag_square_island', 'll': (40.470724, 19.491154), 'yaw': 0, 'island': 13.0, 'clear_half': (13, 13)},
             {'id': 'skela_corner', 'll': (40.45471, 19.48712), 'yaw': 76,
              'clear_half': (18, 27)},
             {'id': 'lungomare_gateway', 'll': (40.45228, 19.48812), 'yaw': 123,
@@ -159,15 +169,27 @@ CITIES = {
             # so the entrance and balcony read from the seafront approach.
             {'id': 'independence_museum', 'll': (40.45218, 19.48528), 'yaw': -62.4,
              'offset_x': 76.0, 'offset_z': -62.0, 'clear_half': (24, 24)},
+            # Kuzum Baba hill (Kodra e Kuzum Babait, 88 m): the Bektashi
+            # temple on the summit, its tower facade facing west down the hill
+            # (OSM way 1222923149, 22 x 27.5 m, turned 7.8 deg), and the
+            # green-domed tomb on the western brow (OSM node 6436869917).
+            {'id': 'kuzum_baba_tekke', 'll': (40.467274, 19.494629), 'yaw': 97.8,
+             'clear_half': (24, 24)},
+            {'id': 'kuzum_baba_turbe', 'll': (40.467831, 19.4929881), 'yaw': 90,
+             'clear_half': (8, 8)},
         ],
         # Replace mapped landmark outlines and open the stadium's frontage
         # by omitting the two buildings that flank its plaza.
         'landmark_buildings': [1237374187, 1237374188, 1237374189, 1237374190, 1003616059,
-                               1083265737, 1083173083, 533052049, 731109970, 491621848, 776920597],
+                               1083265737, 1083173083, 533052049, 731109970, 491621848, 776920597,
+                               1222923149],
         # Lungomare: from Sheshi Pavarsia past the museum to the end of the
         # promenade. Sea on one side (palms), cafés and 10-15 storey blocks on the other.
         'seafront': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943),
                      'levels': (10, 15), 'frontage': 140},
+        # Start/finish on the straight Bulevardi Ismail Qemali, 100 m before
+        # the circuit passes the Kuzum Baba park on the hill (finish_line.py).
+        'finish_before': {'ll': (40.467341, 19.493249), 'metres': 100},
         'sea': True,
         'style': 'seaside',
     },

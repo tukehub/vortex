@@ -127,7 +127,9 @@ func _ready() -> void:
 			for id in ["independence", "independence_museum", "flagpole_big"]:
 				var at := (marks.get_node(id) as Node3D).global_position
 				var d := scene.track.dist_to(at.x, at.z)
-				assert(d > scene.track.half_w + 20.0 and d < 70.0, "landmark off the road and in sight of it: " + id)
+				# The great flag stands on Flag Square, beside the turn round its island.
+				var off := 8.0 if id == "flagpole_big" else 20.0
+				assert(d > scene.track.half_w + off and d < 70.0, "landmark off the road and in sight of it: " + id)
 			var flag := marks.get_node("flagpole_big/GreatFlag") as MeshInstance3D
 			assert((flag.material_override as ShaderMaterial).get_shader_parameter("use_tex"), "the great flag shows the eagle")
 			_test_vlore_circuit(scene, marks)
@@ -147,31 +149,85 @@ func _ready() -> void:
 func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var track := scene.track
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
+	assert(track.L > 8800.0 and track.L < 10400.0, "the Vlorë out-and-back stays near 9.5 km")
+	# Out and back on the seafront road: two one-way carriageways of two
+	# lanes, a divider between them.
+	assert(bool(data.get("one_way", false)) and int(data.get("lanes", 0)) == 2, "Vlorë is raced on one-way carriageways")
+	assert(is_equal_approx(track.half_w, 4.5), "each carriageway is 9 m wide")
+	assert(scene.road.surface_mat.get_shader_parameter("one_way") == true, "no yellow centre line on a one-way carriageway")
+	# Outbound, from the line on Bulevardi Ismail Qemali past Kuzum Baba
+	# down to the waterfront courts; back the same way after the far loop.
+	var outbound := ["petro_marko", "flamurtari", "skela_roundabout", "independence_museum",
+		"lungomare_gateway"]
 	var prior := 0.0
-	assert(track.L < 11200.0, "the compact Vlorë circuit must stay near 11 km")
-	for landmark in ["vlora_house", "muradie_mosque", "petro_marko", "flamurtari", "skela_roundabout",
-			"independence_museum", "lungomare_gateway", "waterfront_courts"]:
+	var first := {}
+	for landmark: String in outbound:
 		var at := (marks.get_node(landmark) as Node3D).position
-		var s := track.locate_xz(at.x, at.z).x
-		assert(s > prior, "Vlorë outbound landmarks must be passed in order: " + landmark)
-		prior = s
+		var passes := _passes(track, at)
+		assert(passes.size() == 2, "the lap passes %s twice (%d)" % [landmark, passes.size()])
+		assert(passes[0] > prior, "Vlorë outbound landmarks must be passed in order: " + landmark)
+		prior = passes[0]
+		first[landmark] = passes
+	# The sports courts and their rock-armoured shore are on the far loop,
+	# past the merge, before the tunnel.
+	var courts := _passes(track, (marks.get_node("waterfront_courts") as Node3D).position)
+	assert(courts.size() == 1 and courts[0] > prior, "the far loop passes the waterfront courts once")
+	prior = courts[0]
 	var entry := track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
 	var exit := track.locate_xz(data.tunnel[1][0], data.tunnel[1][1]).x
-	var old_town := track.locate_xz(data.stone_street[0][0], data.stone_street[0][1]).x
 	var turn := track.locate_xz(data.turnaround[0][0], data.turnaround[0][1]).x
-	var city_hall := (marks.get_node("vlore_municipality") as Node3D).position
-	var hall_s := track.locate_xz(city_hall.x, city_hall.z).x
-	assert(prior < entry and entry + 70.0 < exit and exit < turn and turn < old_town and old_town < hall_s)
-	assert(hall_s > track.L - 850.0, "town hall should be on the final approach to Flag Square")
+	assert(prior < entry and entry + 70.0 < exit and exit < turn, "the far loop: tunnel, then the turnaround")
+	var back := turn
+	outbound.reverse()
+	for landmark: String in outbound:
+		var second: float = first[landmark][1]
+		assert(second > back, "Vlorë return passes the landmarks in reverse order: " + landmark)
+		back = second
+	# Up past the Muradie Mosque, round the island on Flag Square by the
+	# Independence Monument, and down past the mosque again to the line.
+	var mosque := _passes(track, (marks.get_node("muradie_mosque") as Node3D).position)
+	var square := _passes(track, (marks.get_node("independence") as Node3D).position)
+	assert(mosque.size() == 2 and square.size() == 1, "the lap ends with a turn round Flag Square")
+	assert(back < mosque[0] and mosque[0] < square[0] and square[0] < mosque[1] and mosque[1] < track.L,
+		"the run to the line passes the Muradie Mosque and turns round Flag Square")
+	# The two passes never share road: wherever the lap comes back past
+	# itself, the carriageways stay a divider apart.
+	var tight := INF
+	var grid := {}
+	var pts := PackedVector2Array()
+	for k in track.M:
+		var p := track.pos(k * track.ds, 0.0)
+		pts.append(Vector2(p.x, p.z))
+		var cell := Vector2i(floori(p.x / 10.0), floori(p.z / 10.0))
+		if not grid.has(cell):
+			grid[cell] = []
+		grid[cell].append(k)
+	var apart := int(60.0 / track.ds)
+	for k in track.M:
+		var c := Vector2i(floori(pts[k].x / 10.0), floori(pts[k].y / 10.0))
+		for dx in range(-1, 2):
+			for dz in range(-1, 2):
+				for other: int in grid.get(c + Vector2i(dx, dz), []):
+					var gap := absi(other - k)
+					if mini(gap, track.M - gap) > apart:
+						tight = minf(tight, pts[k].distance_to(pts[other]))
+	assert(tight >= 2.0 * track.half_w + 0.4, "the carriageways never touch (closest %.1f m)" % tight)
+	# Both roundabouts are driven round their islands, one pass each side.
+	var baked: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
+	for anchor: Dictionary in baked.landmarks:
+		if not anchor.has("radius"):
+			continue
+		var clear := track.dist_to(anchor.x, anchor.z) - track.half_w
+		var least := 15.0 if anchor.id == "skela_roundabout" else 6.0
+		assert(float(anchor.radius) >= least, "%s: a real island (%.1f m)" % [anchor.id, anchor.radius])
+		assert(clear >= float(anchor.radius) + 0.5, "%s: the island clears the road (%.1f m)" % [anchor.id, clear])
 	var approach := track.tangent(turn)
 	var turn_dot := 1.0
 	for after in range(25, 170, 5):
 		turn_dot = minf(turn_dot, approach.dot(track.tangent(turn + after)))
 	assert(turn_dot < -0.85, "the road reverses heading after the southern portal")
 	assert(scene.road.get_node_or_null("UjiIFtohteTunnel/TunnelBore") != null)
-	var median := scene.road.get_node_or_null("LungomarePavedMedian") as MeshInstance3D
-	assert(median != null and median.mesh.get_aabb().size.length() < 900.0, "Lungomare needs a short raised median")
-	assert(scene.road.get_node_or_null("MuradieStreet/MuradieStreetFronts") != null)
+	print("VLORE OUT-AND-BACK: %.0f m, carriageways at least %.1f m apart" % [track.L, tight])
 	for i in track.M * 4:
 		var s := i * track.ds * 0.25
 		for side: float in [-1.0, 1.0]:
@@ -189,3 +245,27 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var bore := tunnel.get_node("TunnelBore") as MeshInstance3D
 	assert(bore.mesh.get_aabb().size.length() < 145.0, "reverse race must build the same short bore")
 	tunnel.queue_free()
+
+
+## Arc positions where the lap passes closest to `at`, one per pass (a pass
+## within 20 m of the nearest counts), in lap order.
+func _passes(track: RaceTrack, at: Vector3) -> Array:
+	var best := INF
+	var d := PackedFloat32Array()
+	d.resize(track.M)
+	for k in track.M:
+		var p := track.pos(k * track.ds, 0.0)
+		d[k] = Vector2(p.x - at.x, p.z - at.z).length()
+		best = minf(best, d[k])
+	var out := []
+	var k := 0
+	while k < track.M:
+		if d[k] <= best + 20.0:
+			var low := k
+			while k < track.M and d[k] <= best + 20.0:
+				if d[k] < d[low]:
+					low = k
+				k += 1
+			out.append(low * track.ds)
+		k += 1
+	return out
