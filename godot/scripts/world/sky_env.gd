@@ -20,6 +20,7 @@ var sun: DirectionalLight3D
 var rain: RainFx
 var snow: GPUParticles3D
 var env_id := "day"
+var city_id := ""
 var preset: Dictionary
 var wet := 0.0
 var night := 0.0
@@ -31,6 +32,7 @@ const DAY_SUN := 0.81
 const DAY_EXPOSURE := 0.96
 ## Glow weaker than this is not drawn at all.
 const GLOW_MIN := 0.15
+const TIRANA_AMBIENT := {"day": 0.44, "sunset": 0.43, "golden": 0.43, "night": 0.39, "rainy": 0.59, "rain": 0.49}
 
 
 func _ready() -> void:
@@ -62,14 +64,24 @@ func _gate_glow() -> void:
 	env.glow_enabled = env.glow_enabled and env.glow_intensity >= GLOW_MIN
 
 
+func _preset_ambient() -> float:
+	var has_probe := bool(Quality.p.probe)
+	var fill := float(preset.ambient)
+	if city_id == "tirane" and has_probe:
+		fill = float(TIRANA_AMBIENT.get(env_id, fill))
+	return ambient_energy(fill, _is_night, has_probe)
+
+
 func _apply_quality() -> void:
 	if not preset.is_empty() and _transition >= 1.0:
-		env.ambient_light_energy = ambient_energy(float(preset.ambient), _is_night, bool(Quality.p.probe))
+		env.ambient_light_energy = _preset_ambient()
 	Quality.apply_env(env, wet > 0.05)
 	_gate_glow()
 	env.volumetric_fog_enabled = env.volumetric_fog_enabled and night > 0.3
 	Quality.apply_sun(sun)
 	sun.light_angular_distance = (0.3 if night > 0.3 else 0.15) if bool(Quality.p.sun_penumbra) else 0.0
+	if city_id == "tirane":
+		_apply_tirana_shadows()
 
 
 func apply(id: String, is_wet_override: bool = false) -> void:
@@ -83,7 +95,7 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	# sky
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
-	var hdri_path: String = HDRI.get(id, "")
+	var hdri_path := _panorama_path(id)
 	if hdri_path != "" and ResourceLoader.exists(hdri_path):
 		var pano := PanoramaSkyMaterial.new()
 		pano.panorama = load(hdri_path)
@@ -112,7 +124,7 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	env.ambient_light_color = Color(0.64, 0.70, 0.80) if is_night else Color(0.78, 0.82, 0.88)
 	env.ambient_light_sky_contribution = 0.0 if is_night else SKY_AMBIENT
 	_is_night = is_night
-	env.ambient_light_energy = ambient_energy(float(preset.ambient), is_night, bool(Quality.p.probe))
+	env.ambient_light_energy = _preset_ambient()
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 
 	# tonemap + exposure
@@ -181,21 +193,76 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	sun.shadow_enabled = true
 	sun.shadow_opacity = (0.5 if id == "rainy" else 0.78) if not is_night else 0.5
 	Quality.apply_sun(sun)
+	if city_id == "tirane":
+		_apply_tirana_atmosphere(id)
+		_apply_tirana_shadows()
+		_gate_glow()
 
 	rain.set_light(dir, sun.light_color * sun.light_energy, env.fog_light_color)
+	rain.amount_ratio = 1.0
 	rain.emitting = bool(preset.rain)
 	snow.emitting = bool(preset.snow)
 	rain.visible = rain.emitting
 	snow.visible = snow.emitting
 
 
+func _apply_tirana_atmosphere(id: String) -> void:
+	env.ambient_light_sky_contribution = 0.34
+	env.adjustment_saturation = 0.96
+	env.glow_intensity *= 0.68
+	env.glow_bloom *= 0.48
+	env.glow_hdr_threshold = 1.35
+	match id:
+		"day":
+			env.ambient_light_color = Color("#c5d1df")
+			env.tonemap_exposure = 0.88
+			sun.light_energy = 1.82
+			sun.shadow_opacity = 0.89
+		"sunset", "golden":
+			env.ambient_light_color = Color("#c0c8dd")
+			env.tonemap_exposure = 0.92
+			env.fog_light_color = Color("#b4a3a2")
+			env.fog_density = 0.00048
+			sun.light_color = Color("#ffc68e") if id == "sunset" else Color("#ffe1b4")
+			sun.shadow_opacity = 0.87
+		"night":
+			env.ambient_light_color = Color("#aebdd5")
+			env.tonemap_exposure = 1.0
+			env.fog_light_color = Color("#262f44")
+			env.fog_density = 0.0007
+			sun.shadow_opacity = 0.28
+		"rainy", "rain":
+			env.fog_light_color = Color("#88939c") if id == "rainy" else Color("#333d4b")
+			env.fog_density = 0.00145 if id == "rainy" else 0.00185
+			env.ambient_light_color = Color("#c6cdd3") if id == "rainy" else Color("#abb8d0")
+			env.tonemap_exposure = 0.91 if id == "rainy" else 1.0
+			sun.light_energy *= 0.64
+			sun.shadow_opacity = 0.16
+
+
+func _apply_tirana_shadows() -> void:
+	sun.shadow_bias = 0.032
+	sun.shadow_normal_bias = 1.15
+	if Quality.renderer == "mobile" and Quality.preset == "high" and int(Quality.p.shadow_splits) > 1:
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_split_1 = 0.32
+		sun.directional_shadow_max_distance = minf(sun.directional_shadow_max_distance, 155.0)
+		RenderingServer.directional_shadow_atlas_set_size(2048, true)
+
+
+func _panorama_path(id: String) -> String:
+	# Reuse the dusk panorama already in the Android package for golden hour.
+	var sky_id := "golden" if city_id == "tirane" and id == "sunset" else id
+	return HDRI.get(sky_id, "")
+
+
 func _sky_energy(id: String) -> float:
 	match id:
-		"night": return 0.9
+		"night": return 0.73 if city_id == "tirane" else 0.9
 		"rain", "snow": return 0.35
-		"rainy": return 0.60
+		"rainy": return 0.54 if city_id == "tirane" else 0.60
 		"dusk": return 0.8
-		"sunset": return 0.9
+		"sunset": return 0.32 if city_id == "tirane" else 0.9
 		_: return 1.0
 
 
@@ -268,7 +335,8 @@ func _snapshot() -> Dictionary:
 		"ambient": env.ambient_light_energy, "ambient_color": env.ambient_light_color,
 		"exposure": env.tonemap_exposure,
 		"fog_color": env.fog_light_color, "fog_density": env.fog_density,
-		"glow": env.glow_intensity, "sky_ambient": env.ambient_light_sky_contribution}
+		"glow": env.glow_intensity, "sky_ambient": env.ambient_light_sky_contribution,
+		"shadow_opacity": sun.shadow_opacity}
 
 
 ## Smoothly changes both time of day and weather; no scene rebuild.
@@ -283,8 +351,8 @@ func transition_to(id: String, seconds: float = 18.0) -> void:
 	_transition = 0.0
 	_sky_blend = ShaderMaterial.new()
 	_sky_blend.shader = preload("res://shaders/sky_blend.gdshader")
-	_sky_blend.set_shader_parameter("from_sky", load(HDRI[old_id]))
-	_sky_blend.set_shader_parameter("to_sky", load(HDRI[id]))
+	_sky_blend.set_shader_parameter("from_sky", load(_panorama_path(old_id)))
+	_sky_blend.set_shader_parameter("to_sky", load(_panorama_path(id)))
 	_sky_blend.set_shader_parameter("from_energy", _sky_energy(old_id))
 	_sky_blend.set_shader_parameter("to_energy", _sky_energy(id))
 	_sky_blend.set_shader_parameter("from_yaw", _sky_yaw(old_id))
@@ -316,6 +384,9 @@ func advance(dt: float) -> void:
 	env.ambient_light_sky_contribution = lerpf(_from.sky_ambient, _to.sky_ambient, k)
 	env.glow_enabled = bool(Quality.p.glow)
 	_gate_glow()
+	if city_id == "tirane":
+		sun.shadow_opacity = lerpf(_from.shadow_opacity, _to.shadow_opacity, k)
+		rain.set_light(sun.global_transform.basis.z, sun.light_color * sun.light_energy, env.fog_light_color)
 	env.ssr_enabled = bool(Quality.p.ssr) and wet > 0.05
 	_sky_blend.set_shader_parameter("blend", k)
 	rain.amount_ratio = wet

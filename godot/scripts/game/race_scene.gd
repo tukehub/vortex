@@ -167,11 +167,14 @@ func _build_world() -> void:
 	route_guide = RouteGuide.new(track)
 	var tj: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/%s/track.json" % city_id))
 	sky = SkyEnv.new()
+	sky.city_id = city_id
 	add_child(sky)
+	if city_id == "tirane":
+		sky.rain.set_tirana_profile(track.half_w)
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
-	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at)
+	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
 	if tj.has("tunnel"):
 		var tunnel := preload("res://scripts/world/vlore_tunnel.gd").new()
 		tunnel.name = "UjiIFtohteTunnel"
@@ -208,9 +211,9 @@ func _build_world() -> void:
 	bld.set_env(sky.night, sky.wet)
 	props = Props.new()
 	add_child(props)
-	props.load_city(city_id, terrain)
+	props.load_city(city_id, terrain, track, reverse)
 	props.set_night(sky.night)
-	road.set_crossings(track, props.road_marks.get("crossings", []))
+	road.set_crossings(track, props.road_marks.get("crossings", []), true)
 	reflections = RaceReflections.new()
 	reflections.name = "Reflections"
 	add_child(reflections)
@@ -729,7 +732,7 @@ func _process(dt: float) -> void:
 	sky.follow(cam.global_position)
 	reflections.update_focus(track.pos(player.s, player.d), track.tangent(player.s))
 	if sky.wet > 0.01:
-		sky.set_rain_ground(track.pos(player.s, player.d), track.tangent(player.s))
+		sky.set_rain_ground(track.pos(player.s, 0.0 if city_id == "tirane" else player.d), track.tangent(player.s))
 	Sfx.listener_pos = cam.global_position
 	if state in ["race", "finish"]:
 		Sfx.set_mix(Sfx.danger_of(player), Sfx.space_near(cam.global_position, props.landmarks))

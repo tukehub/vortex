@@ -1,4 +1,6 @@
 extends Node3D
+
+const Showcase := preload("res://scripts/world/tirana_showcase.gd")
 ## Plan 3.5: crossings from props.json reach the road shader in lap
 ## coordinates; inferred street furniture is marked as such and obeys the
 ## same rules as mapped items; low quality drops the road hardware.
@@ -23,7 +25,7 @@ func _ready() -> void:
 			var track := RaceTrack.load_city(city_id, reverse)
 			var road := RoadMesh.new()
 			add_child(road)
-			road.build(track, track.half_w, 0.0)
+			road.build(track, track.half_w, 0.0, Callable(), reverse)
 			var marks := road.set_crossings(track, rows)
 			check(marks.size() == rows.size(), "%s paints every crossing (reverse=%s)" % [city_id, reverse])
 			check(int(road.surface_mat.get_shader_parameter("crossing_count")) == marks.size(), "crossing count reaches the shader")
@@ -41,6 +43,13 @@ func _ready() -> void:
 			for row in rows:
 				var p := track.pos(track.locate_xz(float(row[0]), float(row[1])).x, 0.0)
 				check(Vector2(p.x - float(row[0]), p.z - float(row[1])).length() < 3.0, "crossing projects onto itself")
+			var combined := road.set_crossings(track, rows, true)
+			var added := 3 if city_id == "tirane" else 0
+			check(combined.size() == marks.size() + added, "only Tirana adds three showcase crossings")
+			if city_id == "tirane" and combined.size() == marks.size() + added:
+				for i in added:
+					var at := Showcase.forward_s(track, combined[marks.size() + i].x, reverse)
+					check(absf(at - Showcase.CROSSINGS[i]) < 0.01, "showcase crossing stays at its physical position")
 			Quality.set_preset("low")
 			check(float(road.surface_mat.get_shader_parameter("detail")) == 0.0, "low skips manholes, gullies and patches")
 			Quality.set_preset("medium")

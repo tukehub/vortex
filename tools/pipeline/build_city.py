@@ -7,6 +7,7 @@ Outputs to godot/assets/cities/<city>/:
   terrain_far.bin  float32 heights for the distant ring
   splat.png        RGBA ground mask: R road, G vegetation, B water, A urban
   buildings.glb    extruded OSM buildings, chunked 250 m, vertex colours for tint
+  showcase_facades.glb  Tirana-only street frontage relief
   props.json       street lamps, trees (positions), landmarks (x,y,z,yaw,id)
   map.png          debug map (not shipped)
 Data (c) OpenStreetMap contributors (ODbL); elevation (c) Copernicus DEM.
@@ -16,6 +17,7 @@ import math
 import os
 import sys
 import zlib
+from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -28,6 +30,7 @@ from water import process_city as build_water_mask  # noqa: E402
 import seafront  # noqa: E402
 import street_props  # noqa: E402
 import fetch_dem  # noqa: E402
+from showcase_facades import bake as bake_showcase_facades
 from side_roads import build_side_roads
 
 SAMPLE = 2.0          # m, centreline sample spacing used for smoothing
@@ -1282,6 +1285,8 @@ def build(cid, route_only=False):
                           'palms': seafront.palms(ref, hw, idx, side, mask, wnm, terrain_sample, surface, rnd)}
         log(f'  seafront: {len(idx) * SAMPLE:.0f} m of road, sea on the {"+" if side > 0 else "-"} normal side')
     build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS))
+    if cid == 'tirane':
+        bake_showcase_facades(Path(out))
     build_side_roads(osm, ref, hw, terrain_sample, os.path.join(out, 'roads.glb'), radius=city.get('osm_radius', 2600))
     build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.

@@ -433,8 +433,7 @@ func build(root: Node3D, id: String) -> void:
 			for side in [-1.0, 1.0]:
 				_box(root, Vector3(side * 36, 9, 12), Vector3(12, 18, 45), Color("d8c8b0"))
 		"clocktower":
-			_box(root, Vector3(0, 12, 0), Vector3(5, 24, 5), stone)
-			_column(root, Vector3(0, 25, 0), 4, 3, Color("85664e"), 0)
+			_clocktower(root)
 		"bridge_gorica":
 			_box(root, Vector3(0, 5, 0), Vector3(70, 2, 8), stone)
 			for x in range(-30, 31, 10):
@@ -450,6 +449,55 @@ func build(root: Node3D, id: String) -> void:
 		_:
 			_column(root, Vector3(0, 9, 0), 0.15, 18, stone)
 			_box(root, Vector3(2, 16, 0), Vector3(4, 2.5, 0.1), Color("b3272e"))
+
+
+func _clocktower(root: Node3D) -> void:
+	var body := LandmarkKit.begin()
+	var limestone := Color("#d3c2a7")
+	LandmarkKit.box(body, Vector3(0, 11.65, 0), Vector3(4.7, 23.3, 4.7), limestone)
+	LandmarkKit.box(body, Vector3(0, 23.2, 0), Vector3(5.5, 0.68, 5.5), limestone.lightened(0.07))
+	LandmarkKit.box(body, Vector3(0, 25.25, 0), Vector3(4.83, 3.5, 4.83), limestone)
+	LandmarkKit.box(body, Vector3(0, 30.27, 0), Vector3(5.2, 0.42, 5.2), limestone)
+	for x: float in [-2.16, 2.16]:
+		for z: float in [-2.16, 2.16]:
+			LandmarkKit.box(body, Vector3(x, 28.75, z), Vector3(0.58, 3.12, 0.58), limestone)
+	var stone_mat := LandmarkKit.material(0.86)
+	stone_mat.albedo_texture = preload("res://assets/textures/landmark_ashlar.jpg")
+	stone_mat.uv1_triplanar = true
+	stone_mat.uv1_scale = Vector3.ONE * 0.76
+	root.add_child(LandmarkKit.mesh_node(body, stone_mat, "ClocktowerMasonry", 850.0))
+
+	var detail := LandmarkKit.begin()
+	var lead := Color("#6b7471")
+	var iron := Color("#353b37")
+	var roof := [Vector3(-2.66, 30.48, -2.66), Vector3(2.66, 30.48, -2.66),
+		Vector3(2.66, 30.48, 2.66), Vector3(-2.66, 30.48, 2.66)]
+	for i in 4:
+		var apex := Vector3.UP * 34.2
+		LandmarkKit.quad_facing(detail, roof[i], roof[(i + 1) % 4], apex, apex, lead, Vector3.UP)
+		var basis := Basis(Vector3.UP, i * PI * 0.5)
+		var dial := basis * Vector3(0, 25.5, 2.425)
+		var axis := basis.z
+		LandmarkKit.tube(detail, dial, dial + axis * 0.075, 0.88, 0.88, iron, 24)
+		LandmarkKit.tube(detail, dial + axis * 0.075, dial + axis * 0.095, 0.77, 0.77, Color("#ece2c8"), 24)
+		for hour in 12:
+			var rotation := Basis(axis, hour * TAU / 12.0) * basis
+			var tick := dial + axis * 0.103 + rotation.y * 0.645
+			LandmarkKit.box(detail, tick, Vector3(0.05, 0.115, 0.021), iron, rotation)
+		for hand in [[-0.56, 0.50], [0.94, 0.36]]:
+			var rotation := Basis(axis, hand[0]) * basis
+			LandmarkKit.box(detail, dial + axis * 0.125 + rotation.y * hand[1] * 0.44,
+				Vector3(0.064, hand[1], 0.027), iron, rotation)
+		var guard := basis * Vector3(0, 27.6, 2.34)
+		LandmarkKit.box(detail, guard, Vector3(4.12, 0.09, 0.09), iron, basis)
+		for rail in range(-4, 5):
+			LandmarkKit.box(detail, guard + basis.x * rail * 0.43 - Vector3.UP * 0.19,
+				Vector3(0.043, 0.38, 0.043), iron, basis)
+		for slit_height in [5.7, 13.0, 20.0]:
+			LandmarkKit.box(detail, basis * Vector3(0, slit_height, 2.352), Vector3(0.34, 1.25, 0.04), iron, basis)
+	var hardware := LandmarkKit.mesh_node(detail, LandmarkKit.material(0.63), "ClocktowerDialAndRoof", 850.0)
+	hardware.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(hardware)
 
 
 ## The great flag on Sheshi i Flamurit: a 32 m mast flying the national flag.

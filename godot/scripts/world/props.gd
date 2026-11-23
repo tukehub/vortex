@@ -4,13 +4,16 @@ extends Node3D
 ## Lamps along the track get real OmniLights (nearest N to the player, from
 ## the quality preset); the rest are emissive meshes only.
 
-var lamp_mm: MultiMeshInstance3D
 const TREE_CHUNK_SIZE := 400.0
 var track_lamps: Array = []          # [x,y,z,yaw]
 var lights: Array[OmniLight3D] = []
 var light_slots := 0
 var lamp_emis: StandardMaterial3D
 var night := 1.0
+var _tirana := false
+var _showcase_lamp_heads := {}
+const TIRANA_LAMP_REACH := 2.3
+const Showcase := preload("res://scripts/world/tirana_showcase.gd")
 var landmarks: Array = []
 ## OSM street furniture (3.4); null when the city has none.
 var street: StreetProps
@@ -33,11 +36,12 @@ var _tree_lod_last := 0
 
 
 
-func load_city(city_id: String, terrain: Terrain) -> void:
+func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, reverse := false) -> void:
 	var path := "res://assets/cities/%s/props.json" % city_id
 	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
 		return
 	var p: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	_tirana = city_id == "tirane"
 	track_lamps = p.get("track_lamps", [])
 	landmarks = p.get("landmarks", [])
 	road_marks = p.get("road_marks", {})
@@ -66,7 +70,7 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 		for anchor in landmarks:
 			clear.append([float(anchor.x), float(anchor.z)])
 		promenade.build(front, terrain, clear)
-	_build_lamps(p.get("lamps", []), track_lamps)
+	_build_lamps(p.get("lamps", []), track_lamps, track if _tirana else null, reverse)
 	var furniture: Dictionary = p.get("street", {})
 	if not furniture.is_empty():
 		street = StreetProps.new()
@@ -74,13 +78,19 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 		add_child(street)
 		street.build(furniture, terrain.height_at)
 	_build_trees(p.get("trees", []), terrain, city_id)
+	if _tirana and track != null and terrain != null:
+		var showcase_street := preload("res://scripts/world/showcase_street_props.gd").new()
+		showcase_street.name = "TiranaStreetProps"
+		add_child(showcase_street)
+		showcase_street.build(track, reverse, terrain, furniture.get("bench", []))
+		RaceReflections.hide_detail(showcase_street)
 	light_slots = int(Quality.p.lamp_lights)
 	for i in light_slots:
 		var l := OmniLight3D.new()
-		l.light_color = Color(1.0, 0.82, 0.55)
+		l.light_color = Color("#ffe2b5") if _tirana else Color(1.0, 0.82, 0.55)
 		l.light_energy = 0.0
-		l.omni_range = 22.0
-		l.omni_attenuation = 1.6
+		l.omni_range = 18.5 if _tirana else 22.0
+		l.omni_attenuation = 1.25 if _tirana else 1.6
 		l.shadow_enabled = false
 		l.light_specular = 0.6
 		add_child(l)
@@ -94,12 +104,19 @@ func _apply_light_budget() -> void:
 			lights[i].visible = false
 
 
-func _lamp_mesh() -> ArrayMesh:
+func _lamp_mesh(tuned: bool) -> ArrayMesh:
 	# pole (thin box) + head (emissive box), built as two surfaces
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_box(st, Vector3(0, 4.0, 0), Vector3(0.14, 8.0, 0.14), Color(0.25, 0.26, 0.28))
-	_box(st, Vector3(0, 8.0, 1.2), Vector3(0.12, 0.12, 2.4), Color(0.25, 0.26, 0.28))
+	var st := LandmarkKit.begin()
+	if tuned:
+		var steel := Color(0.21, 0.24, 0.24)
+		LandmarkKit.tube(st, Vector3.ZERO, Vector3(0, 7.65, 0), 0.11, 0.052, steel, 6)
+		LandmarkKit.tube(st, Vector3(0, 7.59, 0), Vector3(0, 8.0, 0.63), 0.053, 0.046, steel, 6)
+		LandmarkKit.tube(st, Vector3(0, 8.0, 0.60), Vector3(0, 8.0, TIRANA_LAMP_REACH), 0.046, 0.035, steel, 6)
+		LandmarkKit.box(st, Vector3(0, 7.98, TIRANA_LAMP_REACH), Vector3(0.49, 0.18, 0.83), steel)
+		LandmarkKit.box(st, Vector3(0, 0.25, 0), Vector3(0.29, 0.5, 0.29), steel)
+	else:
+		_box(st, Vector3(0, 4.0, 0), Vector3(0.14, 8.0, 0.14), Color(0.25, 0.26, 0.28))
+		_box(st, Vector3(0, 8.0, 1.2), Vector3(0.12, 0.12, 2.4), Color(0.25, 0.26, 0.28))
 	var pole_mat := StandardMaterial3D.new()
 	pole_mat.vertex_color_use_as_albedo = true
 	pole_mat.roughness = 0.5
@@ -108,12 +125,16 @@ func _lamp_mesh() -> ArrayMesh:
 	var mesh := st.commit()
 	var st2 := SurfaceTool.new()
 	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_box(st2, Vector3(0, 7.9, 2.3), Vector3(0.5, 0.22, 0.9), Color(1, 1, 1))
-	lamp_emis = StandardMaterial3D.new()
-	lamp_emis.albedo_color = Color(0.9, 0.85, 0.7)
-	lamp_emis.emission_enabled = true
-	lamp_emis.emission = Color(1.0, 0.82, 0.55)
-	lamp_emis.emission_energy_multiplier = 6.0
+	if tuned:
+		LandmarkKit.box(st2, Vector3(0, 7.88, TIRANA_LAMP_REACH), Vector3(0.39, 0.045, 0.69), Color.WHITE)
+	else:
+		_box(st2, Vector3(0, 7.9, 2.3), Vector3(0.5, 0.22, 0.9), Color.WHITE)
+	if lamp_emis == null:
+		lamp_emis = StandardMaterial3D.new()
+		lamp_emis.albedo_color = Color(0.9, 0.85, 0.7)
+		lamp_emis.emission_enabled = true
+		lamp_emis.emission = Color(1.0, 0.82, 0.55)
+		lamp_emis.emission_energy_multiplier = 6.0
 	st2.set_material(lamp_emis)
 	st2.commit(mesh)
 	return mesh
@@ -155,28 +176,45 @@ static func _box(st: SurfaceTool, c: Vector3, size: Vector3, col: Color) -> void
 		st.add_vertex(quad[3])
 
 
-func _build_lamps(lamps: Array, tl: Array) -> void:
-	var mesh := _lamp_mesh()
+func _build_lamps(lamps: Array, tl: Array, track: RaceTrack, reverse: bool) -> void:
+	var basic: Array[Transform3D] = []
+	var detail: Array[Transform3D] = []
+	for lamp: Array in lamps + tl:
+		var yaw := float(lamp[3]) if lamp.size() > 3 else 0.0
+		var pos := Vector3(lamp[0], lamp[1], lamp[2])
+		var transform := Transform3D(Basis(Vector3.UP, yaw), pos)
+		if track != null and track.nearest(pos.x, pos.z, 34.0) >= 0:
+			var at := track.locate_xz(pos.x, pos.z).x
+			if Showcase.forward_s(track, at, reverse) <= Showcase.LENGTH:
+				var toward := track.pos(at, 0.0) - pos
+				var aim := Basis(Vector3.UP, atan2(toward.x, toward.z))
+				detail.append(Transform3D(aim, pos))
+				_showcase_lamp_heads[pos] = pos + aim * Vector3(0.0, 7.65, TIRANA_LAMP_REACH)
+				continue
+		basic.append(transform)
+	_lamp_batch(_lamp_mesh(false), basic, Vector3.ZERO, float(Quality.p.props_dist), "StreetLamps")
+	if not detail.is_empty():
+		var origin := track.pos(Showcase.LENGTH * (-0.5 if reverse else 0.5), 0.0)
+		_lamp_batch(_lamp_mesh(true), detail, origin, 405.0, "ShowcaseLamps")
+
+
+func _lamp_batch(mesh: Mesh, transforms: Array[Transform3D], origin: Vector3, reach: float, label: String) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
-	var all := []
-	for l in lamps:
-		all.append([l[0], l[1], l[2], 0.0])
-	for l in tl:
-		all.append(l)
-	mm.instance_count = all.size()
-	for i in all.size():
-		var l: Array = all[i]
-		var yaw := float(l[3]) if l.size() > 3 else 0.0
-		var t := Transform3D(Basis(Vector3.UP, yaw), Vector3(l[0], l[1], l[2]))
-		mm.set_instance_transform(i, t)
-	lamp_mm = MultiMeshInstance3D.new()
-	lamp_mm.multimesh = mm
-	lamp_mm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	lamp_mm.visibility_range_end = float(Quality.p.props_dist)
-	lamp_mm.visibility_range_end_margin = 60.0
-	add_child(lamp_mm)
+	mm.instance_count = transforms.size()
+	for i in transforms.size():
+		var instance := transforms[i]
+		instance.origin -= origin
+		mm.set_instance_transform(i, instance)
+	var node := MultiMeshInstance3D.new()
+	node.name = label
+	node.position = origin
+	node.multimesh = mm
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.visibility_range_end = reach
+	node.visibility_range_end_margin = 60.0
+	add_child(node)
 
 
 func _tree_meshes() -> Array:
@@ -199,6 +237,8 @@ func _tree_meshes() -> Array:
 	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.roughness = 1.0
+	if _tirana:
+		material.albedo_color = Color(0.84, 0.87, 0.79)
 	st.set_material(material)
 	return [st.commit()]
 
@@ -208,17 +248,23 @@ func _pilot_leaf_mesh() -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1949
-	for i in 160:
+	# Overlapping clusters produce an irregular crown. Fewer, larger cards
+	# make the silhouette denser while lowering vertex and alpha-test work.
+	for i in 112:
+		var cluster := i % 7
+		var crown_angle := TAU * cluster / 7.0
+		var crown := Vector3(cos(crown_angle) * 1.1, 4.9 + 0.55 * sin(cluster * 2.15), sin(crown_angle) * 1.1)
 		var az := rng.randf_range(0.0, TAU)
 		var y := rng.randf_range(-1.0, 1.0)
-		var r := sqrt(maxf(0.0, 1.0 - y * y)) * rng.randf_range(0.28, 1.0)
-		var centre := Vector3(cos(az) * r * 2.15, 4.9 + y * 1.9, sin(az) * r * 2.15)
+		var r := sqrt(maxf(0.0, 1.0 - y * y)) * rng.randf_range(0.34, 1.0)
+		var centre := crown + Vector3(cos(az) * r * 1.28, y * 1.65, sin(az) * r * 1.28)
 		var rot := rng.randf_range(0.0, TAU)
 		var axis := Vector3(cos(rot), 0.0, sin(rot))
 		var up := Vector3(0.0, 1.0, 0.0).rotated(axis, rng.randf_range(-0.65, 0.65))
-		var right := axis * rng.randf_range(0.45, 0.70)
-		up *= rng.randf_range(0.65, 0.95)
-		var normal := right.cross(up).normalized()
+		var right := axis * rng.randf_range(0.55, 0.83)
+		up *= rng.randf_range(0.63, 0.96)
+		var normal := (centre - Vector3(0, 3.8, 0)).normalized()
+		st.set_color(Color(0.79, 0.84, 0.73).lerp(Color(1.0, 0.98, 0.91), rng.randf()))
 		var corners := [centre - right - up, centre + right - up, centre + right + up, centre - right + up]
 		var uvs := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]
 		for index in [0, 1, 2, 0, 2, 3]:
@@ -228,8 +274,9 @@ func _pilot_leaf_mesh() -> ArrayMesh:
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = load("res://assets/foliage/polyhaven_tree_leaves.png")
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-	material.alpha_scissor_threshold = 0.45
-	# MSAA (medium/high) resolves cut-out leaf edges only through coverage.
+	material.alpha_scissor_threshold = 0.41
+	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
 	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.roughness = 1.0
@@ -286,14 +333,14 @@ func _build_trees(trees: Array, terrain: Terrain, city_id: String) -> void:
 
 ## Fewer full 3D trees ride along with the camera on the low preset.
 func _near_tree_limit() -> int:
-	return 12 if Quality.preset == "low" else NEAR_TREE_LIMIT
+	return 12 if Quality.preset == "low" else (22 if Quality.preset == "medium" else NEAR_TREE_LIMIT)
 
 
 func _make_tree_pool(mesh: Mesh, node_name: String) -> MultiMesh:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
-	mm.instance_count = _near_tree_limit()
+	mm.instance_count = NEAR_TREE_LIMIT
 	mm.visible_instance_count = 0
 	var node := MultiMeshInstance3D.new()
 	node.name = node_name
@@ -383,7 +430,7 @@ func _tree_chunk(mesh: Mesh, transforms: Array, origin: Vector3, distance: float
 func set_night(n: float) -> void:
 	night = n
 	if lamp_emis:
-		lamp_emis.emission_energy_multiplier = 6.0 * n
+		lamp_emis.emission_energy_multiplier = (3.3 if _tirana else 6.0) * n
 
 
 ## Move the real lights to the nearest lamps ahead of the player.
@@ -408,14 +455,15 @@ func update_lights(player_pos: Vector3, forward: Vector3) -> void:
 			continue
 		# favour lamps ahead
 		var ahead := to.normalized().dot(forward)
-		cand.append([dist - ahead * 30.0, p])
+		var head: Vector3 = _showcase_lamp_heads.get(p, p + Vector3.UP * 7.7)
+		cand.append([dist - ahead * 30.0, head])
 	cand.sort_custom(func(a, b): return a[0] < b[0])
 	for i in lights.size():
 		var l := lights[i]
 		if i < cand.size() and i < int(Quality.p.lamp_lights):
 			var p: Vector3 = cand[i][1]
-			l.global_position = p + Vector3(0, 7.7, 0) + Vector3(0, 0, 0)
-			l.light_energy = 2.2 * night
+			l.global_position = p
+			l.light_energy = (2.75 if _tirana else 2.2) * night
 			l.visible = night > 0.05
 		else:
 			l.visible = false

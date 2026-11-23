@@ -32,7 +32,7 @@ func _build() -> void:
 	var glazing := SurfaceTool.new()
 	glazing.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var panel := Color(0.72, 0.70, 0.66)
-	var glass := Color(0.12, 0.18, 0.21)
+	var glass := Color(0.19, 0.25, 0.27)
 	var mullion := Color(0.40, 0.40, 0.38)
 	for floor_index in 25:
 		var y0 := 0.3 + floor_index * 3.38
@@ -44,8 +44,10 @@ func _build() -> void:
 			var d := _perimeter(i, y1)
 			# Facade alternates glass and solid areas in a changing stepped rhythm.
 			var window_cell := (i + floor_index + floori(float(floor_index) / 4.0)) % 3 != 0
-			_quad(glazing if window_cell else st, a, b, c, d, glass if window_cell else panel)
 			if window_cell:
+				var tint := glass.lerp(Color(0.30, 0.34, 0.33), 0.24 + 0.18 * sin(i * 1.87 + floor_index * 3.01))
+				_quad(glazing, _perimeter(i, y0, -0.09), _perimeter(i + 1, y0, -0.09),
+					_perimeter(i + 1, y1, -0.09), _perimeter(i, y1, -0.09), tint)
 				# Narrow concrete spandrels and vertical edge frames add depth without
 				# generating one node per window, for mobile draw-call efficiency.
 				var bottom_top := y0 + 0.3
@@ -53,6 +55,8 @@ func _build() -> void:
 				var p := _perimeter(i, y0, 0.05)
 				var q := _perimeter(i, y1, 0.05)
 				_quad(st, p, p.lerp(_perimeter(i + 1, y0, 0.05), 0.035), q.lerp(_perimeter(i + 1, y1, 0.05), 0.035), q, mullion)
+			else:
+				_quad(st, a, b, c, d, panel.darkened(0.04 + 0.025 * sin(float(i) + floor_index * 1.7)))
 	var roof := Color(0.60, 0.60, 0.57)
 	for i in 32:
 		_quad(st, Vector3(0, 85, 0), _perimeter(i, 85), _perimeter(i + 1, 85), Vector3(0, 85, 0), roof)
@@ -75,8 +79,8 @@ func _build() -> void:
 	glazing.generate_normals()
 	var glazing_material := StandardMaterial3D.new()
 	glazing_material.vertex_color_use_as_albedo = true
-	glazing_material.roughness = 0.22
-	glazing_material.metallic = 0.1
+	glazing_material.roughness = 0.27
+	glazing_material.metallic = 0.22
 	glazing_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	glazing.set_material(glazing_material)
 	var windows := MeshInstance3D.new()

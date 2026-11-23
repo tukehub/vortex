@@ -110,6 +110,12 @@ func set_light(to_sun: Vector3, sun: Color, haze: Color) -> void:
 		mat.set_shader_parameter("ambient_light", ambient_v)
 
 
+func set_tirana_profile(road_half_width: float) -> void:
+	_streak_mat.set_shader_parameter("exposure_time", 0.024)
+	_streak_mat.set_shader_parameter("fall_velocity", Vector3(-1.8, -10.8, 0.8))
+	_splash_mat.set_shader_parameter("road_half_width", road_half_width)
+
+
 ## The road under the player: a point on it and the direction it runs in.
 func set_ground(origin: Vector3, tangent: Vector3) -> void:
 	var flat := Vector2(tangent.x, tangent.z)
@@ -119,11 +125,17 @@ func set_ground(origin: Vector3, tangent: Vector3) -> void:
 		grad = flat / run * (tangent.y / run)
 	_splash_mat.set_shader_parameter("ground_origin", origin)
 	_splash_mat.set_shader_parameter("ground_grad", grad)
+	_splash_mat.set_shader_parameter("ground_right", Vector2(-flat.y, flat.x).normalized())
 
 
 func _process(dt: float) -> void:
 	var target := clampf(amount_ratio, 0.0, 1.0) if emitting else 0.0
 	level = move_toward(level, target, dt * 0.8)
+	visible = level > 0.0
+	if not visible:
+		_has_cam = false
+		_cam_velocity = Vector3.ZERO
+		return
 	_streak_mat.set_shader_parameter("rain", level)
 	_splash_mat.set_shader_parameter("rain", level)
 	var cam := get_viewport().get_camera_3d()

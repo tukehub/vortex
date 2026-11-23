@@ -3,6 +3,7 @@ extends Node3D
 ## Builds the race road from a RaceTrack: asphalt surface with UV (u across,
 ## v along), kerbs, a skirt down to the terrain, and start/finish line.
 
+const Showcase := preload("res://scripts/world/tirana_showcase.gd")
 const ROAD_SHADER := preload("res://shaders/road.gdshader")
 const KERB_H := 0.14
 const KERB_W := 0.5
@@ -15,13 +16,18 @@ var surface_mat: ShaderMaterial
 var kerb_mat: StandardMaterial3D
 var skirt_mat: StandardMaterial3D
 var surface: MeshInstance3D
+var pavement_mat: StandardMaterial3D
+var _showcase := false
+var _reverse := false
 var length := 0.0
 var barrier_mat: StandardMaterial3D
 var _terrain_height := Callable()
 
 
-func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()) -> void:
+func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable(), reverse := false) -> void:
 	length = track.L
+	_showcase = track.id == "tirane"
+	_reverse = reverse
 	_terrain_height = terrain_height
 	surface_mat = ShaderMaterial.new()
 	surface_mat.shader = ROAD_SHADER
@@ -31,6 +37,9 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	surface_mat.set_shader_parameter("half_w", hw)
 	surface_mat.set_shader_parameter("track_len", track.L)
 	surface_mat.set_shader_parameter("wetness", wet)
+	if _showcase:
+		surface_mat.set_shader_parameter("showcase_length", Showcase.LENGTH)
+		surface_mat.set_shader_parameter("showcase_direction", -1.0 if _reverse else 1.0)
 
 	kerb_mat = StandardMaterial3D.new()
 	kerb_mat.vertex_color_use_as_albedo = true
@@ -44,6 +53,8 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	_build_kerbs(track, hw)
 	_build_edge_barriers(track, hw)
 	_build_skirt(track, hw)
+	if _showcase:
+		_build_showcase_pavement(track, hw)
 	set_wet(wet)
 	surface_mat.set_shader_parameter("crossing_map", ImageTexture.create_from_image(crossing_lookup(PackedVector2Array(), track.L)))
 	apply_quality()
@@ -86,7 +97,7 @@ func add_paved_median(track: RaceTrack, start: float, length_m: float) -> void:
 ## MAX_CROSSINGS, nearest the start first; returns the (s, width) pairs used.
 const MAX_CROSSINGS := 24
 
-func set_crossings(track: RaceTrack, rows: Array) -> PackedVector2Array:
+func set_crossings(track: RaceTrack, rows: Array, include_showcase := false) -> PackedVector2Array:
 	var marks := PackedVector2Array()
 	for row in rows:
 		if marks.size() >= MAX_CROSSINGS:
@@ -96,6 +107,19 @@ func set_crossings(track: RaceTrack, rows: Array) -> PackedVector2Array:
 		if track.dist_to(x, z) > track.half_w + 1.0:
 			continue
 		marks.append(Vector2(track.locate_xz(x, z).x, float(row[2])))
+	if include_showcase and _showcase:
+		var direction := -1.0 if _reverse else 1.0
+		for distance: float in [Showcase.CROSSINGS.x, Showcase.CROSSINGS.y, Showcase.CROSSINGS.z]:
+			if marks.size() >= MAX_CROSSINGS:
+				break
+			var at := track.mod_s(distance * direction)
+			var clear := true
+			for mark in marks:
+				if absf(track.wrap_s(mark.x - at)) <= 55.0:
+					clear = false
+					break
+			if clear:
+				marks.append(Vector2(at, 3.4))
 	var padded := marks.duplicate()
 	padded.resize(MAX_CROSSINGS)
 	surface_mat.set_shader_parameter("crossings", padded)
@@ -168,6 +192,9 @@ func set_wet(w: float) -> void:
 	kerb_mat.albedo_color = Color.WHITE.darkened(wet * 0.12)
 	skirt_mat.albedo_color = Color(0.46, 0.44, 0.40).darkened(wet * 0.16)
 	skirt_mat.roughness = lerpf(0.95, 0.82, wet)
+	if pavement_mat != null:
+		pavement_mat.roughness = lerpf(0.91, 0.69, wet)
+		pavement_mat.albedo_color = Color.WHITE.darkened(wet * 0.24)
 	if barrier_mat != null:
 		barrier_mat.roughness = lerpf(0.88, 0.7, wet)
 		barrier_mat.albedo_color = Color.WHITE.darkened(wet * 0.1)
@@ -226,6 +253,10 @@ func _build_kerbs(track: RaceTrack, hw: float) -> void:
 			var k0 := i
 			var k1 := (i + 1) % M
 			var seg_col := KERB_RED if (i / 3) % 2 == 0 else KERB_WHITE
+			if _showcase:
+				var at := Showcase.forward_s(track, (i + 0.5) * track.ds, _reverse)
+				var blend := smoothstep(0.0, 7.0, minf(at, Showcase.LENGTH - at))
+				seg_col = seg_col.lerp(Color(0.66, 0.64, 0.60), blend)
 			seg_col = seg_col.darkened(0.04 + 0.035 * (1.0 + sin(i * 0.37)))
 			var pts: Array[Vector3] = []
 			for k: int in [k0, k1]:
@@ -272,6 +303,11 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 		for i in track.M:
 			var j := (i + 1) % track.M
 			var color := KERB_RED if int(i * track.ds / 8.0) % 2 == 0 else KERB_WHITE
+			if _showcase:
+				var at := Showcase.forward_s(track, (i + 0.5) * track.ds, _reverse)
+				var blend := smoothstep(0.0, 7.0, minf(at, Showcase.LENGTH - at))
+				var guard := Color(0.59, 0.54, 0.49) if int(at / 8.0) % 2 == 0 else Color(0.76, 0.73, 0.67)
+				color = color.lerp(guard, blend * 0.90)
 			var a := Vector3(track.X[i], track.Y[i], track.Z[i]) + Vector3(track.NX[i], 0.0, track.NZ[i]) * side * (hw + KERB_W)
 			var b := Vector3(track.X[j], track.Y[j], track.Z[j]) + Vector3(track.NX[j], 0.0, track.NZ[j]) * side * (hw + KERB_W)
 			var normal := Vector3(track.NX[i], 0.0, track.NZ[i]) * -side
@@ -340,3 +376,37 @@ func _build_skirt(track: RaceTrack, hw: float) -> void:
 	mi.name = "RoadShoulders"
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
+
+
+func _build_showcase_pavement(track: RaceTrack, hw: float) -> void:
+	var st := LandmarkKit.begin()
+	var steps := ceili(Showcase.LENGTH / track.ds)
+	var direction := -1.0 if _reverse else 1.0
+	var outer := hw + KERB_W
+	for side: float in [-1.0, 1.0]:
+		var previous: Array[Vector3] = []
+		for i in steps + 1:
+			var at := Showcase.LENGTH * i / steps
+			var progress := smoothstep(0.0, 10.0, minf(at, Showcase.LENGTH - at))
+			var ramp := smoothstep(1.0, 4.7, Showcase.crossing_distance(at))
+			var s := at * direction
+			var outer_point := track.pos(s, side * (outer + 0.55 + 2.25 * progress))
+			var ground := float(_terrain_height.call(outer_point.x, outer_point.z)) if _terrain_height.is_valid() else outer_point.y - 0.06
+			var edge := track.pos(s, side * (outer + 0.04)) + Vector3.UP * lerpf(0.04, KERB_H - 0.015, ramp)
+			# Bury the outside edge into the existing shoulder, allowing the
+			# sidewalk to follow its crossfall without moving terrain or the road.
+			outer_point.y = lerpf(edge.y, maxf(outer_point.y + 0.035, ground - 0.03), progress)
+			var seam := edge.lerp(outer_point, 0.80)
+			var row: Array[Vector3] = [edge, seam, outer_point]
+			if not previous.is_empty():
+				var slab := Color(0.76, 0.73, 0.66).darkened(0.065 * (0.5 + 0.5 * sin(i * 7.01)))
+				LandmarkKit.quad_facing(st, previous[0], row[0], row[1], previous[1], slab, Vector3.UP)
+				LandmarkKit.quad_facing(st, previous[1], row[1], row[2], previous[2], slab.darkened(0.12), Vector3.UP)
+			previous = row
+	pavement_mat = LandmarkKit.material(0.91)
+	pavement_mat.albedo_texture = preload("res://assets/textures/cobble_diff.jpg")
+	pavement_mat.uv1_triplanar = true
+	pavement_mat.uv1_scale = Vector3.ONE * 0.89
+	var pavement := LandmarkKit.mesh_node(st, pavement_mat, "TiranaShowcasePavement", 650.0)
+	pavement.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pavement)
