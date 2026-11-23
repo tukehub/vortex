@@ -23,18 +23,18 @@ the model) and the trees inside both keepouts are cleared, as a full rebuild
 does through `landmark_buildings` and `clear_half` in `cities.py`.
 
 Where the race sees it: the tomb on the brow is abreast of the road 60 m
-after the line; the temple, behind the brow from the boulevard below, shows
-on the return pass east of the hill (≈ 8.6 km) and its towers above the
-rooftops further out.
+after the line and again on the way back; the temple, behind the brow from
+the boulevard below, shows its towers above the rooftops.
 
 ## Start/finish
 
 Before: Sheshi i Flamurit, inside the square's turn (tightest radius ≈ 28 m
 within 40 m of the line). Now: on the straight Bulevardi Ismail Qemali,
 **102 m before** the road passes the Kuzum Baba park, with no bend tighter
-than 212 m over the grid behind the line and the run past it. The lap now
-opens past Petro Marko and closes through the old town, the town hall,
-Sheshi i Flamurit, the Vlora house and the Muradie Mosque.
+than 211 m over the grid behind the line and the run past it. On the
+out-and-back circuit ([the road and the sea](vlore-out-and-back.md)) the
+road passes the park twice; the line is on the first, outbound pass, on the
+sea-side carriageway.
 
 `tools/pipeline/finish_line.py` rotates the closed lap so it starts the asked
 distance before the point of the circuit nearest a landmark, and refuses a
@@ -49,8 +49,8 @@ python3 tools/pipeline/glb_cut.py vlore 1222923149
 All three only touch the processed data they name (track.json order,
 props.json rows, the temple's index triangles in buildings.glb) and are
 idempotent; `build_city.py` applies the same placement on a full rebuild.
-Everything else in the city (tunnel, old-town paving, median, turnaround,
-crossings, furniture) is located by world position, so it is unaffected.
+Everything else in the city (tunnel, turnaround, crossings, furniture) is
+located by world position, so it is unaffected.
 
 Tests: `tests/vlore_kuzum_baba` (line on a straight in both directions,
 100 ± 12 m before the park, landmarks built and facing west, no building

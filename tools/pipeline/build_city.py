@@ -294,6 +294,164 @@ def route_vlore_turnaround(raw, city, proj):
     return np.vstack((raw[:first + 1], arc, exit_join, raw[last:]))
 
 
+def _path_through(graph, waypoints_xz):
+    """Shortest path through consecutive waypoints, roads may be reused."""
+    nodes = [graph.nearest(x, z) for x, z in waypoints_xz]
+    path = []
+    for a, b in zip(nodes, nodes[1:]):
+        leg = graph.dijkstra(a, b, set(), set())
+        if leg is None:
+            raise RuntimeError(f'no road between waypoints {a} and {b}')
+        path += leg[1:] if path else leg
+    return np.array([graph.pos[i] for i in path], float)
+
+
+def _resample_open(pts, spacing):
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    s = np.arange(0.0, cum[-1], spacing)
+    return np.column_stack([np.interp(s, cum, pts[:, k]) for k in range(2)])
+
+
+def _through_centre(centreline, centre, radius):
+    """Replace the mapped ring of a roundabout by a line through its centre,
+    so offset carriageways pass either side of the island."""
+    d = np.linalg.norm(centreline - centre, axis=1)
+    inside = np.where(d < radius * 1.6)[0]
+    if len(inside) == 0:
+        raise ValueError('roundabout centre is not on the shared road')
+    first, last = inside[0], inside[-1]
+    head = centreline[:first] if first > 0 else centreline[:0]
+    tail = centreline[last + 1:]
+    return np.vstack([head, [centre], tail])
+
+
+def route_out_and_back(graph, city, proj, hw):
+    """A street circuit raced both ways on the same roads (right-hand traffic):
+    the outbound leg keeps to the right carriageway of the shared roads, the
+    return to the other, `offset` metres either side of the mapped centreline,
+    so a kerbed divider runs between them. At each roundabout on the way both
+    legs swing out to the ring radius, outbound round one side of the island
+    and back round the other; at the near end the return turns anticlockwise
+    round the first roundabout into the outbound leg. The far end is an
+    one-way loop (`loop` waypoints, from the merge point round to the road
+    that comes back to it).
+    Returns the closed raw centreline."""
+    spec = city['out_and_back']
+    offset = float(spec['offset'])
+    rings = [(np.asarray(proj.to_xz(*ll), float), float(r)) for ll, r in spec['roundabouts']]
+    near_centre, near_radius = rings[0]
+    shared = _path_through(graph, [proj.to_xz(*ll) for ll in spec['shared']])
+    shared = _resample_open(shared, SAMPLE)
+    shared = np.vstack([[near_centre], shared[np.linalg.norm(shared - near_centre, axis=1) >= near_radius * 1.6]])
+    for centre, radius in rings[1:]:
+        shared = _through_centre(shared, centre, radius)
+    shared = _resample_open(shared, SAMPLE)
+    shared = smooth_closed(np.vstack([shared, shared[::-1]]), 5, 2)[:len(shared)]
+    tangent = np.gradient(shared, axis=0)
+    tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-9)
+    right = np.column_stack((-tangent[:, 1], tangent[:, 0]))
+    off = np.full(len(shared), offset)
+    for centre, radius in rings:
+        d = np.linalg.norm(shared - centre, axis=1)
+        reach = radius * 2.4
+        bulge = np.where(d < reach, 0.5 + 0.5 * np.cos(np.pi * np.clip(d / reach, 0.0, 1.0)), 0.0)
+        off = np.maximum(off, offset + (radius - offset) * bulge)
+    outbound = shared + right * off[:, None]
+    back = (shared - right * off[:, None])[::-1]
+    # Near end: anticlockwise round the island from the return into the outbound leg.
+    t0, r0 = tangent[0], right[0]
+    theta = np.linspace(0.0, np.pi, 24)[1:-1]
+    arc = near_centre + near_radius * (np.cos(theta)[:, None] * -r0 + np.sin(theta)[:, None] * -t0)
+    # Far end: the one-way loop from the merge point back to it.
+    # Open: it ends on the inland road short of the junction, and the merge
+    # join below turns it into the return carriageway.
+    loop_wps = [proj.to_xz(*ll) for ll in spec['loop']]
+    loop = _path_through(graph, loop_wps)
+    if 'turnaround' in city:
+        loop = route_vlore_turnaround(loop, city, proj)
+    merge = shared[-1]
+    keep = np.linalg.norm(loop - merge, axis=1) > spec.get('merge_trim', 45.0)
+    loop = loop[int(np.argmax(keep)):]
+    loop, back, join = _merge_join(loop, back, outbound, hw)
+    log(f'  out-and-back: shared {np.sum(np.linalg.norm(np.diff(shared, axis=0), axis=1)):.0f} m, '
+        f'loop {np.sum(np.linalg.norm(np.diff(loop, axis=0), axis=1)):.0f} m, offset {offset} m, '
+        f'merge turn radius {join["radius"]:.0f} m, clearance {join["clearance"]:.1f} m, cut {join["cut"]:.0f} m')
+    return np.vstack([outbound, loop, back, arc])
+
+
+def check_carriageways_apart(dense, hw, gap=0.5):
+    """An out-and-back lap passes the same roads twice; nowhere may the two
+    passes' road surfaces touch (closest approach of samples more than 50 m
+    apart along the lap: two half widths plus `gap`)."""
+    from scipy.spatial import cKDTree
+    n = len(dense)
+    apart = int(50 / SAMPLE)
+    for i, j in cKDTree(dense).query_pairs(2 * hw + gap):
+        if min(j - i, n - (j - i)) > apart:
+            raise ValueError(f'out-and-back: carriageways touch at {dense[i].round(1)} / {dense[j].round(1)}')
+
+
+def _rot(v, phi):
+    c, s_ = np.cos(phi), np.sin(phi)
+    return np.array([c * v[0] - s_ * v[1], s_ * v[0] + c * v[1]])
+
+
+def _merge_join(loop, back, outbound, hw):
+    """Where the far loop comes back to the shared road, turn it into the
+    return carriageway (Dhimitër Konomi into the shore road at Vlorë): the
+    loop is cut short of the junction, runs straight on, turns on a circle
+    of radius R (either hand) and runs straight into the return leg. The turn and
+    the kept end of the loop must clear the outbound carriageway (and the
+    loop leaving the junction) by a road width plus SMOOTH_MARGIN. The
+    shortest cut (longest on the mapped road) wins, then the widest turn."""
+    from scipy.spatial import cKDTree
+    SMOOTH_MARGIN = 2.5
+    loop = _resample_open(loop, SAMPLE)
+    avoid = cKDTree(np.vstack([outbound, loop[:int(150 / SAMPLE)]]))
+    back_tree = cKDTree(back[:int(200 / SAMPLE)])
+    need = 2.0 * hw + 1.0 + SMOOTH_MARGIN
+    tail = int(30 / SAMPLE)
+    right = lambda t: np.array([-t[1], t[0]])
+    for cut in range(0, int(200 / SAMPLE)):
+        e = len(loop) - 1 - cut
+        if e < 4 or avoid.query(loop[max(0, e - tail):e + 1])[0].min() < need:
+            continue
+        t0 = loop[e] - loop[e - 3]
+        t0 /= np.linalg.norm(t0)
+        for radius in np.arange(40.0, 11.9, -2.0):
+            for j in range(3, int(150 / SAMPLE)):
+                v = back[j + 3] - back[j - 3]
+                v /= np.linalg.norm(v)
+                # Right-hand (+1) or left-hand (-1) turn, whichever is shorter.
+                turn = float(np.arctan2(t0[0] * v[1] - t0[1] * v[0], t0 @ v))
+                side = 1.0 if turn >= 0.0 else -1.0
+                turn = abs(turn)
+                rhs = back[j] - loop[e] - side * radius * (right(t0) - right(v))
+                m = np.column_stack([t0, v])
+                if abs(np.linalg.det(m)) < 1e-6:
+                    continue
+                run_in, run_out = np.linalg.solve(m, rhs)
+                if run_in < 0.0 or run_out < 0.0:
+                    continue
+                centre = loop[e] + run_in * t0 + side * radius * right(t0)
+                phi = np.linspace(0.0, turn, max(6, int(radius * turn / SAMPLE) + 2))
+                arc = np.array([centre - side * radius * _rot(right(t0), side * f) for f in phi])
+                path = np.vstack([loop[e] + np.outer(np.linspace(0, 1, 6), t0 * run_in), arc,
+                                  arc[-1] + np.outer(np.linspace(0, 1, 6), v * run_out)])
+                path = _resample_open(path, SAMPLE)
+                # Where it has settled onto the return carriageway it is a
+                # divider from the outbound by design; elsewhere, full margin.
+                gaps = avoid.query(path)[0]
+                on_back = back_tree.query(path)[0] < 1.5
+                if np.any(gaps < np.where(on_back, 2.0 * hw + 1.0, need)):
+                    continue
+                clearance = float(gaps[~on_back].min()) if np.any(~on_back) else float(gaps.min())
+                return (np.vstack([loop[:e], path]), back[j:],
+                        {'radius': float(radius), 'clearance': clearance, 'cut': cut * SAMPLE})
+    raise ValueError('out-and-back: no merge hairpin clears the outbound carriageway')
+
+
 def separate_vlore_coastal_legs(dense, proj):
     # Duro Shaska and the coastal road converge near the seafront. Give
     # their full-width racing ribbons clearance along this shared slope.
@@ -987,7 +1145,14 @@ def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf,
         x += lm.get('offset_x', 0)
         z += lm.get('offset_z', 0)
         y = float(terrain_sample([x], [z])[0]) + lm.get('offset_y', 0.0)
-        landmarks.append({'id': lm['id'], 'x': round(x, 1), 'y': round(y, 1), 'z': round(z, 1), 'yaw': lm.get('yaw', 0)})
+        entry = {'id': lm['id'], 'x': round(x, 1), 'y': round(y, 1), 'z': round(z, 1), 'yaw': lm.get('yaw', 0)}
+        if 'island' in lm:
+            # A roundabout island the race circles: as big as asked, but its
+            # kerb 0.8 m clear of the road as built (bend smoothing pulls the
+            # road in round the ring).
+            gap = float(np.min(np.hypot(ref.xz[:, 0] - x, ref.xz[:, 1] - z))) - hw - 0.8
+            entry['radius'] = round(min(float(lm['island']), gap), 1)
+        landmarks.append(entry)
     cafes = []
     if city.get('style') == 'tirana':
         mask = blloku_building_mask(os.path.join(os.path.dirname(out_json), 'buildings.glb'))
@@ -996,11 +1161,14 @@ def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf,
     if seafront_props:
         mask = blloku_building_mask(os.path.join(os.path.dirname(out_json), 'buildings.glb'))
         idx, side = seafront_props['idx'], seafront_props['side']
-        sea_cafes = cafe_strip_anchors(ref, hw, terrain_sample, zones, mask, idx, (-side,), seafront.CAFE_SPACING, parasols=True)
+        # Out-and-back: the land side of the seafront pass is the return
+        # carriageway; terraces and palms stand beyond it.
+        land_hw = hw + 2.0 * city['out_and_back']['offset'] if 'out_and_back' in city else hw
+        sea_cafes = cafe_strip_anchors(ref, land_hw, terrain_sample, zones, mask, idx, (-side,), seafront.CAFE_SPACING, parasols=True, road_hw=hw)
         cafes += sea_cafes
         # A second row of palms along the land-side pavement, between terraces.
-        land_palms = seafront.palms(ref, hw, idx, -side, *seafront_props['water'], terrain_sample, seafront_props['surface'], rnd,
-                                    offset=2.6, avoid=[(c[0], c[2]) for c in sea_cafes], seed=500)
+        land_palms = seafront.palms(ref, land_hw, idx, -side, *seafront_props['water'], terrain_sample, seafront_props['surface'], rnd,
+                                    offset=2.6, avoid=[(c[0], c[2]) for c in sea_cafes], seed=500, road_hw=hw)
         palms = seafront_props['palms'] + land_palms
         # The promenade has its palms; drop mapped trees that would crowd them.
         trees = [t for t in trees if min((t[0] - q[0]) ** 2 + (t[2] - q[2]) ** 2 for q in palms) > 36.0] if palms else trees
@@ -1087,8 +1255,9 @@ def blloku_cafe_anchors(ref, hw, proj, terrain_sample, zones, walls=None):
     return cafe_strip_anchors(ref, hw, terrain_sample, zones, walls, list(range(first, last)), (-1.0, 1.0), 48.0)
 
 
-def cafe_strip_anchors(ref, hw, terrain_sample, zones, walls, idx, sides, every, parasols=False):
-    """Terraces along the track samples `idx` on the given sides (+1 = +normal).
+def cafe_strip_anchors(ref, hw, terrain_sample, zones, walls, idx, sides, every, parasols=False, road_hw=None):
+    """Terraces along the track samples `idx` on the given sides (+1 = +normal),
+    `hw` + 4.5 m out; none within `road_hw` + 1 m of any road centreline.
 
     Keep the whole terrace, not just its centre, outside all track sections.
     Store the road and terrain elevations separately so foundations are only
@@ -1109,7 +1278,7 @@ def cafe_strip_anchors(ref, hw, terrain_sample, zones, walls, idx, sides, every,
                 pos = ref.xz[j] + side * (hw + 4.5) * normal
                 corners = [pos + dx * tangent + dz * normal
                            for dx in (-2.8, 2.8) for dz in (-1.55, 1.55)]
-                if any(ref.nearest(*corner)[0] < hw + 1.0 for corner in corners):
+                if any(ref.nearest(*corner)[0] < (road_hw or hw) + 1.0 for corner in corners):
                     continue
                 if overlaps_landmark_bounds([tuple(p) for p in corners], zones) or blloku_building_overlap(corners, walls):
                     continue
@@ -1186,11 +1355,14 @@ def build(cid, route_only=False):
     g = Graph(osm, exclude_pedestrian=city.get('exclude_pedestrian', False), race_ways=city.get('race_ways', ()),
               race_connectors=city.get('race_connectors', ()))
     wps = [proj.to_xz(lat, lon) for lat, lon in city['waypoints']]
-    raw = route_loop(g, wps, city.get('leg_clearance', 0.0))
-    if len(raw) != len(set(map(tuple, raw))):
-        raise RuntimeError(f'{cid}: route doubles back; correct the city waypoints before export')
-    if 'turnaround' in city:
-        raw = route_vlore_turnaround(raw, city, proj)
+    if 'out_and_back' in city:
+        raw = route_out_and_back(g, city, proj, hw)
+    else:
+        raw = route_loop(g, wps, city.get('leg_clearance', 0.0))
+        if len(raw) != len(set(map(tuple, raw))):
+            raise RuntimeError(f'{cid}: route doubles back; correct the city waypoints before export')
+        if 'turnaround' in city:
+            raw = route_vlore_turnaround(raw, city, proj)
     dense, length = resample_closed(raw, SAMPLE)
     dense = smooth_closed(dense, 7, 3)
     dense, length = resample_closed(dense, SAMPLE)
@@ -1204,12 +1376,15 @@ def build(cid, route_only=False):
         dense = repair_road_bends(dense, hw)
         dense, length = resample_closed(dense, SAMPLE)
     if cid == 'vlore':
-        dense = separate_vlore_coastal_legs(dense, proj)
-        dense, length = resample_closed(dense, SAMPLE)
+        if 'out_and_back' not in city:
+            dense = separate_vlore_coastal_legs(dense, proj)
+            dense, length = resample_closed(dense, SAMPLE)
         # Round the tight mapped junctions before baking terrain and meshes.
         for sigma in (8, 8, 12, 20, 24, 28):
             dense = repair_road_bends(dense, hw + 1.5, sigma)
             dense, length = resample_closed(dense, SAMPLE)
+    if 'out_and_back' in city:
+        check_carriageways_apart(dense, hw)
     log(f'  track length {length:.0f} m, {len(dense)} samples')
 
     # 2. terrain
@@ -1269,6 +1444,10 @@ def build(cid, route_only=False):
         'style': city['style'], 'sea_level': sea_level,
         **({'tunnel': portals} if 'tunnel' in city else {}),
         **{key: [proj.to_xz(*ll) for ll in city[key]] for key in ('stone_street', 'median', 'turnaround') if key in city},
+        # Lanes per carriageway and one-way traffic (an out-and-back circuit
+        # races each direction on its own carriageway).
+        **({'lanes': city['lanes']} if 'lanes' in city else {}),
+        **({'one_way': True} if 'out_and_back' in city else {}),
     })
     log(f'  track.json {len(pts)} control points, elevation {y.min():.1f}..{y.max():.1f} m')
 

@@ -21,11 +21,24 @@ PALM_OFFSET = 7.5     # metres beyond the road edge
 CAFE_SPACING = 30.0
 
 
+def _first_pass(xz, at, slack=20.0):
+    """The sample nearest `at` on the lap's first pass by it: an out-and-back
+    lap passes the same road twice, a carriageway apart."""
+    d = np.linalg.norm(xz - at, axis=1)
+    passes = np.where(d <= d.min() + slack)[0]
+    first = int(passes.min())
+    return int(min((j for j in passes if j - first < 40), key=lambda j: d[j]))
+
+
 def stretch(ref, proj, cfg):
-    """Sample indices of the stretch, in loop order (may wrap)."""
-    a = int(np.argmin(np.linalg.norm(ref.xz - np.asarray(proj.to_xz(*cfg['from'])), axis=1)))
-    b = int(np.argmin(np.linalg.norm(ref.xz - np.asarray(proj.to_xz(*cfg['to'])), axis=1)))
+    """Sample indices of the stretch, in loop order (may wrap). On an
+    out-and-back lap, the first pass (Vlorë: the outbound, sea-side one)."""
+    a = _first_pass(ref.xz, np.asarray(proj.to_xz(*cfg['from'])))
     n = len(ref.xz)
+    to = np.asarray(proj.to_xz(*cfg['to']))
+    d = np.linalg.norm(ref.xz - to, axis=1)
+    # The pass of `to` that follows `a` soonest.
+    b = int(min(np.where(d <= d.min() + 20.0)[0], key=lambda j: ((j - a) % n, d[j])))
     return [(a + k) % n for k in range(((b - a) % n) + 1)]
 
 
@@ -80,9 +93,10 @@ def frontage_height(cfg, idx, side, rnd):
     return override
 
 
-def palms(ref, hw, idx, side, mask, nm, terrain_sample, surface, rnd_fn, offset=PALM_OFFSET, avoid=(), seed=0):
-    """A row of palms `offset` metres beyond the road edge on `side`: on dry
-    ground, clear of the road and of the points in `avoid` (café terraces)."""
+def palms(ref, hw, idx, side, mask, nm, terrain_sample, surface, rnd_fn, offset=PALM_OFFSET, avoid=(), seed=0, road_hw=None):
+    """A row of palms `offset` metres beyond `hw` on `side`: on dry ground,
+    clear of every road (`road_hw`, default `hw`) and of the points in
+    `avoid` (café terraces)."""
     out = []
     step = max(1, int(round(PALM_SPACING / float(np.median(np.linalg.norm(np.diff(ref.xz, axis=0), axis=1))))))
     avoid = np.asarray(avoid, float).reshape(-1, 2)
@@ -91,7 +105,7 @@ def palms(ref, hw, idx, side, mask, nm, terrain_sample, surface, rnd_fn, offset=
         p = ref.xz[i] + side * (hw + offset) * ref.nrm[i]
         if len(avoid) and np.min(np.hypot(*(avoid - p).T)) < 4.5:
             continue
-        if is_water(mask, nm, *p) or ref.nearest(*p)[0] < hw + min(4.0, offset - 0.5):
+        if is_water(mask, nm, *p) or ref.nearest(*p)[0] < (road_hw or hw) + min(4.0, offset - 0.5):
             continue
         y = float(terrain_sample([p[0]], [p[1]])[0])
         if y < surface + 0.4:

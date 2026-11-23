@@ -7,7 +7,7 @@ Vortex is an Android arcade combat racer set on real Albanian streets. Drift thr
 ## Play
 
 - **Tirana Cup.** Learn the controls in the tutorial, then earn stars from race finishes and event goals. Four stars unlock Vlorë. Race fans buy cosmetic paints, rims and liveries for the Vortex GT.
-- **Vlorë.** The 11 km circuit starts on the straight Bulevardi Ismail Qemali, 100 m before it passes the Kuzum Baba hill (its Bektashi temple on the summit, the green-domed tomb on the brow), passes Flamurtari stadium and the Independence Museum, follows Lungomare through the Uji i Ftohtë tunnel, and returns via Kuzum Baba, the old town, Sheshi i Flamurit and Muradie Mosque to the line. [How the line and Kuzum Baba were placed](docs/vlore-kuzum-baba.md)
+- **Vlorë.** A 9.5 km out-and-back on two one-way carriageways with a divider between them. It starts on the straight Bulevardi Ismail Qemali, 100 m before the Kuzum Baba hill (its Bektashi temple on the summit, the green-domed tomb on the brow), runs past Flamurtari stadium, round the Sheshi Pavarsia island and down Lungomare past the rock-armoured shore by the sports courts, through the Uji i Ftohtë tunnel and back up Dhimitër Konomi. It merges into Lungomare again and returns the same way, round Sheshi Pavarsia’s other side, to the turning island at Sheshi i Flamurit. [The out-and-back road and the sea](docs/vlore-out-and-back.md) · [Kuzum Baba and the line](docs/vlore-kuzum-baba.md)
 - **Points mode.** Choose **Mënyra → Pikë**, then pick Tirana’s Skanderbeg Square or Vlorë’s Sheshi i Flamurit. Score with rams and weapons in a two- or three-minute round. [See the Independence Monument in the Vlorë arena](docs/images/vlore-pike.webp)
 - **Same-Wi-Fi multiplayer.** One player hosts from **Online** and shares the displayed IP address. Friends join directly, and the host can fill the remaining grid slots with bots. Tap a stored item to select it or tap the active slot to cycle. Selection and firing use the same synchronized input stream on every phone.
 
@@ -78,7 +78,7 @@ Raw downloads go to `tools/cache/` and processed cities to `godot/assets/cities/
 - [ ] Give the tunnel distinct portal rock, warm reflected light and engine echo. Fade rain and spray under cover.
 - [ ] Place a repair-versus-boost choice before the coastal straight. Have rivals choose lanes based on the item they need and the cost of reaching it.
 - [ ] Playtest the current damage rule against gradual top-speed losses capped at 6% and 10%. Compare repair use and how often damaged drivers recover positions.
-- [ ] Check touch assists through the final Muradie bend on both laps. Measure cold loading and sustained frame times on the target phones with six cars, rain and combat.
+- [ ] Check touch assists through the Sheshi i Flamurit turn and the Dhimitër Konomi merge on both laps. Measure cold loading and sustained frame times on the target phones with six cars, rain and combat.
 
 ### Expand after the sprint
 

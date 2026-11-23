@@ -19,15 +19,30 @@ func _ready() -> void:
 	var env := "day"
 	var qualities := ["medium", "high"]
 	var views: Array = VIEWS
+	var city := "tirane"
+	# --eye=x,y,z --look=x,y,z for the "custom" view; y is metres above ground.
+	var hide := ""   # --hide=NodeName: that child of the race scene hidden, for A/B costs
+	var eye_at := Vector3.ZERO
+	var look_at := Vector3.ZERO
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--env="):
 			env = a.substr(6)
 		elif a.begins_with("--views="):
 			views = Array(a.substr(8).split(","))
+		elif a.begins_with("--hide="):
+			hide = a.substr(7)
+		elif a.begins_with("--eye="):
+			var v := a.substr(6).split_floats(",")
+			eye_at = Vector3(v[0], v[1], v[2])
+		elif a.begins_with("--look="):
+			var v := a.substr(7).split_floats(",")
+			look_at = Vector3(v[0], v[1], v[2])
+		elif a.begins_with("--city="):
+			city = a.substr(7)
 		elif a.begins_with("--qualities="):
 			qualities = Array(a.substr(12).split(","))
 	Quality.set_preset("medium")
-	Game.race_opts.city = "tirane"
+	Game.race_opts.city = city
 	Game.race_opts.env = env
 	Game.race_opts.laps = 1
 	Game.race_opts.reverse = false
@@ -36,6 +51,8 @@ func _ready() -> void:
 	scene.set_process(false)
 	scene._ui_layer.visible = false
 	var track := scene.track
+	if hide != "" and scene.get_node_or_null(hide) != null:
+		(scene.get_node(hide) as Node3D).visible = false
 	var player := scene.player
 	var player_visual: CarVisual = scene.cars[scene.race.cars.find(player)]
 	# The longest gentle straight ahead of the grid, for distant markings.
@@ -87,10 +104,39 @@ func _ready() -> void:
 					var fwd := -player_visual.global_basis.z
 					cam.look_at_from_position(c + fwd * 9.0 + player_visual.global_basis.x * 1.2 + Vector3(0, 0.9, 0), c + Vector3(0, 0.5, 0), Vector3.UP)
 					cam.fov = 50.0
+				"custom":
+					var e := eye_at + Vector3(0, scene.terrain.height_at(eye_at.x, eye_at.z), 0)
+					var l := look_at + Vector3(0, scene.terrain.height_at(look_at.x, look_at.z), 0)
+					cam.look_at_from_position(e, l, Vector3.UP)
+					cam.far = 4000.0
+				"seafront":
+					# Vlorë: from the kerb by the waterfront courts, out over
+					# the rock armour, with a wave breaking on it.
+					var rocks: SeaRocks = scene.sea_rocks
+					var best := rocks.spray_points[0]
+					var best_d := INF
+					for p in rocks.spray_points:
+						var rd := track.dist_to(p.x, p.z)
+						if rd < best_d:
+							best_d = rd
+							best = p
+					var n := track.nearest(best.x, best.z, 200.0)
+					var road := Vector3(track.X[n], best.y, track.Z[n])
+					var dir := (best - road).normalized()
+					var tangent := Vector3(-dir.z, 0, dir.x)
+					var eye := best - dir * 3.5 + Vector3(0, 2.6, 0)
+					cam.look_at_from_position(eye, best + dir * 9.0 + tangent * 22.0 + Vector3(0, -0.8, 0), Vector3.UP)
+					cam.fov = 62.0
+					rocks._spray_t = 0.0
+					rocks.update(eye + dir * 30.0, 0.0)
 			cam.current = true
 			for i in 14:
 				await get_tree().process_frame
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s_%s.png" % [out, env, q, view])
+			var vp := get_viewport().get_viewport_rid()
+			print("RENDER STATS %s %s %s: %d primitives, %d draw calls" % [env, q, view,
+				RenderingServer.viewport_get_render_info(vp, RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
+				RenderingServer.viewport_get_render_info(vp, RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)])
 			cam.queue_free()
 			player.braking = false
 			for other in scene.cars:

@@ -24,7 +24,7 @@ a mapped OSM node.
 Only the street furniture near the circuit is fetched (Overpass, or the main
 OSM API for a tile Overpass will not serve), cached per tile in tools/cache/osm/<city>_street/:
   python3 tools/pipeline/street_props.py tirane vlore
-  (--api skips Overpass and reads the main OSM API, --force refetches)
+  (--api or VORTEX_OSM_API=1 skips Overpass for the main OSM API, --force refetches)
 Data (c) OpenStreetMap contributors, ODbL.
 """
 import json
@@ -458,7 +458,8 @@ def process_city(cid, force=False, api=False):
     tj = json.load(open(os.path.join(out_dir, 'track.json')))
     props_path = os.path.join(out_dir, 'props.json')
     props = json.load(open(props_path))
-    elements = fetch(cid, proj, tj['pts'], force, api)
+    # VORTEX_OSM_API=1: skip Overpass (when its mirrors are down) on full rebuilds too.
+    elements = fetch(cid, proj, tj['pts'], force, api or os.environ.get('VORTEX_OSM_API') == '1')
     items, segments, rings = from_osm(elements, proj)
     anchors = [(float(a['x']), float(a['z'])) for a in props.get('landmarks', [])]
     track, roads, buildings = Track(tj['pts'], tj['hw']), Roads(segments), Buildings(rings)

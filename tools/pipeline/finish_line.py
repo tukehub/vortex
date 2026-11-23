@@ -30,6 +30,7 @@ RUN_AFTER = 40.0       # metres past the line that must also be straight
 MIN_RADIUS = 150.0     # tightest bend allowed there, metres
 STEP = 12.0            # bend measured over this arc length
 SNAP = 12.0            # metres the line may move to find the straightest spot
+PASS_SLACK = 20.0      # a pass this much further than the nearest still counts
 
 
 def _cum(xz):
@@ -64,7 +65,13 @@ def place_finish_before(points, anchor_xz, metres):
     xz = np.asarray([[p[0], p[2]] for p in points], float)
     cum = _cum(xz)
     lap = cum[-1]
-    near = int(np.argmin(np.hypot(xz[:, 0] - anchor_xz[0], xz[:, 1] - anchor_xz[1])))
+    # Where the lap first passes the landmark: on an out-and-back circuit the
+    # landmark is passed twice (outbound and return, a carriageway apart), and
+    # the line belongs to the first pass in lap order.
+    dist = np.hypot(xz[:, 0] - anchor_xz[0], xz[:, 1] - anchor_xz[1])
+    passes = np.where(dist <= dist.min() + PASS_SLACK)[0]
+    near = int(min(passes, key=lambda i: (i, dist[i])))
+    near = int(min((j for j in passes if abs(j - near) < 40), key=lambda j: dist[j]))
     target = (cum[near] - metres) % lap
     off = lambda i: abs((cum[i] - target + lap / 2) % lap - lap / 2)
     candidates = sorted((i for i in range(len(xz)) if off(i) <= SNAP), key=off)

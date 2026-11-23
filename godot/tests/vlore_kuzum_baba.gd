@@ -30,19 +30,26 @@ func _ready() -> void:
 		check(tightest >= 150.0, "the start/finish sits on a straight (tightest radius %.0f m, reverse=%s)" % [tightest, reverse])
 		if not reverse:
 			# Where the road passes the park (its centre is ~180 m off the road).
-			var at := 0.0
+			# The lap passes it twice, out and back a carriageway apart: the
+			# line belongs to the first pass.
+			var dists := PackedFloat32Array()
 			var best := INF
 			var probe := 0.0
 			while probe < track.L:
 				var p := track.pos(probe, 0.0)
-				var d := Vector2(p.x - PARK.x, p.z - PARK.y).length()
-				if d < best:
-					best = d
-					at = probe
+				dists.append(Vector2(p.x - PARK.x, p.z - PARK.y).length())
+				best = minf(best, dists[-1])
 				probe += 2.0
+			var k := 0
+			while dists[k] > best + 20.0:
+				k += 1
+			while k + 1 < dists.size() and dists[k + 1] < dists[k]:
+				k += 1
+			var at := k * 2.0
 			check(at > 88.0 and at < 112.0, "the line is 100 m before the road passes Kuzum Baba (%.0f m)" % at)
+			# On the outbound carriageway, 6 m west of the boulevard's mapped centre.
 			var line := track.pos(0.0, 0.0)
-			check(Vector2(line.x - 20.3, line.z + 2721.3).length() < 3.0, "the line is on Bulevardi Ismail Qemali")
+			check(Vector2(line.x - 14.3, line.z + 2720.2).length() < 3.0, "the line is on Bulevardi Ismail Qemali")
 	# The landmarks on the hill.
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
 	var ids := {}

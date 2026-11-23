@@ -125,7 +125,7 @@ func _grid_for_player() -> void:
 			c = CarState.new(i, cdef, drv.name, false, Color.html(drv.col))
 		c.progress = -9.0 - row * 9.0 - col * 3.5
 		c.s = track.mod_s(c.progress)
-		c.d = 4.0 if col == 1 else -4.0
+		c.d = grid_d() if col == 1 else -grid_d()
 		c.ai.t = 1.0 + rng.randf()
 		c.ai.plan_t = 0.0
 		c.ai.v_t = 0.0
@@ -137,6 +137,12 @@ func _grid_for_player() -> void:
 		cars.append(c)
 
 
+## Grid columns either side of the centreline: 4 m, or less on a narrow road
+## (Vlorë's one-way carriageways are 9 m wide).
+func grid_d() -> float:
+	return minf(4.0, hw - 1.6)
+
+
 ## Pick-up stations and the adaptive director; the same for every grid.
 func _stations_and_director() -> void:
 	var n_st := clampi(roundi(L / 300.0), 5, 10)
@@ -145,7 +151,8 @@ func _stations_and_director() -> void:
 		wsum += Data.PW[k].w
 	for k in n_st:
 		var st := (k + 0.55) * L / n_st + (rng.randf() - 0.5) * 30.0
-		for lane in [-6.5, 0.0, 6.5]:
+		var side := minf(6.5, hw - 2.0)
+		for lane in [-side, 0.0, side]:
 			var kind: String = Data.TUTORIAL_PICKUPS[k % Data.TUTORIAL_PICKUPS.size()] if tutorial else _pick_type(wsum)
 			pickups.append({"id": _nid(), "s": track.mod_s(st), "d": lane, "type": kind, "alive": true, "t": 0.0})
 	compute_order()
@@ -222,7 +229,7 @@ func _grid_for_humans(list: Array, bots: int) -> void:
 			bi += 1
 		c.progress = -9.0 - row * 9.0 - col * 3.5
 		c.s = track.mod_s(c.progress)
-		c.d = 4.0 if col == 1 else -4.0
+		c.d = grid_d() if col == 1 else -grid_d()
 		c.ai.t = 1.0 + rng.randf()
 		c.ai.plan_t = 0.0
 		c.ai.v_t = 0.0
@@ -452,7 +459,7 @@ func physics(c: CarState, dt: float) -> void:
 			c.recovery_t = 0.0
 			c.spin_t = 0.0
 			c.stun_t = 0.0
-			c.d = clampf(c.d, -5.0, 5.0)
+			c.d = clampf(c.d, -minf(5.0, hw - 1.2), minf(5.0, hw - 1.2))
 			emit({"t": "respawn", "car": c})
 		return
 	var steer_in := c.ctrl.steer
@@ -854,7 +861,7 @@ func use_item(c: CarState, back: bool) -> void:
 				mines.append({"id": _nid(), "owner": c, "s": T.mod_s(c.s + 4.0), "d": c.d, "fly": 0.7, "fly0": 0.7, "vs": maxf(c.v, 10.0) + 40.0, "life": 45.0, "arm": 0.4, "born": time})
 		"shock":
 			var lead: CarState = status.target
-			var lanes := [-7.0, 0.0, 7.0]
+			var lanes := [-minf(7.0, hw - 1.0), 0.0, minf(7.0, hw - 1.0)]
 			for i in range(2, 0, -1):
 				var j := rng.randi_range(0, i)
 				var tmp = lanes[i]
