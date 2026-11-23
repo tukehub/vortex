@@ -11,6 +11,8 @@ uniform sampler2D tex_rock_n : hint_normal, filter_linear_mipmap_anisotropic, re
 uniform sampler2D tex_urban : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D tex_urban_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D tex_road : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform bool coastal_ground = false;
+uniform sampler2D ground_macro : filter_linear_mipmap, repeat_enable;
 uniform bool skanderbeg_square = false;
 // Second, coarser texture scale that hides tiling in the distance.
 uniform bool two_scale = true;
@@ -90,10 +92,32 @@ void fragment() {
 	rock_w = max(rock_w, alt * 0.8);
 
 	vec3 base = mix(grass, rock, rock_w);
+	if (coastal_ground) {
+		// Broad olive maquis in sheltered pockets, warm terra rossa on open
+		// ground, pale limestone on dry ridges and steep east-facing slopes.
+		vec3 land = texture(ground_macro, wpos.xz / 1580.0).rgb;
+		float exposed = smoothstep(.47, .76, land.g + (land.b-.5)*.37 + slope * 1.25 + wnrm.x * .105);
+		float scrub = smoothstep(.27, .62, land.r + (land.b-.5)*.55 + sp.g * .20 - exposed * .22);
+		float grain = dot(grass, vec3(.22,.65,.13));
+		float mineral = dot(rock, vec3(.22,.65,.13));
+		vec3 meadow = vec3(.16,.215,.078) * (.24 + 6.6 * grain);
+		vec3 brush = vec3(.039,.088,.036) * (.28 + 6.5 * grain);
+		vec3 soil = vec3(.25,.161,.087) * (.19 + 8.3 * mineral);
+		vec3 limestone = vec3(.44,.425,.339) * (.20 + 9.1 * mineral);
+		base = mix(mix(soil, meadow, smoothstep(.19,.48,land.r)), brush, scrub);
+		rock_w = max(rock_w, exposed * (.72 + .28 * slope));
+		base = mix(base, limestone, rock_w);
+	}
 	vec3 nrm = mix(n_grass, n_rock, rock_w);
 	float rough = mix(0.92, 0.85, rock_w);
 
 	float urban_w = sp.a * (1.0 - rock_w * 0.5);
+	if (coastal_ground) {
+		// The OSM residential polygon spans whole hillsides. Streets and
+		// footprints are drawn separately, and open slopes show through it.
+		float hillside = smoothstep(12., 38., wpos.y) * (.84 + .16 * smoothstep(.005, .07, slope));
+		urban_w *= 1.0 - max(hillside * .90, sp.g * .85);
+	}
 	base = mix(base, urban, urban_w);
 	nrm = mix(nrm, n_urban, urban_w);
 	rough = mix(rough, 0.8, urban_w);

@@ -56,6 +56,7 @@ func build(data: Dictionary, terrain: Terrain, keep_clear: Array = []) -> void:
 		prev = e
 	mat = ShaderMaterial.new()
 	mat.shader = SHADER
+	mat.set_shader_parameter("turf", preload("res://assets/textures/grass_diff.jpg"))
 	var node := MeshInstance3D.new()
 	node.name = "PromenadeGround"
 	node.mesh = st.commit()

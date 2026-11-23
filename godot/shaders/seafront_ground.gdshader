@@ -7,7 +7,8 @@ render_mode cull_disabled, depth_draw_opaque, specular_schlick_ggx;
 
 uniform vec3 stone : source_color = vec3(0.78, 0.76, 0.71);
 uniform vec3 joint : source_color = vec3(0.66, 0.64, 0.60);
-uniform vec3 grass : source_color = vec3(0.27, 0.47, 0.19);
+uniform vec3 grass : source_color = vec3(0.34, 0.47, 0.24);
+uniform sampler2D turf : source_color, filter_linear_mipmap, repeat_enable;
 uniform float slab = 1.2;
 uniform float path_pitch = 34.0;
 uniform float path_half = 1.1;
@@ -30,7 +31,8 @@ void fragment() {
 	// Distance to the nearest path centreline of either family.
 	float d = path_pitch * 0.5 - max(a, b);
 	float path = 1.0 - smoothstep(path_half - 0.15, path_half + 0.15, d);
-	vec3 lawn = grass * (0.88 + 0.2 * hash(floor(p * 0.5)));
+	vec3 blades = texture(turf, p * .31).rgb;
+	vec3 lawn = grass * (.56 + 1.7 * blades) * (.92 + .08 * sin(p.y * .34 + sin(p.x * .12)));
 	float is_lawn = COLOR.r * (1.0 - path);
 	ALBEDO = mix(paving, lawn, is_lawn) * (1.0 - 0.3 * wetness * (1.0 - is_lawn));
 	ROUGHNESS = mix(mix(0.72, 0.25, wetness), 0.95, is_lawn);
