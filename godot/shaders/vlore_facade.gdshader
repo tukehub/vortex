@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
 
+#include "res://shaders/vlore_lod.gdshaderinc"
+
 uniform sampler2D atlas : source_color, filter_linear_mipmap, repeat_disable;
 uniform bool detail = false;
 uniform float night = 0.0;
@@ -19,7 +21,8 @@ void fragment() {
 	float dist = distance(world_pos, CAMERA_POSITION_WORLD);
 	// Opaque screen-door coverage works on Mobile. The matching shell always
 	// fills uncovered pixels, including at the silhouette of a balcony.
-	if (detail && fract(dot(FRAGCOORD.xy, vec2(0.75487767, 0.56984029))) < smoothstep(96., 126., dist)) {
+	float coverage = detail ? smoothstep(96., 126., dist) : skyline_coverage(dist);
+	if (screen_threshold(FRAGCOORD.xy) < coverage) {
 		discard;
 	}
 	vec2 cell = fract(UV);

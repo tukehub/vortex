@@ -134,12 +134,53 @@ def read_model(path):
         return np.frombuffer(data, dtype, a['count']*width,
                              28+size+v['byteOffset']).reshape(-1,width)
 
-    return data, model, attribute
+    def indices(primitive):
+        a = model['accessors'][primitive['indices']]
+        view = model['bufferViews'][a['bufferView']]
+        return np.frombuffer(data, '<u4', a['count'], 28+size+view['byteOffset'])
+
+    return data, model, attribute, indices
+
+
+def linear_pixels(image):
+    rgb = np.array(image.convert('RGB'), dtype=float)/255
+    return np.where(rgb <= .04045, rgb/12.92, ((rgb+.055)/1.055)**2.4)
+
+
+def bake_skyline(directory):
+    """One indexed opaque surface per OSM chunk. Weld roof/wall seams and
+    remove bay UVs and hard-normal splits so Godot can simplify the skyline."""
+    _, source, attribute, indices = read_model(directory/'buildings.glb')
+    atlas = linear_pixels(Image.open(directory/'facade_atlas.png'))
+    roof_mean = linear_pixels(Image.open(directory.parent.parent/'textures'/'rooftiles_diff.jpg')).mean(axis=(0,1))
+    means = np.array([atlas[:TILE, i*TILE:(i+1)*TILE].mean(axis=(0,1)) for i in range(4)])
+    glazing = np.array([(atlas[:TILE, i*TILE:(i+1)*TILE, 2] -
+                         atlas[:TILE, i*TILE:(i+1)*TILE, 0] > .04).mean() for i in range(4)])
+    skyline = GLB()
+    material = skyline.material('skyline')
+    for node in source['nodes']:
+        wall, roof = source['meshes'][node['mesh']]['primitives']
+        wp, rp = (attribute(p,'POSITION') for p in (wall, roof))
+        wc, rc = (attribute(p,'COLOR_0')/255 for p in (wall, roof))
+        family = np.rint(wc[:,3]*3).astype(int)
+        colors = np.vstack((np.column_stack((means[family]*(.68+.45*wc[:,:3]), glazing[family])),
+                            np.column_stack((roof_mean*rc[:,:3], np.zeros(len(rc))))))
+        vertices = np.column_stack((np.vstack((wp,rp)), colors))
+        unique, inverse = np.unique(vertices, axis=0, return_inverse=True)
+        # Reconstruct planar normals in the fragment shader. Sharing corners
+        # across adjacent elevations gives the importer's mesh LOD real adjacency.
+        normals = np.zeros_like(unique[:,:3])
+        normals[:,1] = 1
+        primitive = dict(pos=unique[:,:3], nrm=normals, col=unique[:,3:],
+                         uv=np.zeros((len(unique),2)), mat=material,
+                         idx=inverse[np.r_[indices(wall),indices(roof)+len(wp)]])
+        skyline.node(node['name'], skyline.mesh(node['name'], [primitive]), node['translation'])
+    skyline.write(directory/'skyline.glb')
 
 
 def bake(directory):
     path = directory / 'buildings.glb'
-    data, model, attr = read_model(path)
+    data, model, attr, indices = read_model(path)
     track = json.loads((directory/'track.json').read_text())
     route = np.array(track['pts'])[:,[0,2]]
     placements = []
@@ -174,10 +215,7 @@ def bake(directory):
         # A large flat roof triangle contains its centroid and an inset service unit.
         roof_pos = attr(roof,'POSITION')+origin
         roof_normals = attr(roof,'NORMAL')
-        idx = model['accessors'][roof['indices']]
-        view = model['bufferViews'][idx['bufferView']]
-        start = 28+struct.unpack_from('<I',data,12)[0]+view['byteOffset']
-        triangles = np.frombuffer(data,'<u4',idx['count'],start).reshape(-1,3)
+        triangles = indices(roof).reshape(-1,3)
         used = set()
         for tri in triangles:
             p = roof_pos[tri]
@@ -197,6 +235,7 @@ def bake(directory):
         separators=(',',':')))
     make_modules(directory/'facade_modules.glb')
     make_atlas(directory/'facade_atlas.png')
+    bake_skyline(directory)
 
 
 if __name__ == '__main__':
