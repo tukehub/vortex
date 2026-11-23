@@ -49,7 +49,7 @@ var is_player := false
 var color := Color.WHITE
 var model: Node3D
 var body: MeshInstance3D
-var wheels: Dictionary = {}  # name -> MeshInstance3D
+var wheels: Dictionary = {}  # lowercase simulation key -> Node3D axle pivot
 var mat_paint: StandardMaterial3D
 var sport_paint: ShaderMaterial
 var mat_rear: StandardMaterial3D
@@ -139,8 +139,9 @@ func setup(p_def: Dictionary, p_color: Color, p_is_player: bool, cosmetics := {}
 		if wheels.has("wheel_fl"):
 			visual_wheelbase = absf(wheels.wheel_fl.position.z - rear.position.z)
 	else:
-		visual_wheel_radius = profile.wheel_radius * profile.visual_scale
-		visual_wheelbase = profile.wheelbase * profile.visual_scale
+		var scale_factor := float(profile.get("visual_scale", 1.0))
+		visual_wheel_radius = profile.wheel_radius * scale_factor
+		visual_wheelbase = profile.wheelbase * scale_factor
 	_pose_wheels()
 	_apply_livery()
 	if caliper_parts.size() == 4:
@@ -217,9 +218,7 @@ func _instantiate_visual() -> Node3D:
 			if scene:
 				var instance := scene.instantiate() as Node3D
 				if instance:
-					var problems := PackedStringArray()
-					if not _legacy():
-						problems = VehicleRig.validate(VehicleRig.root(instance), profile)
+					var problems := VehicleRig.validate(VehicleRig.root(instance), profile)
 					if instance is CollisionObject3D or not instance.find_children("*", "CollisionObject3D", true, false).is_empty():
 						problems.append("visual contains gameplay physics objects")
 					if problems.is_empty():

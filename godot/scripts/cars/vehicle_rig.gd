@@ -30,14 +30,21 @@ static func root(scene: Node3D) -> Node3D:
 
 static func validate(rig: Node3D, profile: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
+	if profile.get("legacy", false):
+		for part in ["body", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]:
+			var mesh := rig.get_node_or_null(part) as MeshInstance3D
+			if mesh == null or mesh.mesh == null:
+				errors.append("missing legacy mesh or wheel pivot " + part)
+		return errors
 	for part in ["Body", "Glass", "Interior"]:
 		if not rig.get_node_or_null(part) is Node3D:
 			errors.append("missing part " + part)
-	if not rig.get_node_or_null("Body") is MeshInstance3D:
+	var body := rig.get_node_or_null("Body") as MeshInstance3D
+	if body == null or body.mesh == null:
 		errors.append("Body must be a paintable mesh")
 	for wheel in WHEELS:
 		var pivot := rig.get_node_or_null(wheel) as Node3D
-		if pivot == null or (not pivot is MeshInstance3D and pivot.find_children("*", "MeshInstance3D", true, false).is_empty()):
+		if pivot == null or ((not pivot is MeshInstance3D or not pivot.mesh) and pivot.find_children("*", "MeshInstance3D", true, false).is_empty()):
 			errors.append("missing wheel pivot or wheel mesh " + wheel)
 	for role in LIGHTS:
 		var path := str(profile.get("light_nodes", {}).get(role, LIGHTS[role]))
