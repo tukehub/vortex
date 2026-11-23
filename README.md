@@ -139,6 +139,9 @@ OFL texts. [Architecture and source/licence table](docs/PLAN.md).
 
 ## Profiling on the target phones
 
+The [Tirana boulevard showcase](docs/tirana-showcase.md) includes paired
+Mobile-renderer captures, measurements and the Lungomare follow-up.
+
 ```sh
 python3 tools/export_android.py --version-code 124 --profile-seconds 60 --quality medium
 adb install -r rruga-e-kombit.apk
