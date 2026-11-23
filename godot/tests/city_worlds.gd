@@ -149,7 +149,11 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	var prior := 0.0
 	assert(track.L < 11200.0, "the compact Vlorë circuit must stay near 11 km")
-	for landmark in ["vlora_house", "muradie_mosque", "petro_marko", "flamurtari", "skela_roundabout",
+	# The start/finish is on Bulevardi Ismail Qemali, 100 m before the road
+	# passes Kuzum Baba (cities.py finish_before), so the lap opens past
+	# Petro Marko and closes through Flag Square, the Vlora house and the
+	# Muradie Mosque.
+	for landmark in ["petro_marko", "flamurtari", "skela_roundabout",
 			"independence_museum", "lungomare_gateway", "waterfront_courts"]:
 		var at := (marks.get_node(landmark) as Node3D).position
 		var s := track.locate_xz(at.x, at.z).x
@@ -162,7 +166,13 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var city_hall := (marks.get_node("vlore_municipality") as Node3D).position
 	var hall_s := track.locate_xz(city_hall.x, city_hall.z).x
 	assert(prior < entry and entry + 70.0 < exit and exit < turn and turn < old_town and old_town < hall_s)
-	assert(hall_s > track.L - 850.0, "town hall should be on the final approach to Flag Square")
+	assert(hall_s > track.L - 1100.0, "town hall should be on the final approach to Flag Square")
+	var run_in := []
+	for landmark in ["independence", "vlora_house", "muradie_mosque"]:
+		var at := (marks.get_node(landmark) as Node3D).position
+		run_in.append(track.locate_xz(at.x, at.z).x)
+	assert(hall_s < run_in[0] and run_in[0] < run_in[1] and run_in[1] < run_in[2] and run_in[2] < track.L,
+		"the run to the line passes Flag Square, the Vlora house and the Muradie Mosque")
 	var approach := track.tangent(turn)
 	var turn_dot := 1.0
 	for after in range(25, 170, 5):

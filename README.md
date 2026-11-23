@@ -7,7 +7,7 @@ Vortex is an Android arcade combat racer set on real Albanian streets. Drift thr
 ## Play
 
 - **Tirana Cup.** Learn the controls in the tutorial, then earn stars from race finishes and event goals. Four stars unlock Vlorë. Race fans buy cosmetic paints, rims and liveries for the Vortex GT.
-- **Vlorë.** The 11 km circuit starts at Sheshi i Flamurit, passes Muradie Mosque, Flamurtari stadium and the Independence Museum, follows Lungomare through the Uji i Ftohtë tunnel, and returns via the old town.
+- **Vlorë.** The 11 km circuit starts on the straight Bulevardi Ismail Qemali, 100 m before it passes the Kuzum Baba hill (its Bektashi temple on the summit, the green-domed tomb on the brow), passes Flamurtari stadium and the Independence Museum, follows Lungomare through the Uji i Ftohtë tunnel, and returns via Kuzum Baba, the old town, Sheshi i Flamurit and Muradie Mosque to the line. [How the line and Kuzum Baba were placed](docs/vlore-kuzum-baba.md)
 - **Points mode.** Choose **Mënyra → Pikë**, then pick Tirana’s Skanderbeg Square or Vlorë’s Sheshi i Flamurit. Score with rams and weapons in a two- or three-minute round. [See the Independence Monument in the Vlorë arena](docs/images/vlore-pike.webp)
 - **Same-Wi-Fi multiplayer.** One player hosts from **Online** and shares the displayed IP address. Friends join directly, and the host can fill the remaining grid slots with bots. Tap a stored item to select it or tap the active slot to cycle. Selection and firing use the same synchronized input stream on every phone.
 

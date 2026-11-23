@@ -211,6 +211,11 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			courts.name = "WaterfrontCourts"
 			root.add_child(courts)
 			courts.build()
+		elif str(anchor.id) in ["kuzum_baba_tekke", "kuzum_baba_turbe"]:
+			var hill := KuzumBaba.new()
+			hill.name = "KuzumBaba"
+			root.add_child(hill)
+			hill.build(str(anchor.id), terrain)
 		elif str(anchor.id) == "flagpole_big":
 			_great_flag(root)
 		elif str(anchor.id) in ["national_museum", "prime_minister"]:

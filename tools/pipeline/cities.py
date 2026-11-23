@@ -159,15 +159,27 @@ CITIES = {
             # so the entrance and balcony read from the seafront approach.
             {'id': 'independence_museum', 'll': (40.45218, 19.48528), 'yaw': -62.4,
              'offset_x': 76.0, 'offset_z': -62.0, 'clear_half': (24, 24)},
+            # Kuzum Baba hill (Kodra e Kuzum Babait, 88 m): the Bektashi
+            # temple on the summit, its tower facade facing west down the hill
+            # (OSM way 1222923149, 22 x 27.5 m, turned 7.8 deg), and the
+            # green-domed tomb on the western brow (OSM node 6436869917).
+            {'id': 'kuzum_baba_tekke', 'll': (40.467274, 19.494629), 'yaw': 97.8,
+             'clear_half': (24, 24)},
+            {'id': 'kuzum_baba_turbe', 'll': (40.467831, 19.4929881), 'yaw': 90,
+             'clear_half': (8, 8)},
         ],
         # Replace mapped landmark outlines and open the stadium's frontage
         # by omitting the two buildings that flank its plaza.
         'landmark_buildings': [1237374187, 1237374188, 1237374189, 1237374190, 1003616059,
-                               1083265737, 1083173083, 533052049, 731109970, 491621848, 776920597],
+                               1083265737, 1083173083, 533052049, 731109970, 491621848, 776920597,
+                               1222923149],
         # Lungomare: from Sheshi Pavarsia past the museum to the end of the
         # promenade. Sea on one side (palms), cafés and 10-15 storey blocks on the other.
         'seafront': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943),
                      'levels': (10, 15), 'frontage': 140},
+        # Start/finish on the straight Bulevardi Ismail Qemali, 100 m before
+        # the circuit passes the Kuzum Baba park on the hill (finish_line.py).
+        'finish_before': {'ll': (40.467341, 19.493249), 'metres': 100},
         'sea': True,
         'style': 'seaside',
     },

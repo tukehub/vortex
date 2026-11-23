@@ -29,6 +29,7 @@ from glb import GLB, earcut  # noqa: E402
 from water import process_city as build_water_mask  # noqa: E402
 import seafront  # noqa: E402
 import street_props  # noqa: E402
+import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
 from showcase_facades import bake as bake_showcase_facades
 from side_roads import build_side_roads
@@ -1259,6 +1260,10 @@ def build(cid, route_only=False):
     pts = [[round(float(dense[i, 0]), 2), round(float(y[i]), 2), round(float(dense[i, 1]), 2)] for i in range(0, len(dense), step)]
     if cid == 'tirane':
         pts = place_tirana_finish(pts, city, proj)
+    elif 'finish_before' in city:
+        spec = city['finish_before']
+        pts, info = finish_line.place_finish_before(pts, np.asarray(proj.to_xz(*spec['ll']), float), float(spec.get('metres', 100.0)))
+        log(f'  start/finish {info}')
     save_json(os.path.join(out, 'track.json'), {
         'id': cid, 'name': city['name'], 'hw': hw, 'length': round(length, 1), 'pts': pts,
         'style': city['style'], 'sea_level': sea_level,
