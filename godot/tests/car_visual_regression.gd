@@ -57,5 +57,6 @@ func _assert_shadows(car: CarVisual, expected: int) -> void:
 		if root == null:
 			continue  # bots have no finish driver
 		for child in root.get_children():
-			if child is GeometryInstance3D:
+			# Lamp halos are light, not matter: they never cast.
+			if child is GeometryInstance3D and not child in car.halos:
 				assert(child.cast_shadow == expected, "car and driver shadow settings must match quality")

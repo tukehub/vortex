@@ -215,6 +215,8 @@ func _build_world() -> void:
 	reflections.name = "Reflections"
 	add_child(reflections)
 	reflections.build_landmarks(track, props.landmarks)
+	if props.street != null:
+		RaceReflections.hide_detail(props.street)
 	pine_forest = get_node_or_null("PineForest") as Node3D
 	_setup_pines()
 	terrain.set_env(sky.wet, 0.0, sky.night)
@@ -319,6 +321,7 @@ func _build_race_visuals() -> void:
 		add_child(cv)
 		cv.setup(c.def, (Color.html(c.def.color) if c.is_player else c.color), c == player, Game.cosmetics() if c == player else {})
 		cv.set_night(sky.night)
+		CarVisual.set_wet(sky.wet)
 		cv.apply_state(c, track, DT)
 		if c != player:
 			RaceReflections.hide_from_probes(cv)
@@ -330,6 +333,8 @@ func _build_race_visuals() -> void:
 	effects = FxVisual.new()
 	add_child(effects)
 	effects.setup(race, track, cars[race.cars.find(player)], cars)
+	RaceReflections.hide_detail(pickups)
+	RaceReflections.hide_detail(effects)
 	cam = ChaseCam.new()
 	add_child(cam)
 	cam.setup(track)
@@ -998,6 +1003,7 @@ func _update_weather(dt: float) -> void:
 		props.set_night(sky.night)
 		for car in cars:
 			car.set_night(sky.night)
+		CarVisual.set_wet(sky.wet)
 
 
 # ------------------------------------------------------------------ online

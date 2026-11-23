@@ -47,12 +47,18 @@ void fragment() {
 		col *= 1.0 - body_damage * blue * 0.22;
 		col = mix(col, vec3(0.13, 0.14, 0.145), wear * 0.85);
 	}
+	// Metallic flop: a flake base coat darkens and deepens toward grazing
+	// angles, which flat-tinted paint does not.
+	float facing = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	col *= mix(1.0, mix(0.72, 1.0, facing * facing), blue);
 	ALBEDO = col;
-	METALLIC = mix(0.02, 0.6, blue);
-	ROUGHNESS = mix(0.72, 0.25, blue);
+	// Same finish as CarVisual's public paint: metallic base coat under a
+	// full, nearly sharp clear coat.
+	METALLIC = mix(0.02, 0.55, blue);
+	ROUGHNESS = mix(0.72, 0.38, blue);
 	ROUGHNESS = mix(ROUGHNESS, 0.86, clamp(wear + body_damage * blue * 0.35, 0.0, 1.0));
-	CLEARCOAT = blue * 0.65 * (1.0 - wear);
-	CLEARCOAT_ROUGHNESS = mix(0.18, 0.65, wear);
+	CLEARCOAT = blue * (1.0 - wear);
+	CLEARCOAT_ROUGHNESS = mix(0.06, 0.65, wear);
 	// Microflakes perturb only painted panels. Fade below a pixel to avoid
 	// shimmering at racing distance, and leave trim/glass/lamp normals intact.
 	NORMAL_MAP = vec3(0.5, 0.5, 1.0);

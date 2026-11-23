@@ -19,10 +19,11 @@ func _ready() -> void:
 	for car in visuals:
 		ids.append(car.head_l.get_instance_id())
 		ids.append(car.head_r.get_instance_id())
-		check(car.mat_front != null and car.mat_front.emission_enabled, "every car has emissive lamps")
+		check(_lamp_energy(car) > 0.0, "every car has emissive lamps")
 		if car.mat_paint != null:
-			check(is_equal_approx(car.mat_paint.metallic, 0.6) and is_equal_approx(car.mat_paint.roughness, 0.25), "public paint uses the metallic base coat")
-			check(car.mat_paint.clearcoat_enabled and car.mat_paint.clearcoat > 0.5 and car.mat_paint.normal_texture != null, "public paint includes clearcoat and flakes")
+			check(is_equal_approx(car.mat_paint.metallic, CarVisual.PAINT_METALLIC) and is_equal_approx(car.mat_paint.roughness, CarVisual.PAINT_ROUGHNESS), "public paint uses the metallic base coat")
+			check(car.mat_paint.clearcoat_enabled and is_equal_approx(car.mat_paint.clearcoat, CarVisual.PAINT_CLEARCOAT) and car.mat_paint.clearcoat_roughness < 0.1 and car.mat_paint.normal_texture != null, "public paint has a full, nearly sharp clear coat and flakes")
+			check(car.mat_paint.roughness > car.mat_paint.clearcoat_roughness + 0.2, "the base coat stays rougher than the clear coat (no chrome body)")
 	for preset in ["low", "medium", "high"]:
 		Quality.set_preset(preset)
 		for stage in 4:
@@ -35,7 +36,7 @@ func _ready() -> void:
 				for i in visuals.size():
 					var car := visuals[i]
 					check(car.head_l.get_instance_id() == ids[i * 2] and car.head_r.get_instance_id() == ids[i * 2 + 1], "quality changes reuse the same headlights")
-					check(car.mat_front.emission_energy_multiplier > 0.0, "emissive lamps survive every budget")
+					check(_lamp_energy(car) > 0.0, "emissive lamps survive every budget")
 					if car.mat_paint != null:
 						check(car.mat_paint.normal_enabled == bool(Quality.p.paint_flakes), "flakes follow effective quality")
 					if i > 0:
@@ -59,9 +60,16 @@ func _ready() -> void:
 	state.health = state.max_hp
 	visuals[0]._apply_damage(state)
 	if visuals[0].mat_paint != null:
-		check(is_equal_approx(visuals[0].mat_paint.roughness, 0.25) and is_equal_approx(visuals[0].mat_paint.clearcoat, 0.65), "repair restores the original finish")
+		check(is_equal_approx(visuals[0].mat_paint.roughness, CarVisual.PAINT_ROUGHNESS) and is_equal_approx(visuals[0].mat_paint.clearcoat, CarVisual.PAINT_CLEARCOAT) and is_equal_approx(visuals[0].mat_paint.clearcoat_roughness, CarVisual.PAINT_CLEARCOAT_ROUGHNESS), "repair restores the original finish")
 	for car in visuals:
 		car.queue_free()
 	await get_tree().process_frame
 	print("CAR PAINT / LIGHTS: renderer=%s; failures=%d" % [Quality.renderer, failures])
 	get_tree().quit(1 if failures else 0)
+
+
+## Front lamp glow: the public model's lamp shader, or the atlas model's lens.
+func _lamp_energy(car: CarVisual) -> float:
+	if car.lamp_front != null:
+		return float(car.lamp_front.get_shader_parameter("running")) + float(car.lamp_front.get_shader_parameter("beam"))
+	return car.mat_front.emission_energy_multiplier if car.mat_front != null and car.mat_front.emission_enabled else 0.0

@@ -75,7 +75,10 @@ func _ready() -> void:
 			check(fl.rotation.x > 0.1 and fr.rotation.x < -0.1, "front wheels spin " + def.id)
 			check(rl.rotation.x > 0.1 and rr.rotation.x < -0.1, "rear wheels spin " + def.id)
 			check(absf(fr.rotation.y) > 0.001 and absf(rr.rotation.y) < 0.001, "only front wheels steer " + def.id)
-			check((car.mat_rear != null and car.mat_rear.emission_energy_multiplier > 1.0) or (car.sport_paint != null and float(car.sport_paint.get_shader_parameter("brake_light")) > 0.9), "brake lights respond " + def.id)
+			check((car.lamp_rear != null and float(car.lamp_rear.get_shader_parameter("beam")) > 1.0) or (car.mat_rear != null and car.mat_rear.emission_energy_multiplier > 1.0) or (car.sport_paint != null and float(car.sport_paint.get_shader_parameter("brake_light")) > 0.9), "brake lights respond " + def.id)
+			if car.calipers != null:
+				check(car.calipers.get_parent() == car.model and not car.calipers.get_parent() is MeshInstance3D, "calipers do not spin with the wheels " + def.id)
+				check(is_equal_approx(float(car.caliper_material.get_shader_parameter("steer")), car.steer_vis), "front calipers steer with the wheels " + def.id)
 			check(absf(car.spin - state.v * 0.01 / (rl.mesh.get_aabb().size.y * 0.5)) < 0.001, "wheel rotation matches tire radius " + def.id)
 			state.steer = 1.0
 			state.v = 4.0
@@ -89,7 +92,8 @@ func _ready() -> void:
 			check(car.contact_shadow.transparency > 0.99, "contact shadow fades when airborne " + def.id)
 		var triangles := 0
 		for mi in car.model.get_children():
-			if mi is MeshInstance3D:
+			# Glow sprites (QuadMesh) are not part of the model's budget.
+			if mi is MeshInstance3D and mi.mesh is ArrayMesh:
 				for i in mi.mesh.get_surface_count():
 					triangles += mi.mesh.surface_get_array_index_len(i) / 3
 		check(triangles >= 3000 and triangles <= 60000, "car triangle budget " + def.id)

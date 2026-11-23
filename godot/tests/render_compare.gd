@@ -7,6 +7,10 @@ extends Node3D
 ## every run frames the same cars, road and sky.
 
 const VIEWS := ["chase", "road_far", "car"]
+## Vehicle close-ups (--views=car,car_rear,wheel,car_front): the player's car
+## from the front three-quarter, the rear while braking, the front-right
+## wheel, and low in front at headlight height.
+const CAR_VIEWS := ["car", "car_rear", "wheel", "car_front"]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -14,9 +18,12 @@ func _ready() -> void:
 	Quality.adaptive_enabled = false
 	var env := "day"
 	var qualities := ["medium", "high"]
+	var views: Array = VIEWS
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--env="):
 			env = a.substr(6)
+		elif a.begins_with("--views="):
+			views = Array(a.substr(8).split(","))
 		elif a.begins_with("--qualities="):
 			qualities = Array(a.substr(12).split(","))
 	Quality.set_preset("medium")
@@ -36,7 +43,7 @@ func _ready() -> void:
 	var out := OS.get_environment("SHOTS")
 	for q in qualities:
 		Quality.set_preset(q)
-		for view in VIEWS:
+		for view in views:
 			var cam := Camera3D.new()
 			add_child(cam)
 			cam.fov = 60.0
@@ -57,11 +64,37 @@ func _ready() -> void:
 					var side := player_visual.global_basis.x
 					cam.look_at_from_position(c + fwd * 4.2 + side * 3.0 + Vector3(0, 1.3, 0), c + Vector3(0, 0.55, 0), Vector3.UP)
 					cam.fov = 45.0
+				"car_rear":
+					player.braking = true
+					player_visual.apply_state(player, track, 1.0 / 60.0)
+					var c := player_visual.global_position
+					var fwd := -player_visual.global_basis.z
+					var side := player_visual.global_basis.x
+					cam.look_at_from_position(c - fwd * 5.0 - side * 2.6 + Vector3(0, 1.35, 0), c + Vector3(0, 0.6, 0), Vector3.UP)
+					cam.fov = 45.0
+				"wheel":
+					var w: Node3D = player_visual.wheels.get("wheel_fr", player_visual)
+					var at := w.global_position
+					var side := player_visual.global_basis.x
+					var fwd := -player_visual.global_basis.z
+					cam.look_at_from_position(at + side * 1.5 + fwd * 0.55 + Vector3(0, 0.25, 0), at, Vector3.UP)
+					cam.fov = 40.0
+				"car_front":
+					# The grid puts a rival right ahead: only the player's car here.
+					for other in scene.cars:
+						other.visible = other == player_visual
+					var c := player_visual.global_position
+					var fwd := -player_visual.global_basis.z
+					cam.look_at_from_position(c + fwd * 9.0 + player_visual.global_basis.x * 1.2 + Vector3(0, 0.9, 0), c + Vector3(0, 0.5, 0), Vector3.UP)
+					cam.fov = 50.0
 			cam.current = true
 			for i in 14:
 				await get_tree().process_frame
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s_%s.png" % [out, env, q, view])
 			cam.queue_free()
+			player.braking = false
+			for other in scene.cars:
+				other.visible = true
 	print("RENDER COMPARE: done ", env)
 	get_tree().quit()
 

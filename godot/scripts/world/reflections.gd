@@ -15,7 +15,11 @@ extends Node3D
 
 const PLAYER_LAYER := RaceViews.PLAYER_LAYER
 const CAR_LAYER := 3
-const PROBE_MASK := 0xFFFFF & ~((1 << (PLAYER_LAYER - 1)) | (1 << (CAR_LAYER - 1)))
+## Small, numerous or moving things a reflection would not show anyway
+## (street furniture, pickups, effects): kept out of the probe renders,
+## which then draw fewer objects in each of their six faces.
+const DETAIL_LAYER := 4
+const PROBE_MASK := 0xFFFFF & ~((1 << (PLAYER_LAYER - 1)) | (1 << (CAR_LAYER - 1)) | (1 << (DETAIL_LAYER - 1)))
 const FOLLOW_SIZE := Vector3(180.0, 50.0, 180.0)
 const FOLLOW_HEIGHT := 3.0
 const LANDMARK_SIZE := Vector3(100.0, 50.0, 100.0)
@@ -115,6 +119,17 @@ func update_focus(at: Vector3, forward: Vector3) -> void:
 	var ahead := Vector3(forward.x, 0.0, forward.z).normalized() * step * 0.5
 	follow.position = at + ahead + Vector3(0.0, FOLLOW_HEIGHT, 0.0)
 	follow_moves += 1
+
+
+## Moves a subtree's geometry from the world layer to DETAIL_LAYER: still
+## drawn by every camera, skipped by the probes.
+static func hide_detail(node: Node) -> void:
+	if node is GeometryInstance3D:
+		var geometry := node as GeometryInstance3D
+		if geometry.layers & 1:
+			geometry.layers = (geometry.layers & ~1) | (1 << (DETAIL_LAYER - 1))
+	for child in node.get_children():
+		hide_detail(child)
 
 
 ## Takes a car's meshes off the probes' world layer (the player's car is on

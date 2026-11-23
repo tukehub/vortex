@@ -140,9 +140,11 @@ func _ready() -> void:
 	for car: CarVisual in [plain, dressed]:
 		for wheel: MeshInstance3D in car.wheels.values():
 			for i in wheel.mesh.get_surface_count():
-				var material := wheel.get_surface_override_material(i) as StandardMaterial3D
+				var material := wheel.get_surface_override_material(i)
 				if wheel.mesh.surface_get_material(i).resource_name == "rim":
-					rim_colours.append([car == dressed, material.albedo_color])
+					# The public wheel draws its rim with car_rim.gdshader.
+					var tint: Color = material.get_shader_parameter("rim_color") if material is ShaderMaterial else (material as StandardMaterial3D).albedo_color
+					rim_colours.append([car == dressed, tint])
 	check(rim_colours.size() == 8 and rim_colours.all(func(r: Array) -> bool: return r[1].is_equal_approx(gold) == r[0]), "the chosen rim colours all four wheels, and only on that car")
 	var livery := dressed.livery_material
 	check(livery != null and dressed.mat_paint.next_pass == livery and plain.mat_paint.next_pass == null, "a livery is drawn over the paint")

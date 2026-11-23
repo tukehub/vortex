@@ -12,6 +12,32 @@ static var _flake_normal: NoiseTexture2D
 const CONTACT_SHADER := preload("res://shaders/car_contact.gdshader")
 const SPORT_SHADER := preload("res://shaders/sport_car.gdshader")
 const LIVERY_SHADER := preload("res://shaders/livery_overlay.gdshader")
+const RIM_SHADER := preload("res://shaders/car_rim.gdshader")
+const TYRE_SHADER := preload("res://shaders/car_tyre.gdshader")
+const CALIPER_SHADER := preload("res://shaders/car_caliper.gdshader")
+const TRIM_SHADER := preload("res://shaders/car_trim.gdshader")
+const LAMP_SHADER := preload("res://shaders/car_lamp.gdshader")
+const HALO_SHADER := preload("res://shaders/car_halo.gdshader")
+## Paint: a metallic base coat under a full, nearly sharp clear coat, so
+## reflections read crisp without the body turning into a mirror.
+const PAINT_METALLIC := 0.55
+const PAINT_ROUGHNESS := 0.38
+const PAINT_CLEARCOAT := 1.0
+const PAINT_CLEARCOAT_ROUGHNESS := 0.06
+## Lamp energies (car_lamp.gdshader): running lights by day and night, the
+## dipped beam's projector glow at night, and the brake light.
+const DRL_DAY := 2.2
+const DRL_NIGHT := 1.2
+const BEAM_NIGHT := 3.4
+const TAIL_DAY := 0.6
+const TAIL_NIGHT := 1.0
+const BRAKE := 3.6
+## Spot energy of the headlight beams. (A dipped-beam projector texture was
+## tried: the Mobile renderer draws no light at all through one.)
+const HEADLIGHT_ENERGY := 7.0
+static var _wheel_cache: Dictionary = {}
+static var _lamp_bounds: Dictionary = {}
+static var _tyre_materials: Array[ShaderMaterial] = []
 
 var def: Dictionary
 var is_player := false
@@ -23,6 +49,15 @@ var mat_paint: StandardMaterial3D
 var sport_paint: ShaderMaterial
 var mat_rear: StandardMaterial3D
 var mat_front: StandardMaterial3D
+## Public model lamps (car_lamp.gdshader); null on the atlas model.
+var lamp_front: ShaderMaterial
+var lamp_rear: ShaderMaterial
+## The four brake calipers, one non-spinning mesh (null without them).
+var calipers: MeshInstance3D
+var caliper_material: ShaderMaterial
+## Additive glow at the lamps: [left head, right head, left tail, right tail].
+var halos: Array[MeshInstance3D] = []
+var braking_now := false
 var shield: MeshInstance3D
 var head_l: SpotLight3D
 var head_r: SpotLight3D
@@ -64,14 +99,19 @@ func setup(p_def: Dictionary, p_color: Color, p_is_player: bool, cosmetics := {}
 	var scene := _load_car_scene(str(def.model))
 	model = scene.instantiate()
 	add_child(model)
+	var caliper_parts := []
 	for ch in model.get_children():
 		if ch is MeshInstance3D:
+			var wheel := String(ch.name).begins_with("wheel")
 			if ch.name == "body":
 				body = ch
-			elif String(ch.name).begins_with("wheel"):
+			elif wheel:
 				wheels[String(ch.name)] = ch
+				var part := _strip_caliper(ch)
+				if not part.is_empty():
+					caliper_parts.append(part)
 			ch.gi_mode = GeometryInstance3D.GI_MODE_DYNAMIC
-			_override_materials(ch)
+			_override_materials(ch, wheel)
 	if wheels.has("wheel_rl"):
 		var rear: MeshInstance3D = wheels["wheel_rl"]
 		if rear.mesh != null:
@@ -80,12 +120,15 @@ func setup(p_def: Dictionary, p_color: Color, p_is_player: bool, cosmetics := {}
 			var front: MeshInstance3D = wheels["wheel_fl"]
 			visual_wheelbase = maxf(0.1, absf(front.position.z - rear.position.z))
 	_apply_livery()
+	if caliper_parts.size() == 4:
+		_make_calipers(caliper_parts)
 	_make_contact_shadow()
 	_make_nitro()
 	_make_shield()
-	if is_player:
-		_make_finish_driver()
+	# Every car has someone at the wheel now that the glass shows the cabin.
+	_make_finish_driver()
 	_make_headlights()
+	_make_halos()
 	_apply_car_shadows()
 	if not Quality.preset_changed.is_connected(_apply_car_shadows):
 		Quality.preset_changed.connect(_apply_car_shadows)
@@ -119,8 +162,8 @@ func _apply_damage(c: CarState) -> void:
 	if mat_paint != null:
 		mat_paint.albedo_color = _healthy_paint.darkened(damage_amount * 0.22)
 		mat_paint.roughness = lerpf(_healthy_roughness, 0.82, damage_amount)
-		mat_paint.clearcoat = lerpf(0.65, 0.2, damage_amount)
-		mat_paint.clearcoat_roughness = lerpf(0.18, 0.65, damage_amount)
+		mat_paint.clearcoat = lerpf(PAINT_CLEARCOAT, 0.1, damage_amount)
+		mat_paint.clearcoat_roughness = lerpf(PAINT_CLEARCOAT_ROUGHNESS, 0.65, damage_amount)
 
 
 func _apply_car_shadows(_preset: String = "") -> void:
@@ -132,7 +175,7 @@ func _apply_car_shadows(_preset: String = "") -> void:
 		if root == null:
 			continue
 		for child in root.get_children():
-			if child is GeometryInstance3D:
+			if child is GeometryInstance3D and not child in halos:
 				child.cast_shadow = shadow_mode
 
 
@@ -168,16 +211,28 @@ func _make_contact_shadow() -> void:
 	plane.size = Vector2(2.3, 4.8)
 	contact_shadow = MeshInstance3D.new()
 	contact_shadow.mesh = plane
-	contact_shadow.material_override = _shared("contact_shadow", func():
+	# Dark patches exactly under this model's tyres (shared per model).
+	var tyres := PackedVector2Array()
+	for nm in ["wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"]:
+		if wheels.has(nm):
+			var w: MeshInstance3D = wheels[nm]
+			tyres.append(Vector2(w.position.x, w.position.z))
+	if tyres.size() != 4:
+		var sz: Vector3 = def.size
+		tyres = PackedVector2Array([Vector2(-sz.x * 0.42, -sz.z * 0.27), Vector2(sz.x * 0.42, -sz.z * 0.27),
+			Vector2(-sz.x * 0.42, sz.z * 0.33), Vector2(sz.x * 0.42, sz.z * 0.33)])
+	contact_shadow.material_override = _shared("contact_shadow_" + str(def.model) + str(tyres), func():
 		var material := ShaderMaterial.new()
 		material.shader = CONTACT_SHADER
+		material.set_shader_parameter("plane_size", plane.size)
+		material.set_shader_parameter("tyres", tyres)
 		return material)
 	contact_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	contact_shadow.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
 	add_child(contact_shadow)
 
 
-func _override_materials(mi: MeshInstance3D) -> void:
+func _override_materials(mi: MeshInstance3D, wheel := false) -> void:
 	var mesh := mi.mesh
 	if mesh == null:
 		return
@@ -204,13 +259,31 @@ func _override_materials(mi: MeshInstance3D) -> void:
 					ov = finish_glass
 				else:
 					ov = _shared("glass", _mk_glass)
-			"light_front": ov = _front()
-			"light_rear": ov = _rear()
-			"trim": ov = _shared("trim", func(): return _mk_simple(Color(0.05, 0.05, 0.055), 0.0, 0.7))
+			"light_front": ov = _lamp(false, mesh, i)
+			"light_rear": ov = _lamp(true, mesh, i)
+			"trim": ov = _shared("trim", func():
+				var shader_mat := ShaderMaterial.new()
+				shader_mat.shader = TRIM_SHADER
+				return shader_mat)
 			"chrome": ov = _shared("chrome", func(): return _mk_simple(Color(0.9, 0.9, 0.92), 1.0, 0.12))
-			"interior": ov = _shared("interior", func(): return _mk_simple(Color(0.07, 0.07, 0.08), 0.0, 0.95))
-			"tyre": ov = _shared("tyre", func(): return _mk_simple(Color(0.035, 0.035, 0.04), 0.0, 0.9))
-			"rim": ov = _shared("rim_" + str(rim.id), func(): return _mk_simple(Color.html(str(rim.color)), float(rim.metal), float(rim.rough)))
+			# Seen through the glass now: charcoal rather than a black hole.
+			"interior": ov = _shared("interior", func(): return _mk_simple(Color(0.085, 0.085, 0.095), 0.0, 0.82))
+			"tyre": ov = _shared("tyre", func():
+				var shader_mat := ShaderMaterial.new()
+				shader_mat.shader = TYRE_SHADER
+				_tyre_materials.append(shader_mat)
+				return shader_mat)
+			"rim":
+				if wheel:
+					ov = _shared("wheel_rim_" + str(rim.id), func():
+						var shader_mat := ShaderMaterial.new()
+						shader_mat.shader = RIM_SHADER
+						shader_mat.set_shader_parameter("rim_color", Color.html(str(rim.color)))
+						shader_mat.set_shader_parameter("rim_metal", float(rim.metal))
+						shader_mat.set_shader_parameter("rim_rough", float(rim.rough))
+						return shader_mat)
+				else:
+					ov = _shared("rim_" + str(rim.id), func(): return _mk_simple(Color.html(str(rim.color)), float(rim.metal), float(rim.rough)))
 			"brake": ov = _shared("brake", func(): return _mk_simple(Color(0.75, 0.12, 0.08), 0.3, 0.5))
 			"plate": ov = _shared("plate", func(): return _mk_simple(Color(0.95, 0.95, 0.9), 0.0, 0.5))
 		if ov:
@@ -254,11 +327,15 @@ func _make_finish_driver() -> void:
 	finish_driver.visible = true
 	add_child(finish_driver)
 	var suit := _shared("driver_suit", func(): return _mk_simple(Color(0.28, 0.31, 0.35), 0.0, 0.72))
-	var helmet := _shared("driver_helmet", func(): return _mk_simple(Color(0.83, 0.85, 0.88), 0.08, 0.38))
+	# Rivals wear their car's colour on the helmet; the player keeps silver.
+	var helmet := _shared("driver_helmet", func(): return _mk_simple(Color(0.83, 0.85, 0.88), 0.08, 0.38)) if is_player \
+		else _shared("driver_helmet_" + color.to_html(false), func(): return _mk_simple(color, 0.1, 0.3))
 	var visor := _shared("driver_visor", func(): return _mk_simple(Color(0.025, 0.04, 0.065), 0.2, 0.2))
 	var torso_mesh := CapsuleMesh.new()
 	torso_mesh.radius = 0.18
 	torso_mesh.height = 0.48
+	torso_mesh.radial_segments = 10
+	torso_mesh.rings = 2
 	var torso := MeshInstance3D.new()
 	torso.mesh = torso_mesh
 	torso.material_override = suit
@@ -268,8 +345,8 @@ func _make_finish_driver() -> void:
 	var head_mesh := SphereMesh.new()
 	head_mesh.radius = 0.145
 	head_mesh.height = 0.30
-	head_mesh.radial_segments = 16
-	head_mesh.rings = 8
+	head_mesh.radial_segments = 12
+	head_mesh.rings = 6
 	var head := MeshInstance3D.new()
 	head.mesh = head_mesh
 	head.material_override = helmet
@@ -286,6 +363,8 @@ func _make_finish_driver() -> void:
 		var arm_mesh := CapsuleMesh.new()
 		arm_mesh.radius = 0.055
 		arm_mesh.height = 0.38
+		arm_mesh.radial_segments = 6
+		arm_mesh.rings = 1
 		var arm := MeshInstance3D.new()
 		arm.mesh = arm_mesh
 		arm.material_override = suit
@@ -300,9 +379,9 @@ func show_finish_driver() -> void:
 		finish_driver.visible = true
 	if finish_glass:
 		finish_glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		finish_glass.albedo_color = Color(0.16, 0.22, 0.27, 0.20)
+		finish_glass.albedo_color = Color(0.05, 0.07, 0.09, 0.22)
 		finish_glass.metallic = 0.0
-		finish_glass.roughness = 0.22
+		finish_glass.roughness = 0.06
 
 
 func _shared(key: String, maker: Callable) -> Material:
@@ -319,15 +398,17 @@ static func _mk_simple(col: Color, metal: float, rough: float) -> StandardMateri
 	return m
 
 
+## Tinted laminated glass: premultiplied alpha keeps the full specular
+## reflection while the dark tint lets the cabin (and driver) show through
+## head-on, about 45% like real privacy glass.
 static func _mk_glass() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.12, 0.20, 0.28)
-	m.metallic = 0.18
-	m.metallic_specular = 0.6
-	m.roughness = 0.12
-	m.clearcoat_enabled = true
-	m.clearcoat = 0.5
-	m.clearcoat_roughness = 0.05
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_PREMULT_ALPHA
+	m.albedo_color = Color(0.03, 0.045, 0.06, 0.55)
+	m.metallic = 0.0
+	m.metallic_specular = 0.55
+	m.roughness = 0.04
 	m.cull_mode = BaseMaterial3D.CULL_BACK
 	m.render_priority = 1
 	return m
@@ -342,12 +423,12 @@ func _paint(source: Material = null) -> StandardMaterial3D:
 		# base coat and restrained neutral reflections. Preserve white paint.
 		var white_paint := color.s < 0.15 and color.v > 0.8
 		mat_paint.albedo_color = color.darkened(0.05 if white_paint else 0.30)
-		mat_paint.metallic = 0.6
+		mat_paint.metallic = PAINT_METALLIC
 		mat_paint.metallic_specular = 0.5
-		mat_paint.roughness = 0.25
+		mat_paint.roughness = PAINT_ROUGHNESS
 		mat_paint.clearcoat_enabled = true
-		mat_paint.clearcoat = 0.65
-		mat_paint.clearcoat_roughness = 0.18
+		mat_paint.clearcoat = PAINT_CLEARCOAT
+		mat_paint.clearcoat_roughness = PAINT_CLEARCOAT_ROUGHNESS
 		if _flake_normal == null:
 			var noise := FastNoiseLite.new()
 			noise.seed = 31
@@ -388,6 +469,175 @@ func _rear() -> StandardMaterial3D:
 	return mat_rear
 
 
+# ------------------------------------------------------------------ wheels
+## The public wheels carry the brake caliper inside the spinning wheel mesh
+## (their "trim" surface). Take it out, so it can stay put while the wheel
+## turns; returns {name, position, arrays} or {} when there is none. The
+## stripped wheel mesh is cached per source mesh (all six cars share it).
+func _strip_caliper(w: MeshInstance3D) -> Dictionary:
+	var mesh := w.mesh as ArrayMesh
+	if mesh == null:
+		return {}
+	var key := mesh.get_instance_id()
+	if not _wheel_cache.has(key):
+		var trim := -1
+		for i in mesh.get_surface_count():
+			var m := mesh.surface_get_material(i)
+			if m != null and m.resource_name == "trim":
+				trim = i
+		if trim < 0:
+			_wheel_cache[key] = {}
+		else:
+			var stripped := ArrayMesh.new()
+			for i in mesh.get_surface_count():
+				if i == trim:
+					continue
+				stripped.add_surface_from_arrays(mesh.surface_get_primitive_type(i), mesh.surface_get_arrays(i))
+				stripped.surface_set_material(stripped.get_surface_count() - 1, mesh.surface_get_material(i))
+			_wheel_cache[key] = {"mesh": stripped, "arrays": mesh.surface_get_arrays(trim)}
+	var entry: Dictionary = _wheel_cache[key]
+	if entry.is_empty():
+		return {}
+	w.mesh = entry.mesh
+	return {"name": String(w.name), "position": w.position, "arrays": entry.arrays}
+
+
+## One mesh for all four calipers, in car space, each placed as its wheel
+## draws it (left wheels are turned half round about their upright, as
+## _animate turns them). Front calipers are tagged COLOR.r = 1 and steer in
+## the vertex shader.
+func _make_calipers(parts: Array) -> void:
+	var v := PackedVector3Array()
+	var n := PackedVector3Array()
+	var c := PackedColorArray()
+	var idx := PackedInt32Array()
+	var front_pivot := Vector2.ZERO
+	for part: Dictionary in parts:
+		var arrays: Array = part.arrays
+		var pv: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var pn: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var pi: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var left := String(part.name).ends_with("l")
+		var front := String(part.name).begins_with("wheel_f")
+		var at: Vector3 = part.position
+		if front:
+			front_pivot = Vector2(absf(at.x), at.z)
+		var base := v.size()
+		var turn := Vector3(-1.0, 1.0, -1.0) if left else Vector3.ONE
+		for i in pv.size():
+			v.append(pv[i] * turn + at)
+			n.append(pn[i] * turn if not pn.is_empty() else Vector3.UP)
+			c.append(Color(1.0 if front else 0.0, 0.0, 0.0))
+		if pi.is_empty():
+			for i in pv.size():
+				pi.append(i)
+		for i in pi:
+			idx.append(base + i)
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = v
+	arr[Mesh.ARRAY_NORMAL] = n
+	arr[Mesh.ARRAY_COLOR] = c
+	arr[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	caliper_material = ShaderMaterial.new()
+	caliper_material.shader = CALIPER_SHADER
+	caliper_material.set_shader_parameter("front_pivot", front_pivot)
+	calipers = MeshInstance3D.new()
+	calipers.name = "Calipers"
+	calipers.mesh = mesh
+	calipers.material_override = caliper_material
+	model.add_child(calipers)
+
+
+## Wet tyres (all cars share their tyre materials).
+static func set_wet(w: float) -> void:
+	for m in _tyre_materials:
+		m.set_shader_parameter("wetness", clampf(w, 0.0, 1.0))
+
+
+# ------------------------------------------------------------------ lamps
+static func _surface_bounds(mesh: Mesh, surface: int) -> AABB:
+	var key := "%d:%d" % [mesh.get_instance_id(), surface]
+	if not _lamp_bounds.has(key):
+		var verts: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		var box := AABB(verts[0], Vector3.ZERO)
+		for p in verts:
+			box = box.expand(p)
+		_lamp_bounds[key] = box
+	return _lamp_bounds[key]
+
+
+func _lamp(rear: bool, mesh: Mesh, surface: int) -> ShaderMaterial:
+	var box := _surface_bounds(mesh, surface)
+	var m := ShaderMaterial.new()
+	m.shader = LAMP_SHADER
+	m.set_shader_parameter("rear", rear)
+	m.set_shader_parameter("lamp_min", box.position)
+	m.set_shader_parameter("lamp_size", box.size)
+	m.set_shader_parameter("lamp_color", Color(1.0, 0.05, 0.02) if rear else Color(1.0, 0.97, 0.92))
+	if rear:
+		lamp_rear = m
+	else:
+		lamp_front = m
+	m.set_meta("bounds", box)
+	return m
+
+
+## Lamp states for night and braking; only writes what changed.
+func _update_lamps() -> void:
+	var dark := night > 0.3
+	if lamp_front:
+		lamp_front.set_shader_parameter("running", DRL_NIGHT if dark else DRL_DAY)
+		lamp_front.set_shader_parameter("beam", BEAM_NIGHT if dark else 0.0)
+	if lamp_rear:
+		lamp_rear.set_shader_parameter("running", TAIL_NIGHT if dark else TAIL_DAY)
+		lamp_rear.set_shader_parameter("beam", BRAKE if braking_now else 0.0)
+	if halos.size() == 4:
+		for i in 2:
+			halos[i].visible = dark
+		var tail := 1.0 if braking_now else (0.3 if dark else 0.0)
+		if braking_now and not dark:
+			tail = 0.55
+		for i in [2, 3]:
+			halos[i].visible = tail > 0.0
+		(halos[2].material_override as ShaderMaterial).set_shader_parameter("energy", 1.8 * tail)
+		(halos[0].material_override as ShaderMaterial).set_shader_parameter("energy", 1.6)
+
+
+static func _halo_material(tint: Color, lamp_dir: Vector3) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = HALO_SHADER
+	m.set_shader_parameter("tint", tint)
+	m.set_shader_parameter("lamp_dir", lamp_dir)
+	return m
+
+
+## Glow sprites at the lamps: what an eye sees around a bright lamp at night
+## and around a brake light, independent of the screen glow pass (which
+## daylight skips). Billboards, additive, depth-tested, and only toward the
+## way each lamp points (car_halo.gdshader).
+func _make_halos() -> void:
+	var head_box: AABB = lamp_front.get_meta("bounds") if lamp_front else AABB(Vector3(-def.size.x * 0.5, def.size.y * 0.4, -def.size.z * 0.5), Vector3(def.size.x, 0.08, 0.05))
+	var tail_box: AABB = lamp_rear.get_meta("bounds") if lamp_rear else AABB(Vector3(-def.size.x * 0.5, def.size.y * 0.5, def.size.z * 0.5 - 0.05), Vector3(def.size.x, 0.06, 0.05))
+	var head_mat := _halo_material(Color(0.85, 0.9, 1.0), Vector3(0, 0, -1))
+	var tail_mat := _halo_material(Color(1.0, 0.05, 0.02), Vector3(0, 0, 1))
+	for side in [-1.0, 1.0]:
+		var q := FxVisual.glow_quad(head_mat, 0.55)
+		q.position = Vector3(side * (head_box.end.x - 0.22), head_box.get_center().y, head_box.position.z - 0.08)
+		q.visible = false
+		model.add_child(q)
+		halos.append(q)
+	for side in [-1.0, 1.0]:
+		var q := FxVisual.glow_quad(tail_mat, 0.42)
+		q.position = Vector3(side * (tail_box.end.x - 0.1), tail_box.get_center().y, tail_box.end.z + 0.06)
+		q.visible = false
+		model.add_child(q)
+		halos.append(q)
+	_update_lamps()
+
+
 func _make_shield() -> void:
 	shield = MeshInstance3D.new()
 	var sm := SphereMesh.new()
@@ -421,10 +671,12 @@ func _make_headlights() -> void:
 	for side in [-1.0, 1.0]:
 		var l := SpotLight3D.new()
 		l.position = Vector3(side * (sz.x * 0.5 - 0.3), sz.y * 0.42, -sz.z * 0.5 + 0.05)
-		l.rotation = Vector3(deg_to_rad(-6.0), side * deg_to_rad(-3.0), 0)
-		l.spot_range = 55.0
-		l.spot_angle = 32.0
-		l.spot_attenuation = 0.8
+		# Dipped-beam aim: a few degrees down, so the pool reaches well down
+		# the road, with soft edges instead of a hard disc.
+		l.rotation = Vector3(deg_to_rad(-4.0), side * deg_to_rad(-3.0), 0)
+		l.spot_range = 60.0
+		l.spot_angle = 34.0
+		l.spot_attenuation = 1.4
 		l.light_color = Color(0.9, 0.95, 1.0)
 		l.light_energy = 0.0
 		l.visible = false
@@ -453,6 +705,7 @@ func _make_headlights() -> void:
 func set_night(n: float) -> void:
 	night = n
 	_apply_headlights()
+	_update_lamps()
 	if mat_front:
 		mat_front.emission_energy_multiplier = 3.0 if n > 0.3 else 1.1
 
@@ -460,8 +713,8 @@ func set_night(n: float) -> void:
 func _apply_headlights() -> void:
 	var on := night > 0.3 and (is_player or _bot_beams)
 	if head_l:
-		head_l.light_energy = 6.0 if on else 0.0
-		head_r.light_energy = 6.0 if on else 0.0
+		head_l.light_energy = HEADLIGHT_ENERGY if on else 0.0
+		head_r.light_energy = HEADLIGHT_ENERGY if on else 0.0
 		head_l.visible = on
 		head_r.visible = on
 
@@ -561,10 +814,16 @@ func _animate(c: CarState, dt: float, lateral_accel: float, full_lock := -1.0) -
 		# In model space the car faces -Z, so forward rolling turns the bottom
 		# of each tire toward +Z relative to the car.
 		w.rotation = Vector3(-spin * side, (PI if left else 0.0) + (steer_vis if front else 0.0), 0.0)
+	if caliper_material:
+		caliper_material.set_shader_parameter("steer", steer_vis)
 	# lights
+	var braking := c.braking or c.v < -0.1
+	if braking != braking_now:
+		braking_now = braking
+		_update_lamps()
 	if mat_rear:
 		var base := 0.9 if night > 0.3 else 0.65
-		mat_rear.emission_energy_multiplier = 3.5 if (c.braking or c.v < -0.1) else base
+		mat_rear.emission_energy_multiplier = 3.5 if braking else base
 	if sport_paint:
 		sport_paint.set_shader_parameter("brake_light", 1.0 if (c.braking or c.v < -0.1) else (0.2 if night > 0.3 else 0.0))
 	# shield
