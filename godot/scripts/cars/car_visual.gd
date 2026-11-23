@@ -124,7 +124,10 @@ func _apply_damage(c: CarState) -> void:
 
 
 func _apply_car_shadows(_preset: String = "") -> void:
-	var shadow_mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if bool(Quality.p.car_shadows) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# High: every car. Medium: only the player's (one 41k-triangle shadow
+	# draw instead of six); the rest keep their contact shadow.
+	var casts := bool(Quality.p.car_shadows) or (is_player and bool(Quality.p.get("player_shadow", false)))
+	var shadow_mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if casts else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for root in [model, finish_driver]:
 		if root == null:
 			continue

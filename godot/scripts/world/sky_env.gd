@@ -24,6 +24,13 @@ var preset: Dictionary
 var wet := 0.0
 var night := 0.0
 var _is_night := false
+## Share of the daylight fill that comes from the sky radiance.
+const SKY_AMBIENT := 0.55
+## Daylight sun and exposure, against the night presets' 0.5 and 1.0.
+const DAY_SUN := 0.81
+const DAY_EXPOSURE := 0.96
+## Glow weaker than this is not drawn at all.
+const GLOW_MIN := 0.15
 
 
 func _ready() -> void:
@@ -48,10 +55,18 @@ static func ambient_energy(preset_ambient: float, is_night: bool, probe: bool) -
 	return maxf(preset_ambient, 0.48 if is_night else 0.45)
 
 
+## Glow below GLOW_MIN intensity is invisible (daylight: 0.45 x 0.25), yet
+## it costs a downsample chain and, on the Mobile renderer, the subpass
+## post-process path. Skip it there.
+func _gate_glow() -> void:
+	env.glow_enabled = env.glow_enabled and env.glow_intensity >= GLOW_MIN
+
+
 func _apply_quality() -> void:
 	if not preset.is_empty() and _transition >= 1.0:
 		env.ambient_light_energy = ambient_energy(float(preset.ambient), _is_night, bool(Quality.p.probe))
 	Quality.apply_env(env, wet > 0.05)
+	_gate_glow()
 	env.volumetric_fog_enabled = env.volumetric_fog_enabled and night > 0.3
 	Quality.apply_sun(sun)
 	sun.light_angular_distance = (0.3 if night > 0.3 else 0.15) if bool(Quality.p.sun_penumbra) else 0.0
@@ -89,16 +104,22 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	# A neutral fill keeps the road and car sides visible in building shadows,
 	# including on low quality where there are no GI or local lamp lights.
 	# Sky-only lighting made the old night preset almost black on a phone.
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	# Daylight fill takes part of its colour and direction from the sky
+	# radiance (bluish from above, darker from below) instead of one flat
+	# colour, so shade reads as shade. Dark presets keep the flat fill
+	# (sky contribution 0), which is what keeps them legible on a phone.
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_BG
 	env.ambient_light_color = Color(0.64, 0.70, 0.80) if is_night else Color(0.78, 0.82, 0.88)
-	env.ambient_light_sky_contribution = 0.25
+	env.ambient_light_sky_contribution = 0.0 if is_night else SKY_AMBIENT
 	_is_night = is_night
 	env.ambient_light_energy = ambient_energy(float(preset.ambient), is_night, bool(Quality.p.probe))
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 
 	# tonemap + exposure
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = float(preset.exposure)
+	# The brighter sun and sky fill below would push light facades into
+	# clipping; a slightly lower exposure keeps their highlights.
+	env.tonemap_exposure = float(preset.exposure) * (1.0 if is_night else DAY_EXPOSURE)
 	env.tonemap_white = 4.0
 
 	# bloom with neon threshold (sunlit white stays below the threshold)
@@ -136,9 +157,13 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	env.ssao_detail = 0.3
 	env.ssil_enabled = false
 	env.adjustment_enabled = true
+	# Tried and rejected: contrast 1.04-1.06 clipped the golden sky (0.3% ->
+	# 2.7% of the frame) and saturation 1.04 clipped the yellow centre line.
+	# Daylight depth comes from the sky-tinted fill and the sun instead.
 	env.adjustment_saturation = 1.08 if is_night else 0.98
 	env.adjustment_contrast = 1.0 if is_night else 1.02
 	Quality.apply_env(env, wet > 0.5)
+	_gate_glow()
 	# Clear daylight needs no volume pass or haze over the racing corridor.
 	env.volumetric_fog_enabled = env.volumetric_fog_enabled and is_night
 
@@ -146,7 +171,7 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	var dir: Vector3 = preset.sun_dir
 	sun.look_at_from_position(dir.normalized() * 100.0, Vector3.ZERO, Vector3.UP)
 	sun.light_color = Data.col(preset.sun_col)
-	sun.light_energy = float(preset.sun_i) * (0.5 if is_night else 0.75) * (0.5 if bool(preset.moon) else 1.0)
+	sun.light_energy = float(preset.sun_i) * (0.5 if is_night else DAY_SUN) * (0.5 if bool(preset.moon) else 1.0)
 	sun.light_indirect_energy = 1.0
 	# PCSS penumbra: values >= ~0.3 smear PSSM shadows into nothing at this
 	# shadow distance, so keep the sun disc small (real sun is 0.26 deg).
@@ -243,7 +268,7 @@ func _snapshot() -> Dictionary:
 		"ambient": env.ambient_light_energy, "ambient_color": env.ambient_light_color,
 		"exposure": env.tonemap_exposure,
 		"fog_color": env.fog_light_color, "fog_density": env.fog_density,
-		"glow": env.glow_intensity}
+		"glow": env.glow_intensity, "sky_ambient": env.ambient_light_sky_contribution}
 
 
 ## Smoothly changes both time of day and weather; no scene rebuild.
@@ -265,6 +290,9 @@ func transition_to(id: String, seconds: float = 18.0) -> void:
 	_sky_blend.set_shader_parameter("from_yaw", _sky_yaw(old_id))
 	_sky_blend.set_shader_parameter("to_yaw", _sky_yaw(id))
 	env.sky.sky_material = _sky_blend
+	# The blend changes every frame: refresh the radiance map over several
+	# frames instead of re-filtering all of it each frame.
+	env.sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	env.sky_rotation = Vector3.ZERO
 	advance(0.0)
 
@@ -285,6 +313,9 @@ func advance(dt: float) -> void:
 	env.fog_light_color = (_from.fog_color as Color).lerp(_to.fog_color, k)
 	env.fog_density = lerpf(_from.fog_density, _to.fog_density, k)
 	env.glow_intensity = lerpf(_from.glow, _to.glow, k)
+	env.ambient_light_sky_contribution = lerpf(_from.sky_ambient, _to.sky_ambient, k)
+	env.glow_enabled = bool(Quality.p.glow)
+	_gate_glow()
 	env.ssr_enabled = bool(Quality.p.ssr) and wet > 0.05
 	_sky_blend.set_shader_parameter("blend", k)
 	rain.amount_ratio = wet

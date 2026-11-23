@@ -170,3 +170,12 @@ Do not merge to `main`; the user requested a separate branch.
   the procedural far model now matches the outline. Shadows on high.
 - **Licence of the pack not confirmed in the file**; credited in
   CREDITS.txt by name. Confirm before a store release.
+
+## Checkpoint: Android graphics pass (2026-11-23)
+
+Medium at 0.9 scale with MSAA 2x and mip bias -0.35 (Mobile has no FSR),
+filtered road lines, one-fetch crossing lookup, the player's sun shadow on
+medium, sky-tinted daylight fill, glow skipped where invisible, incremental
+sky refresh during weather changes. Measurements, rejected options (AgX,
+extra contrast/saturation, all-car shadows) and what still needs the phones:
+[android-graphics.md](android-graphics.md).

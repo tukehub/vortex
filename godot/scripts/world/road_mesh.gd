@@ -45,6 +45,7 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	_build_edge_barriers(track, hw)
 	_build_skirt(track, hw)
 	set_wet(wet)
+	surface_mat.set_shader_parameter("crossing_map", ImageTexture.create_from_image(crossing_lookup(PackedVector2Array(), track.L)))
 	apply_quality()
 	if not Quality.budget_changed.is_connected(apply_quality):
 		Quality.budget_changed.connect(apply_quality)
@@ -99,7 +100,30 @@ func set_crossings(track: RaceTrack, rows: Array) -> PackedVector2Array:
 	padded.resize(MAX_CROSSINGS)
 	surface_mat.set_shader_parameter("crossings", padded)
 	surface_mat.set_shader_parameter("crossing_count", marks.size())
+	crossing_map = crossing_lookup(marks, track.L)
+	surface_mat.set_shader_parameter("crossing_map", ImageTexture.create_from_image(crossing_map))
 	return marks
+
+
+## The shader's per-pixel crossing lookup: one R8 texel per CROSSING_CELL
+## metres of lap holding the index + 1 of the crossing whose paint (and the
+## stop lines 2.2 m beyond it) reaches that cell, or 0. Crossings are at
+## least 55 m apart, so no cell needs two.
+const CROSSING_CELL := 8.0
+var crossing_map: Image
+
+static func crossing_lookup(marks: PackedVector2Array, lap: float) -> Image:
+	var cells := maxi(1, ceili(lap / CROSSING_CELL))
+	var data := PackedByteArray()
+	data.resize(cells)
+	data.fill(0)
+	for i in marks.size():
+		var reach := marks[i].y * 0.5 + 3.0
+		var c0 := floori((marks[i].x - reach) / CROSSING_CELL)
+		var c1 := floori((marks[i].x + reach) / CROSSING_CELL)
+		for c in range(c0, c1 + 1):
+			data[posmod(c, cells)] = i + 1
+	return Image.create_from_data(cells, 1, false, Image.FORMAT_R8, data)
 
 
 ## The shader's sin-free cell hash (road.gdshader cell_hash).

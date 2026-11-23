@@ -195,6 +195,8 @@ func _tree_meshes() -> Array:
 	material.albedo_texture = load("res://assets/foliage/photographic_tree.png")
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	material.alpha_scissor_threshold = 0.25
+	# MSAA (medium/high) resolves cut-out leaf edges only through coverage.
+	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.roughness = 1.0
 	st.set_material(material)
@@ -227,6 +229,8 @@ func _pilot_leaf_mesh() -> ArrayMesh:
 	material.albedo_texture = load("res://assets/foliage/polyhaven_tree_leaves.png")
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 	material.alpha_scissor_threshold = 0.45
+	# MSAA (medium/high) resolves cut-out leaf edges only through coverage.
+	material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.roughness = 1.0
 	st.set_material(material)

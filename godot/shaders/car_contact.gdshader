@@ -13,5 +13,7 @@ void fragment() {
 		}
 	}
 	ALBEDO = vec3(0.012, 0.012, 0.012);
-	ALPHA = max(body * 0.22, tires * 0.34);
+	// Occlusion under the floor pan: strong enough to seat the car on the
+	// road in daylight, where the sun shadow is short or (bots on medium) absent.
+	ALPHA = max(body * 0.42, tires * 0.58);
 }

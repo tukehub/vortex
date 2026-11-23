@@ -10,9 +10,17 @@ func _ready() -> void:
 	var state := CarState.new(0, def, "test", true, Color.WHITE)
 	assert(car.finish_driver != null, "player driver exists")
 	_assert_shadows(car, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-	# Medium relies on the contact-shadow quad; only high casts real car shadows.
+	# Medium: the player's car casts its sun shadow, bots rely on the
+	# contact-shadow quad; high casts every car's.
+	var bot := CarVisual.new()
+	add_child(bot)
+	bot.setup(def, Color.html(def.color), false)
 	Quality.set_preset("medium")
-	_assert_shadows(car, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	_assert_shadows(car, GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	_assert_shadows(bot, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	Quality.set_preset("high")
+	_assert_shadows(bot, GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	bot.queue_free()
 	Quality.set_preset("high")
 	_assert_shadows(car, GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
 	Quality.set_preset("low")
@@ -46,6 +54,8 @@ func _ready() -> void:
 
 func _assert_shadows(car: CarVisual, expected: int) -> void:
 	for root in [car.model, car.finish_driver]:
+		if root == null:
+			continue  # bots have no finish driver
 		for child in root.get_children():
 			if child is GeometryInstance3D:
 				assert(child.cast_shadow == expected, "car and driver shadow settings must match quality")

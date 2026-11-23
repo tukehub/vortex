@@ -34,6 +34,8 @@ func build_forest(transforms: Array[Transform3D]) -> void:
                     if "needle" in material_name or "foliage" in material_name or material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
                         material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
                         material.alpha_scissor_threshold = 0.5
+                        # MSAA (medium/high) resolves cut-out leaf edges only through coverage.
+                        material.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
                         material.cull_mode = BaseMaterial3D.CULL_DISABLED
                     mesh.surface_set_material(surface, material)
             var mm := MultiMesh.new()

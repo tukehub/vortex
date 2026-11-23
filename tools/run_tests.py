@@ -41,6 +41,8 @@ for renderer in RENDERERS:
           'res://tests/speed_feedback.tscn')
     godot(f'reflections on {renderer}', '--rendering-method', renderer,
           'res://tests/reflections.tscn')
+    godot(f'render_quality on {renderer}', '--rendering-method', renderer,
+          'res://tests/render_quality.tscn')
     godot(f'renderer_truth on {renderer}', '--rendering-method', renderer,
           'res://tests/renderer_truth.tscn', '--', '--expect-renderer=' + renderer)
     # The command line a profile APK bakes in must reach the benchmark, and the

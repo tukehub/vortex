@@ -28,7 +28,7 @@ const REFLECTION_PROBES_PER_MESH := 8
 
 const PRESETS := {
 	"low": {
-		"scale": 0.7, "msaa": Viewport.MSAA_DISABLED, "fxaa": true,
+		"scale": 0.7, "msaa": Viewport.MSAA_DISABLED, "fxaa": true, "mip_bias": -0.2,
 		"ssao": false, "ssao_q": RenderingServer.ENV_SSAO_QUALITY_VERY_LOW, "sdfgi": false, "ssr": false, "ssr_steps": 16,
 		"vol_fog": false, "glow": true, "glow_levels": 2,
 		"shadow_size": 1024, "shadow_splits": 1, "shadow_dist": 70.0, "car_shadows": false,
@@ -36,7 +36,7 @@ const PRESETS := {
 		"props_dist": 350.0, "anisotropy": 1, "max_fps": 60,
 	},
 	"medium": {
-		"scale": 0.8, "msaa": Viewport.MSAA_DISABLED, "fxaa": true,
+		"scale": 0.9, "msaa": Viewport.MSAA_2X, "fxaa": false, "mip_bias": -0.35,
 		"ssao": true, "ssao_q": RenderingServer.ENV_SSAO_QUALITY_VERY_LOW, "sdfgi": false, "ssr": true, "ssr_steps": 24,
 		"vol_fog": false, "glow": true, "glow_levels": 3,
 		"shadow_size": 2048, "shadow_splits": 1, "shadow_dist": 80.0, "car_shadows": false,
@@ -44,7 +44,7 @@ const PRESETS := {
 		"props_dist": 600.0, "anisotropy": 2, "max_fps": 60,
 	},
 	"high": {
-		"scale": 1.0, "msaa": Viewport.MSAA_2X, "fxaa": false,
+		"scale": 1.0, "msaa": Viewport.MSAA_2X, "fxaa": false, "mip_bias": 0.0,
 		"ssao": true, "ssao_q": RenderingServer.ENV_SSAO_QUALITY_LOW, "sdfgi": true, "ssr": true, "ssr_steps": 48,
 		"vol_fog": true, "glow": true, "glow_levels": 4,
 		"shadow_size": 4096, "shadow_splits": 4, "shadow_dist": 220.0, "car_shadows": true,
@@ -125,9 +125,15 @@ func _derive_budget() -> void:
 	p.street_detail = preset != "low" and stage < 2
 	# Road marks (3.5): crossings always; manholes, gullies and patches not on low.
 	p.road_detail = preset != "low" and stage < 3
+	# Medium and high resolve edges with MSAA 2x (cheap on tile-based phone
+	# GPUs, and unlike FXAA it does not smear road markings and texture
+	# detail); stage 2 trades it for FXAA. A negative mip bias puts back
+	# the texture detail a reduced 3D scale loses (Mobile has no FSR).
+	p.player_shadow = bool(p.car_shadows) or (preset == "medium" and stage < 2)
 	if stage >= 2:
 		p.msaa = Viewport.MSAA_DISABLED
 		p.fxaa = true
+		p.mip_bias = maxf(float(p.mip_bias), -0.2)
 		p.car_shadows = false
 		p.shadow_splits = 1
 		p.shadow_size = mini(1024, int(p.shadow_size))
@@ -169,7 +175,9 @@ func snapshot() -> Dictionary:
 		"mirror_width": p.mirror_width, "fx_light_limit": p.fx_light_limit,
 		"lamp_lights": p.lamp_lights, "renderer": renderer}, true)
 	result.merge({"paint_flakes": p.paint_flakes, "speed_post": p.speed_post, "driving_cars": p.driving_cars,
-		"probe": p.probe, "landmark_probes": p.landmark_probes})
+		"probe": p.probe, "landmark_probes": p.landmark_probes,
+		"msaa": int(p.msaa), "fxaa": bool(p.fxaa), "mip_bias": float(p.mip_bias),
+		"player_shadow": bool(p.player_shadow), "car_shadows": bool(p.car_shadows)})
 	# What the renderer was really asked to draw, for PROFILE comparisons.
 	for key in FORWARD_PLUS_ONLY:
 		result[key] = bool(p[key])
@@ -221,6 +229,7 @@ func apply_viewport(vp: Viewport) -> void:
 	vp.msaa_3d = p.msaa
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if p.fxaa else Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.use_debanding = true
+	vp.texture_mipmap_bias = float(p.mip_bias)
 	vp.positional_shadow_atlas_size = 1024 if preset == "low" else 2048
 	vp.anisotropic_filtering_level = p.anisotropy
 

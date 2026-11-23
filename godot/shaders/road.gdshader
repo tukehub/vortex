@@ -22,6 +22,9 @@ uniform vec2 stone_section = vec2(0.0); // start and length in metres
 const int MAX_CROSSINGS = 24;
 uniform vec2 crossings[24];
 uniform int crossing_count = 0;
+// R8, one texel per CROSSING_CELL metres of lap: crossing index + 1, or 0.
+uniform sampler2D crossing_map : filter_nearest, repeat_disable;
+const float CROSSING_CELL = 8.0;
 uniform float detail = 1.0; // 0 skips manholes, gullies and patches (low quality)
 
 varying vec2 ruv;
@@ -36,6 +39,12 @@ float cell_hash(float c, float salt) {
 	vec3 p3 = fract(vec3(c, salt, c) * 0.1031);
 	p3 += dot(p3, p3.yzx + 33.33);
 	return fract((p3.x + p3.y) * p3.z);
+}
+// A line of half width `hw` at distance `d`, edge filtered over `aa` metres.
+// Thinner than a pixel it fades with its coverage instead of aliasing.
+float line_mask(float d, float hw, float aa) {
+	float w = max(hw, aa * 0.5);
+	return (1.0 - smoothstep(w - aa * 0.5, w + aa * 0.5, d)) * min(1.0, hw / w);
 }
 float vnoise(vec2 p) {
 	vec2 i = floor(p);
@@ -75,15 +84,22 @@ void fragment() {
 	float wear = exp(-pow((lane_pos - 0.3) * 6.0, 2.0)) + exp(-pow((lane_pos - 0.7) * 6.0, 2.0));
 	asphalt *= 1.0 - 0.09 * wear;
 
-	// lane markings: dashed white between lanes, solid yellow centre, solid white edges
-	float edge = 1.0 - smoothstep(0.15, 0.25, abs(abs(across) - (half_w - 0.35)));
-	float centre = 1.0 - smoothstep(0.12, 0.22, abs(across));
-	float dash = step(0.5, fract(along / 6.0));
+	// lane markings: dashed white between lanes, solid yellow centre, solid white edges.
+	// Edges are filtered over the pixel's footprint (fwidth): sharp up close,
+	// and far away a thin line fades to its coverage instead of breaking into
+	// crawling stair-steps (MSAA cannot fix aliasing inside a shader).
+	float aa_x = max(fwidth(across), 0.002);
+	float aa_s = max(fwidth(along), 0.002);
+	float edge = line_mask(abs(abs(across) - (half_w - 0.35)), 0.2, aa_x);
+	float centre = line_mask(abs(across), 0.17, aa_x);
+	// 3 m dashes, 3 m gaps, with filtered ends.
+	float dash_pos = fract(along / 6.0) * 6.0;
+	float dash = smoothstep(3.0 - aa_s, 3.0 + aa_s, dash_pos) * (1.0 - smoothstep(6.0 - aa_s, 6.0, dash_pos));
 	float lane_line = 0.0;
 	for (int i = 1; i < 4; i++) {
 		float lx = -half_w + float(i) * lane_w;
 		if (abs(float(i) * 2.0 - lane_count) < 0.5) continue; // centre handled separately
-		lane_line = max(lane_line, (1.0 - smoothstep(0.1, 0.18, abs(across - lx))) * dash);
+		lane_line = max(lane_line, line_mask(abs(across - lx), 0.14, aa_x) * dash);
 	}
 	// Street hardware set into the asphalt.
 	float grate = 0.0;
@@ -157,14 +173,13 @@ void fragment() {
 	float zebra = 0.0;
 	float stop_line = 0.0;
 	float no_lines = 0.0;
-	float aa_x = max(fwidth(across), 0.002);
-	float aa_s = max(fwidth(along), 0.002);
-	for (int i = 0; i < MAX_CROSSINGS; i++) {
-		if (i >= crossing_count) break;
-		float hw2 = crossings[i].y * 0.5;
-		float dz = along - crossings[i].x;
+	// One texel of crossing_map (8 m per cell) names the crossing near this
+	// stretch of lap, so a pixel evaluates at most one instead of looping.
+	int ci = int(texelFetch(crossing_map, ivec2(clamp(int(along / CROSSING_CELL), 0, textureSize(crossing_map, 0).x - 1), 0), 0).r * 255.0 + 0.5) - 1;
+	if (ci >= 0 && ci < crossing_count) {
+		float hw2 = crossings[ci].y * 0.5;
+		float dz = along - crossings[ci].x;
 		dz -= track_len * round(dz / track_len);
-		if (abs(dz) > hw2 + 3.0) continue;
 		no_lines = max(no_lines, 1.0 - smoothstep(hw2 + 0.6, hw2 + 0.6 + aa_s, abs(dz)));
 		float span = (1.0 - smoothstep(hw2 - aa_s, hw2 + aa_s, abs(dz))) * (1.0 - smoothstep(half_w - 0.7 - aa_x, half_w - 0.7 + aa_x, abs(across)));
 		float bar = 1.0 - smoothstep(0.25 - aa_x, 0.25 + aa_x, abs(fract(across + 0.5) - 0.5));

@@ -25,7 +25,7 @@ func _ready() -> void:
 	scene.race.started = true
 	scene.hud.center("", "", 0.0)
 	scene.cam.intro = false
-	scene.cam.cabin = false
+	scene.cam.view = ChaseCam.View.CHASE
 	# Compile the atlas-only shader even when the private GLB is absent.
 	var swatch := MeshInstance3D.new()
 	swatch.mesh = SphereMesh.new()
