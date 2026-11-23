@@ -5,6 +5,8 @@ extends Node3D
 ## the quality preset); the rest are emissive meshes only.
 
 const TREE_CHUNK_SIZE := 400.0
+## Cities whose mapped trees use the three-LOD street trees shared with Tirana.
+const STREET_TREE_CITIES := ["tirane", "vlore", "shkoder"]
 var track_lamps: Array = []          # [x,y,z,yaw]
 var lights: Array[OmniLight3D] = []
 var light_slots := 0
@@ -243,9 +245,9 @@ func _tree_meshes() -> Array:
 
 func _build_trees(trees: Array, terrain: Terrain, city_id: String) -> void:
 	var keep := int(trees.size() * float(Quality.p.tree_mul))
-	if city_id in ["tirane", "vlore"]:
+	if city_id in STREET_TREE_CITIES:
 		vegetation = TiranaTrees.new()
-		vegetation.name = "TiranaTrees" if city_id == "tirane" else "CoastalStreetTrees"
+		vegetation.name = {"tirane": "TiranaTrees", "vlore": "CoastalStreetTrees"}.get(city_id, "StreetTrees")
 		add_child(vegetation)
 		vegetation.build(trees.slice(0, keep), terrain)
 		return

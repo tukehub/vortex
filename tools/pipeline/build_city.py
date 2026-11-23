@@ -853,7 +853,7 @@ def overlaps_landmark_bounds(points, zones):
                for x0, z0, x1, z1 in zones)
 
 
-def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS):
+def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS, palette=None):
     excluded_ids = set(landmark_buildings)
     excluded_ways = set(excluded_ids)
     for rel in osm.rels:
@@ -881,7 +881,7 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
 
     chunks = {}
     kept = 0
-    pal = PALETTES.get(style, PALETTES['old'])
+    pal = PALETTES.get(palette or style, PALETTES['old'])
     for bid, tags, ring in footprints:
         ring = clean_ring(ring)
         if len(ring) < 3:
@@ -1378,6 +1378,10 @@ def build(cid, route_only=False):
         dense, length = resample_closed(dense, SAMPLE)
         dense = repair_road_bends(dense, hw)
         dense, length = resample_closed(dense, SAMPLE)
+    if city.get('repair_bends'):
+        for sigma in (8, 12, 20):
+            dense = repair_road_bends(dense, hw + 1.5, sigma)
+            dense, length = resample_closed(dense, SAMPLE)
     if cid == 'vlore':
         if 'out_and_back' not in city:
             dense = separate_vlore_coastal_legs(dense, proj)
@@ -1471,7 +1475,7 @@ def build(cid, route_only=False):
         seafront_props = {'idx': idx, 'side': side, 'water': (mask, wnm), 'surface': surface,
                           'palms': seafront.palms(ref, hw, idx, side, mask, wnm, terrain_sample, surface, rnd)}
         log(f'  seafront: {len(idx) * SAMPLE:.0f} m of road, sea on the {"+" if side > 0 else "-"} normal side')
-    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS))
+    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'))
     if cid == 'tirane':
         bake_showcase_facades(Path(out))
     elif cid == "vlore":

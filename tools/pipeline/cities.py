@@ -234,23 +234,41 @@ CITIES = {
     },
     'shkoder': {
         'name': 'Shkodër',
-        'origin': (42.0600, 19.5060),          # south of the centre, towards Rozafa
+        'origin': (42.0640, 19.5110),          # Sheshi Perash, the middle of the centre loop
         'near_km': 4.5, 'far_km': 24.0,
+        # Dense mapped housing: the lap stays within 1 km of the origin.
+        'building_radius': 1500,
         'half_width': 10.0,
+        'exclude_pedestrian': True,
+        # A 3.45 km centre loop: Sheshi Demokracia, Rruga Studenti and
+        # Bulevardi Zogu I south-west, Bulevardi Mehmet Pashë Plaku east to
+        # Sheshi Perash, Rruga Edith Durham and Bulevardi Skënderbeu north,
+        # Rruga Teuta past the Ebu Bekr mosque back to the square.
         'waypoints': [
-            (42.0665, 19.5125),   # Sheshi Demokracia
-            (42.0640, 19.5160),
-            (42.0548, 19.5048),   # towards the castle road
-            (42.0570, 19.4985),
-            (42.0652, 19.5068),
+            (42.0679, 19.5121),   # Sheshi Demokracia, by Teatri Migjeni
+            (42.0669, 19.5108),   # Rruga Studenti
+            (42.0609, 19.5051),   # Bulevardi Zogu I
+            (42.0584, 19.5029),   # Zogu I meets Mehmet Pashë Plaku
+            (42.0585, 19.5055),   # Bulevardi Mehmet Pashë Plaku
+            (42.0601, 19.5097),
+            (42.0612, 19.5128),   # Sheshi Perash
+            (42.0631, 19.5157),   # Rruga Edith Durham
+            (42.0644, 19.5172),   # Durham meets Skënderbeu
+            (42.0660, 19.5150),   # Bulevardi Skënderbeu
+            (42.0675, 19.5130),   # Rruga Teuta
         ],
+        # Round the acute Zogu I / Mehmet Pashë Plaku corner so the 20 m road
+        # does not fold over itself.
+        'repair_bends': True,
+        'finish_before': {'ll': (42.06825, 19.51200), 'metres': 100.0},
         'landmarks': [
-            {'id': 'rozafa', 'll': (42.04650, 19.49350), 'yaw': 0},
-            {'id': 'mosque_lead', 'll': (42.06530, 19.51180), 'yaw': 0},
-            {'id': 'flagpole', 'll': (42.06700, 19.51300), 'yaw': 0},
+            {'id': 'rozafa', 'll': (42.04652, 19.49355), 'yaw': 0},
+            {'id': 'mosque', 'll': (42.06776, 19.51396), 'yaw': 0},
+            {'id': 'flagpole', 'll': (42.06860, 19.51160), 'yaw': 0},
         ],
         'lake': True,
         'style': 'old',
+        'palette': 'tirana',
     },
     'tetove': {
         'name': 'Tetovë',
