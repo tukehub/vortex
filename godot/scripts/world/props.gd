@@ -11,6 +11,7 @@ var lights: Array[OmniLight3D] = []
 var light_slots := 0
 var lamp_emis: StandardMaterial3D
 var night := 1.0
+var _tirana := false
 var landmarks: Array = []
 
 # A small near-camera 3D pool travels around the circuit; distant trees use
@@ -34,6 +35,7 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
 		return
 	var p: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	_tirana = city_id == "tirane"
 	track_lamps = p.get("track_lamps", [])
 	landmarks = p.get("landmarks", [])
 	var models := Landmarks.new()
@@ -66,10 +68,10 @@ func load_city(city_id: String, terrain: Terrain) -> void:
 	light_slots = int(Quality.p.lamp_lights)
 	for i in light_slots:
 		var l := OmniLight3D.new()
-		l.light_color = Color(1.0, 0.82, 0.55)
+		l.light_color = Color("#ffe2b5") if _tirana else Color(1.0, 0.82, 0.55)
 		l.light_energy = 0.0
-		l.omni_range = 22.0
-		l.omni_attenuation = 1.6
+		l.omni_range = 18.5 if _tirana else 22.0
+		l.omni_attenuation = 1.25 if _tirana else 1.6
 		l.shadow_enabled = false
 		l.light_specular = 0.6
 		add_child(l)
@@ -368,7 +370,7 @@ func _tree_chunk(mesh: Mesh, transforms: Array, origin: Vector3, distance: float
 func set_night(n: float) -> void:
 	night = n
 	if lamp_emis:
-		lamp_emis.emission_energy_multiplier = 6.0 * n
+		lamp_emis.emission_energy_multiplier = (3.3 if _tirana else 6.0) * n
 
 
 ## Move the real lights to the nearest lamps ahead of the player.
@@ -393,14 +395,19 @@ func update_lights(player_pos: Vector3, forward: Vector3) -> void:
 			continue
 		# favour lamps ahead
 		var ahead := to.normalized().dot(forward)
+		if _tirana:
+			var yaw := float(l[3]) if l.size() > 3 else 0.0
+			p += Vector3(0.0, 7.65, 2.3).rotated(Vector3.UP, yaw)
+		else:
+			p.y += 7.7
 		cand.append([dist - ahead * 30.0, p])
 	cand.sort_custom(func(a, b): return a[0] < b[0])
 	for i in lights.size():
 		var l := lights[i]
 		if i < cand.size() and i < int(Quality.p.lamp_lights):
 			var p: Vector3 = cand[i][1]
-			l.global_position = p + Vector3(0, 7.7, 0) + Vector3(0, 0, 0)
-			l.light_energy = 2.2 * night
+			l.global_position = p
+			l.light_energy = (2.75 if _tirana else 2.2) * night
 			l.visible = night > 0.05
 		else:
 			l.visible = false

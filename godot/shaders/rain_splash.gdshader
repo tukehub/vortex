@@ -8,6 +8,8 @@ uniform float density : hint_range(0.0, 1.0) = 1.0;
 // The road under the player as a plane: a point on it and its height gradient.
 uniform vec3 ground_origin = vec3(0.0);
 uniform vec2 ground_grad = vec2(0.0);
+uniform vec2 ground_right = vec2(1.0, 0.0);
+uniform float road_half_width = 0.0;
 uniform vec3 to_sun = vec3(0.3, 0.8, 0.2);
 uniform vec3 sun_light = vec3(1.0);
 uniform vec3 ambient_light = vec3(0.2);
@@ -36,6 +38,8 @@ void vertex() {
 	vec3 cam = CAMERA_POSITION_WORLD;
 	vec2 cell = floor(cam.xz / 4.0) * 4.0;
 	vec2 xz = cell + r * 44.0;
+	float edge = abs(dot(xz - ground_origin.xz, ground_right));
+	float road_mask = road_half_width > 0.0 ? 1.0 - smoothstep(road_half_width - 0.8, road_half_width, edge) : 1.0;
 	float height = ground_origin.y + dot(ground_grad, xz - ground_origin.xz) + 0.02;
 	vec3 p = vec3(xz.x, height, xz.y);
 	float size = mix(0.10, 0.20, seed.z);
@@ -47,9 +51,9 @@ void vertex() {
 	vec3 wp = p + side * (wide * v_quad.x * 2.0) + vec3(0.0, tall * v_quad.y, 0.0);
 	float c = dot(to_p / max(dist, 0.001), to_sun);
 	v_col = ambient_light * 1.4 + sun_light * (0.3 + 1.6 * pow(max(c, 0.0), 6.0)) * 0.8;
-	v_alpha = (1.0 - life) * (1.0 - smoothstep(16.0, 21.0, dist));
+	v_alpha = road_mask * (1.0 - life) * (1.0 - smoothstep(16.0, 21.0, dist));
 	v_life = life;
-	if (seed.y > density || fract(seed.w * 5.3 + cycle * 0.17) > 0.2 + 0.8 * rain) {
+	if (road_mask <= 0.0 || seed.y > density || fract(seed.w * 5.3 + cycle * 0.17) > 0.2 + 0.8 * rain) {
 		VERTEX = vec3(0.0, 0.0, 10.0);
 	} else {
 		VERTEX = (VIEW_MATRIX * vec4(wp, 1.0)).xyz;

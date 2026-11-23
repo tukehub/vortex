@@ -166,7 +166,10 @@ func _build_world() -> void:
 	route_guide = RouteGuide.new(track)
 	var tj: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/%s/track.json" % city_id))
 	sky = SkyEnv.new()
+	sky.city_id = city_id
 	add_child(sky)
+	if city_id == "tirane":
+		sky.rain.set_tirana_profile(track.half_w)
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
@@ -719,7 +722,7 @@ func _process(dt: float) -> void:
 	speed_feedback.update(player, state == "race", dt)
 	sky.follow(cam.global_position)
 	if sky.wet > 0.01:
-		sky.set_rain_ground(track.pos(player.s, player.d), track.tangent(player.s))
+		sky.set_rain_ground(track.pos(player.s, 0.0 if city_id == "tirane" else player.d), track.tangent(player.s))
 	Sfx.listener_pos = cam.global_position
 	if state in ["race", "finish"]:
 		Sfx.set_mix(Sfx.danger_of(player), Sfx.space_near(cam.global_position, props.landmarks))

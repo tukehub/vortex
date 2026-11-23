@@ -39,6 +39,7 @@ func load_city(city_id: String) -> void:
 	add_child(inst)
 	_collect(inst)
 	if city_id == "tirane":
+		facade_mat.set_shader_parameter("window_glow", 1.28)
 		_load_showcase()
 	apply_quality()
 	Quality.preset_changed.connect(func(_p): apply_quality())
