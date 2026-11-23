@@ -11,6 +11,17 @@ const WHEELS := ["Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"]
 const LIGHTS := {"front": "Headlights", "rear": "BrakeLights"}
 const SOCKETS := {"left": "Nitro_L", "right": "Nitro_R"}
 
+const HATCH := {
+	"model_path": "res://assets/cars/hatch.glb", "visual_scale": 1.0,
+	"wheel_radius": .32, "wheelbase": 2.5296, "wheel_offsets": {},
+	"material_slots": {}, "light_nodes": LIGHTS, "nitro_sockets": SOCKETS, "lod_models": {},
+}
+const ESTATE := {
+	"model_path": "res://assets/cars/estate.glb", "visual_scale": 1.0,
+	"wheel_radius": .35, "wheelbase": 2.868, "wheel_offsets": {},
+	"material_slots": {}, "light_nodes": LIGHTS, "nitro_sockets": SOCKETS, "lod_models": {},
+}
+
 
 static func root(scene: Node3D) -> Node3D:
 	var child := scene.get_node_or_null("CarRoot") as Node3D

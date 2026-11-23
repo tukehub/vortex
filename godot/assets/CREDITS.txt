@@ -47,7 +47,9 @@ Fërkimi i gomave, gërvishtja dhe shiu janë sintetizuar proceduralisht (tools/
 Përplasja anësore: regjistrim nga PauliusI, CC0; shkurtuar, filtruar dhe ulur në volum.
 freesound.org/people/PauliusI/sounds/346299/
 
-[b]Modeli i makinës[/b]
+[b]Modelet e makinave[/b]
+Hatch dhe Estate: gjeometri origjinale të VORTEX, të krijuara me tools/build_original_cars.py për përdorim komercial në lojë. Pa modele ose tekstura të palëve të treta.
+
 “Car Concept” © 2024 Darmstadt Graphics Group GmbH dhe Eric Chadwick, CC BY 4.0.
 github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept
 creativecommons.org/licenses/by/4.0/

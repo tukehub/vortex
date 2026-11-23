@@ -250,7 +250,8 @@ def half_section(fy, by, ry, hwb, tumble, arch):
 def build_body(b: Builder, spec):
     L, W = spec['L'], spec['W']
     wr = spec['wheel_r']
-    u = np.linspace(0, 1, NU)
+    stations = spec.get('stations', NU)
+    u = np.linspace(0, 1, stations)
     fy = curve(spec['floor'], u)
     by = curve(spec['belt'], u)
     ry = np.maximum(curve(spec['roof'], u), by)
@@ -261,7 +262,7 @@ def build_body(b: Builder, spec):
 
     rings = []
     glass_rows = []
-    for i in range(NU):
+    for i in range(stations):
         arch = None
         for wz in wheel_z:
             dz = z[i] - wz
@@ -280,14 +281,14 @@ def build_body(b: Builder, spec):
         rear_round = max(0.0, 1.0 - (1.0 - u[i]) / .10) ** 2
         zz += (.12 * front_round - .10 * rear_round) * (ring[:, 0] / hw[i]) ** 2
         rings.append(np.column_stack([ring[:, 0], ring[:, 1], zz]))
-        if .315 <= u[i] <= .425 or .795 <= u[i] <= .88:
+        if in_ranges(u[i], spec.get('screens', ((.315, .425), (.795, .88)))):
             gm[3:] = True
         gmask_ring = np.concatenate([np.zeros(N1, bool), gm, np.concatenate([np.zeros(N1, bool), gm])[::-1][1:-1]])
         glass_rows.append(gmask_ring)
     R = len(rings[0])
     pos = np.vstack(rings)
     body_idx, glass_idx = [], []
-    for i in range(NU - 1):
+    for i in range(stations - 1):
         gi = in_ranges(u[i], spec['glass']) and in_ranges(u[i + 1], spec['glass'])
         for j in range(R):
             a = i * R + j
@@ -304,7 +305,7 @@ def build_body(b: Builder, spec):
             tgt.append((bq, d, c))
     # caps
     cap_pos = []
-    for i, zc in ((0, z[0]), (NU - 1, z[-1])):
+    for i, zc in ((0, z[0]), (stations - 1, z[-1])):
         base = i * R
         centre_i = len(pos) + len(cap_pos)
         cap_pos.append([0.0, (fy[i] + ry[i]) * 0.5, zc])
