@@ -6,8 +6,8 @@ extends Node3D
 ## MultiMeshInstance3D per model per stand, so stands out of view are culled
 ## and far stands drop to the meshes' automatic LODs. crowd_spectator.gdshader
 ## animates them, no skeletons.
-## Barrier geometry comes from Arena (HALF_X x HALF_Z rounded rectangle,
-## CORNER radius); the stands from ArenaSurroundings.stand_segments().
+## Barrier geometry comes from Arena (an HALF_X x HALF_Z oval); the stands
+## from ArenaSurroundings.stand_segments().
 
 const CROWD_DIR := "res://assets/models/crowd/"
 const SHADER := preload("res://shaders/crowd_spectator.gdshader")
@@ -97,7 +97,7 @@ func _first_mesh(node: Node) -> MeshInstance3D:
 ## Every stand row is filled with groups and gaps, then whole groups are
 ## dropped at random until `count` remain, so it stays clustered, not thin.
 func _scatter(count: int) -> Array:
-	var segments := ArenaSurroundings.stand_segments(Arena.HALF_X, Arena.HALF_Z, Arena.CORNER)
+	var segments := ArenaSurroundings.stand_segments(Arena.HALF_X, Arena.HALF_Z)
 	var groups: Array = []
 	for stand in segments.size():
 		var seg: Array = segments[stand]
