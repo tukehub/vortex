@@ -7,6 +7,7 @@ extends Node3D
 const FACADE_SHADER := preload("res://shaders/facade.gdshader")
 const SHOWCASE_SHADER := preload("res://shaders/showcase_facade.gdshader")
 
+var frontages: Node3D
 var facade_mat: ShaderMaterial
 var roof_mat: StandardMaterial3D
 var chunk_nodes: Array[MeshInstance3D] = []
@@ -20,13 +21,19 @@ func load_city(city_id: String) -> void:
 		push_warning("no buildings for " + city_id)
 		return
 	facade_mat = ShaderMaterial.new()
-	facade_mat.shader = FACADE_SHADER
-	facade_mat.set_shader_parameter("tex_facade", load("res://assets/textures/urban_facade_tile.png"))
-	facade_mat.set_shader_parameter("tex_facade_small", load("res://assets/textures/urban_facade_small.png"))
-	facade_mat.set_shader_parameter("tex_facade_double", load("res://assets/textures/urban_facade_double.png"))
-	facade_mat.set_shader_parameter("tex_plaster", load("res://assets/textures/plaster_diff.jpg"))
-	facade_mat.set_shader_parameter("tex_plaster_n", load("res://assets/textures/plaster_nor.jpg"))
-	facade_mat.set_shader_parameter("tex_concrete", load("res://assets/textures/concrete_wall_diff.jpg"))
+	if city_id == "vlore":
+		facade_mat.shader = preload("res://shaders/vlore_facade.gdshader")
+		facade_mat.set_shader_parameter("atlas", preload("res://assets/cities/vlore/facade_atlas.png"))
+		frontages = preload("res://scripts/world/vlore_frontages.gd").new()
+		add_child(frontages)
+	else:
+		facade_mat.shader = FACADE_SHADER
+		facade_mat.set_shader_parameter("tex_facade", load("res://assets/textures/urban_facade_tile.png"))
+		facade_mat.set_shader_parameter("tex_facade_small", load("res://assets/textures/urban_facade_small.png"))
+		facade_mat.set_shader_parameter("tex_facade_double", load("res://assets/textures/urban_facade_double.png"))
+		facade_mat.set_shader_parameter("tex_plaster", load("res://assets/textures/plaster_diff.jpg"))
+		facade_mat.set_shader_parameter("tex_plaster_n", load("res://assets/textures/plaster_nor.jpg"))
+		facade_mat.set_shader_parameter("tex_concrete", load("res://assets/textures/concrete_wall_diff.jpg"))
 	roof_mat = StandardMaterial3D.new()
 	roof_mat.vertex_color_use_as_albedo = true
 	roof_mat.albedo_texture = load("res://assets/textures/rooftiles_diff.jpg")
@@ -102,3 +109,6 @@ func set_env(night: float, wet: float) -> void:
 	if showcase_mat:
 		showcase_mat.set_shader_parameter("night", night)
 		showcase_mat.set_shader_parameter("wetness", wet)
+	if frontages:
+		frontages.material.set_shader_parameter("night", night)
+		frontages.material.set_shader_parameter("wetness", wet)
