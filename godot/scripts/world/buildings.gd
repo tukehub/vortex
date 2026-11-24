@@ -119,6 +119,7 @@ func apply_quality() -> void:
 	var dist := float(Quality.p.building_dist)
 	for mi in chunk_nodes:
 		if frontages:
+			mi.lod_bias = 0.55 if Quality.preset == "low" else (0.8 if Quality.preset == "medium" else 1.0)
 			# Ranges are measured from the AABB centre. Include its radius so
 			# every pixel finishes the shader handoff before engine culling.
 			mi.visibility_range_end = 540. + mi.get_aabb().size.length() * .5

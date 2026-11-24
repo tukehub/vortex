@@ -68,6 +68,8 @@ func _ready() -> void:
 	# Two levels of detail per chunk: the detailed stones only up close.
 	var near_tris := 0
 	var far_tris := 0
+	var coarse_cells := {}
+	var far_instances := 0
 	for child in rocks.get_children():
 		if child is MultiMeshInstance3D:
 			var mmi := child as MultiMeshInstance3D
@@ -75,9 +77,13 @@ func _ready() -> void:
 				near_tris += mmi.multimesh.mesh.get_faces().size() / 3
 				check(mmi.visibility_range_end <= SeaRocks.NEAR_LOD + 0.1, "detailed stones only near the camera")
 			else:
+				check(not coarse_cells.has(mmi.position), "one coarse draw batch per occupied shore cell")
+				coarse_cells[mmi.position] = true
+				far_instances += mmi.multimesh.instance_count
 				far_tris += mmi.multimesh.mesh.get_faces().size() / 3
 				check(mmi.visibility_range_begin >= SeaRocks.NEAR_LOD - 0.1, "coarse stones take over further out")
 				check(mmi.multimesh.mesh.get_faces().size() / 3 <= 40, "a coarse stone is a handful of triangles")
+	check(far_instances == rocks.stones, "coarse batches retain every placed stone")
 	check(near_tris > 0 and far_tris > 0, "both levels of detail are built")
 	Quality.set_preset("low")
 	var thinned := 0

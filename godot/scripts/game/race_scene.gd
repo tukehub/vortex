@@ -196,6 +196,7 @@ func _build_world() -> void:
 	route_signs.name = "RouteSigns"
 	road.add_child(route_signs)
 	route_signs.build(track, route_guide, terrain.height_at)
+	RaceReflections.hide_detail(route_signs.posts)
 	buildings = Buildings.new()
 	var side_path := "res://assets/cities/%s/roads.glb" % city_id
 	if Quality.preset != "low" and ResourceLoader.exists(side_path):

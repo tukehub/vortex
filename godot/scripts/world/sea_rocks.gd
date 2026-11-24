@@ -47,20 +47,25 @@ func build(terrain: Terrain, track: RaceTrack, anchors: Array) -> void:
 	_mat.shader = SHADER
 	_mat.set_shader_parameter("water_y", terrain.water_surface + 0.0)
 	var meshes: Array[ArrayMesh] = []
-	var far_meshes: Array[ArrayMesh] = []
+	var far_mesh := _stone_mesh(0, 3, 5)
 	for v in VARIANTS:
 		meshes.append(_stone_mesh(v, 4, 7))
-		far_meshes.append(_stone_mesh(v, 3, 5))
 	var transforms := {}
 	var level := _waterline_level(terrain)
 	for anchor: Dictionary in anchors:
 		for seg in _contour(terrain, Vector2(float(anchor.x), float(anchor.z)), float(anchor.radius)):
 			_line_of_stones(seg[0], seg[1], terrain, track, level, transforms)
-	# Per stone shape per CHUNK-metre square, a detailed MultiMesh near the
-	# camera and a coarse one beyond NEAR_LOD: culled by view and distance in
-	# pieces rather than as one long strip.
+	# Keep shape variation close up. At distance the existing per-stone
+	# rotations and scales vary one coarse shape in one draw per grid cell.
+	var batches := transforms.duplicate()
 	for key: Vector3i in transforms:
-		var list: Array = transforms[key]
+		var cell := Vector3i(-1, key.y, key.z)
+		if not batches.has(cell):
+			batches[cell] = []
+		batches[cell].append_array(transforms[key])
+		stones += transforms[key].size()
+	for key: Vector3i in batches:
+		var list: Array = batches[key]
 		# Shuffled, so a reduced instance budget thins the pile evenly.
 		var order := range(list.size())
 		var shuffle := RandomNumberGenerator.new()
@@ -71,33 +76,31 @@ func build(terrain: Terrain, track: RaceTrack, anchors: Array) -> void:
 			order[i] = order[j]
 			order[j] = tmp
 		var centre := Vector3((key.y + 0.5) * CHUNK, 0.0, (key.z + 0.5) * CHUNK)
-		for lod in 2:
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.mesh = meshes[key.x] if lod == 0 else far_meshes[key.x]
-			mm.instance_count = list.size()
-			for i in list.size():
-				var xf: Transform3D = list[order[i]]
-				# Instances are placed relative to the chunk centre, so the
-				# node sits there and visibility ranges measure from it.
-				mm.set_instance_transform(i, Transform3D(xf.basis, xf.origin - centre))
-			var node := MultiMeshInstance3D.new()
-			node.name = "Stones_%d_%d_%d_%s" % [key.x, key.y, key.z, "near" if lod == 0 else "far"]
-			node.multimesh = mm
-			node.position = centre
-			node.material_override = _mat
-			if lod == 0:
-				node.visibility_range_end = NEAR_LOD
-				node.visibility_range_end_margin = 10.0
-			else:
-				node.visibility_range_begin = NEAR_LOD
-				node.visibility_range_begin_margin = 10.0
-				node.visibility_range_end = VISIBLE
-				node.visibility_range_end_margin = 40.0
-			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			add_child(node)
-			_multimeshes.append(mm)
-		stones += list.size()
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = meshes[key.x] if key.x >= 0 else far_mesh
+		mm.instance_count = list.size()
+		for i in list.size():
+			var xf: Transform3D = list[order[i]]
+			# Instances are placed relative to the chunk centre, so the
+			# node sits there and visibility ranges measure from it.
+			mm.set_instance_transform(i, Transform3D(xf.basis, xf.origin - centre))
+		var node := MultiMeshInstance3D.new()
+		node.name = "Stones_%d_%d_%d_%s" % [key.x, key.y, key.z, "near" if key.x >= 0 else "far"]
+		node.multimesh = mm
+		node.position = centre
+		node.material_override = _mat
+		if key.x >= 0:
+			node.visibility_range_end = NEAR_LOD
+			node.visibility_range_end_margin = 10.0
+		else:
+			node.visibility_range_begin = NEAR_LOD
+			node.visibility_range_begin_margin = 10.0
+			node.visibility_range_end = VISIBLE
+			node.visibility_range_end_margin = 40.0
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(node)
+		_multimeshes.append(mm)
 	if not Quality.budget_changed.is_connected(_apply_budget):
 		Quality.budget_changed.connect(_apply_budget)
 	_apply_budget()

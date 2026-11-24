@@ -260,6 +260,7 @@ func _build() -> void:
 	_slot_name.offset_right = 210
 	_slot_name.offset_top = -108
 	_slot_name.offset_bottom = -78
+	_shadowed(_slot_name)
 	add_child(_slot_name)
 	_target_hint = UiTheme.label("", 16, UiTheme.MUTED, false, HORIZONTAL_ALIGNMENT_CENTER)
 	_target_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)

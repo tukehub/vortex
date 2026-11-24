@@ -64,6 +64,7 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 	band.mesh = st.commit()
 	var material := ShaderMaterial.new()
 	material.shader = BAND_SHADER
+	material.set_shader_parameter("sign_face", preload("res://assets/textures/turn_chevron.png"))
 	band.material_override = material
 	band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(band)
@@ -72,6 +73,7 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 	pole_mesh.bottom_radius = 0.055
 	pole_mesh.height = 1.2
 	pole_mesh.radial_segments = 6
+	pole_mesh.rings = 0
 	var pole_mat := StandardMaterial3D.new()
 	pole_mat.albedo_color = Color(0.16, 0.17, 0.17)
 	pole_mat.roughness = 0.85

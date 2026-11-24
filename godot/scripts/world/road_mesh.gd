@@ -322,7 +322,9 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 			var a := Vector3(track.X[i], track.Y[i], track.Z[i]) + Vector3(track.NX[i], 0.0, track.NZ[i]) * side * (hw + KERB_W)
 			var b := Vector3(track.X[j], track.Y[j], track.Z[j]) + Vector3(track.NX[j], 0.0, track.NZ[j]) * side * (hw + KERB_W)
 			var normal := Vector3(track.NX[i], 0.0, track.NZ[i]) * -side
-			for point in [a, b, b + Vector3.UP * BARRIER_H, a + Vector3.UP * BARRIER_H]:
+			for corner: Vector2 in [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]:
+				var point := a.lerp(b, corner.x) + Vector3.UP * (corner.y * BARRIER_H)
+				st.set_uv(Vector2((i + corner.x) * track.ds / 4.0, corner.y))
 				st.set_color(color.darkened(0.18 if point.y < a.y + BARRIER_H * 0.5 else 0.0))
 				st.set_normal(normal)
 				st.add_vertex(point)
@@ -332,6 +334,8 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.8
+	mat.albedo_texture = preload("res://assets/textures/barrier_concrete.png")
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	barrier_mat = mat
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var barrier := MeshInstance3D.new()

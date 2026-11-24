@@ -80,8 +80,8 @@ func _apply_quality() -> void:
 	env.volumetric_fog_enabled = env.volumetric_fog_enabled and night > 0.3
 	Quality.apply_sun(sun)
 	sun.light_angular_distance = (0.3 if night > 0.3 else 0.15) if bool(Quality.p.sun_penumbra) else 0.0
-	if city_id == "tirane":
-		_apply_tirana_shadows()
+	if city_id in ["tirane", "vlore"]:
+		_apply_city_shadows()
 
 
 func apply(id: String, is_wet_override: bool = false) -> void:
@@ -195,8 +195,18 @@ func apply(id: String, is_wet_override: bool = false) -> void:
 	Quality.apply_sun(sun)
 	if city_id == "tirane":
 		_apply_tirana_atmosphere(id)
-		_apply_tirana_shadows()
+		_apply_city_shadows()
 		_gate_glow()
+
+	if city_id == "vlore":
+		_apply_city_shadows()
+		env.fog_height = -8.0
+		env.fog_height_density = 0.000035
+		if id in ["day", "golden", "sunset"]:
+			env.fog_density *= 1.35
+			env.ambient_light_sky_contribution = 0.38
+			sun.shadow_opacity = 0.82
+			sun.light_energy *= 0.92
 
 	rain.set_light(dir, sun.light_color * sun.light_energy, env.fog_light_color)
 	rain.amount_ratio = 1.0
@@ -240,7 +250,7 @@ func _apply_tirana_atmosphere(id: String) -> void:
 			sun.shadow_opacity = 0.16
 
 
-func _apply_tirana_shadows() -> void:
+func _apply_city_shadows() -> void:
 	sun.shadow_bias = 0.032
 	sun.shadow_normal_bias = 1.15
 	if Quality.renderer == "mobile" and Quality.preset == "high" and int(Quality.p.shadow_splits) > 1:
@@ -384,7 +394,7 @@ func advance(dt: float) -> void:
 	env.ambient_light_sky_contribution = lerpf(_from.sky_ambient, _to.sky_ambient, k)
 	env.glow_enabled = bool(Quality.p.glow)
 	_gate_glow()
-	if city_id == "tirane":
+	if city_id in ["tirane", "vlore"]:
 		sun.shadow_opacity = lerpf(_from.shadow_opacity, _to.shadow_opacity, k)
 		rain.set_light(sun.global_transform.basis.z, sun.light_color * sun.light_energy, env.fog_light_color)
 	env.ssr_enabled = bool(Quality.p.ssr) and wet > 0.05

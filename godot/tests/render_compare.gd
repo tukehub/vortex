@@ -41,7 +41,7 @@ func _ready() -> void:
 			city = a.substr(7)
 		elif a.begins_with("--qualities="):
 			qualities = Array(a.substr(12).split(","))
-	Quality.set_preset("medium")
+	Quality.set_preset(qualities[0])
 	Game.race_opts.city = city
 	Game.race_opts.env = env
 	Game.race_opts.laps = 1
@@ -144,7 +144,12 @@ func _ready() -> void:
 					scene.cam.follow(player, 1.0 / 60.0)
 					cam.global_transform = scene.cam.global_transform
 					cam.fov = scene.cam.fov
+					scene.sky.follow(cam.global_position)
+					scene.props.update_vegetation(cam.global_position, -cam.global_basis.z)
+					scene.reflections.update_focus(player_visual.global_position, track.tangent(player.s))
 				await get_tree().process_frame
+			if "--profile-frame" in OS.get_cmdline_user_args():
+				await _profile_frame(scene, q)
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s_%s.png" % [out, env, q, view])
 			var vp := get_viewport().get_viewport_rid()
 			print("RENDER STATS %s %s %s: %d primitives, %d draw calls" % [env, q, view,
@@ -173,3 +178,49 @@ func _straight(track: RaceTrack) -> float:
 			best = s
 		s += 25.0
 	return best
+
+## Sample the settled camera without capture readback or warm-up in the timing.
+func _profile_frame(scene: RaceScene, tier: String) -> void:
+	var vp := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(vp, true)
+	var cpu := 0.0
+	var gpu := 0.0
+	var process_ms := 0.0
+	var start := 0
+	for i in 12:
+		if i == 4:
+			start = Time.get_ticks_usec()
+		await RenderingServer.frame_post_draw
+		if i >= 4:
+			cpu += RenderingServer.viewport_get_measured_render_time_cpu(vp)
+			gpu += RenderingServer.viewport_get_measured_render_time_gpu(vp)
+			process_ms += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var elapsed_ms := (Time.get_ticks_usec() - start) / 8000.0
+	var emitting_slots := 0
+	for particle_type in ["CPUParticles3D", "GPUParticles3D"]:
+		for emitter in scene.find_children("*", particle_type, true, false):
+			if emitter.is_visible_in_tree() and emitter.emitting:
+				emitting_slots += emitter.amount
+	var slots := 0
+	for kind in scene.effects.driving.pools:
+		for slot: Dictionary in scene.effects.driving.pools[kind]:
+			if slot.node.visible:
+				slots += slot.node.amount
+	var profile := {
+		"tier": tier,
+		"scale": get_viewport().scaling_3d_scale,
+		"size": str(get_viewport().get_visible_rect().size),
+		"emitting_slots": emitting_slots,
+		"driving_particle_slots_visible": slots,
+		"elapsed_ms": elapsed_ms,
+		"render_cpu_ms": cpu / 8.0,
+		"gpu_ms": gpu / 8.0,
+		"process_ms": process_ms / 8.0,
+		"objects": RenderingServer.viewport_get_render_info(vp,
+			RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RenderingServer.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME),
+		"video_bytes": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED),
+		"texture_bytes": Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED),
+		"shadow_m": scene.sky.sun.directional_shadow_max_distance,
+	}
+	print("FRAME_PROFILE ", JSON.stringify(profile))
+	RenderingServer.viewport_set_measure_render_time(vp, false)

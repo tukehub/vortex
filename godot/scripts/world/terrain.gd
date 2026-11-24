@@ -119,7 +119,13 @@ func set_env(wet: float, snow: float, night: float) -> void:
 	mat.set_shader_parameter("night", night)
 
 
+func _terrain_lod_bias() -> float:
+	return 2.0 if Quality.preset == "high" else (1.0 if Quality.preset == "medium" else 0.55)
+
+
 func _apply_budget() -> void:
+	for chunk in chunks:
+		chunk.lod_bias = _terrain_lod_bias()
 	mat.set_shader_parameter("two_scale", Quality.preset != "low" and Quality.pressure_stage < 2)
 
 
@@ -149,7 +155,7 @@ func _sample(g: Dictionary, h: PackedFloat32Array, x: float, z: float) -> float:
 	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
 
 
-func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells: int, step: int, skirt: float, hole := Rect2(), origin := Vector3.ZERO) -> ArrayMesh:
+func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells: int, step: int, hole := Rect2(), origin := Vector3.ZERO, chunk_lods := {}) -> ArrayMesh:
 	var n := int(g.n)
 	var cell := float(g.cell)
 	var x0 := float(g.x0)
@@ -196,12 +202,6 @@ func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells:
 			idx[k + 3] = a + 1; idx[k + 4] = a + m + 1; idx[k + 5] = a + m
 			k += 6
 	idx.resize(k)
-	if skirt > 0.0:
-		# drop the border vertices to hide LOD cracks
-		for j in m:
-			for i in m:
-				if i == 0 or j == 0 or i == m - 1 or j == m - 1:
-					verts[j * m + i].y -= skirt
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = verts
@@ -209,36 +209,53 @@ func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells:
 	arr[Mesh.ARRAY_TEX_UV] = uvs
 	arr[Mesh.ARRAY_INDEX] = idx
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], chunk_lods)
 	return mesh
+
+
+## Keep every edge vertex in the coarse index buffer so neighbouring chunks
+## can choose different detail levels without opening the ridgeline to the sky.
+func _coarse_indices() -> PackedInt32Array:
+	var indices := PackedInt32Array()
+	var stride := CHUNK + 1
+	for z in range(0, CHUNK, 4):
+		for x in range(0, CHUNK, 4):
+			var a := z * stride + x
+			var b := a + 4
+			var c := b + 4 * stride
+			var d := a + 4 * stride
+			if x > 0 and z > 0 and x + 4 < CHUNK and z + 4 < CHUNK:
+				indices.append_array(PackedInt32Array([a, b, d, b, c, d]))
+				continue
+			var rim := PackedInt32Array()
+			for i in range(0, 4, 1 if z == 0 else 4):
+				rim.append(a + i)
+			for i in range(0, 4, 1 if x + 4 == CHUNK else 4):
+				rim.append(b + i * stride)
+			for i in range(0, 4, 1 if z + 4 == CHUNK else 4):
+				rim.append(c - i)
+			for i in range(0, 4, 1 if x == 0 else 4):
+				rim.append(d - i * stride)
+			for i in rim.size():
+				indices.append_array(PackedInt32Array([a + 2 * stride + 2, rim[i], rim[(i + 1) % rim.size()]]))
+	return indices
 
 
 func _build_near() -> void:
 	var n := int(near.n)
 	var cell := float(near.cell)
 	var nc := (n - 1) / CHUNK
+	var lods := {1.5: _coarse_indices()}
 	for cz in nc:
 		for cx in nc:
 			var center := Vector3(float(near.x0) + (cx + 0.5) * CHUNK * cell, 0, float(near.z0) + (cz + 0.5) * CHUNK * cell)
-			var lod_distance := 1600.0 if Quality.preset == "high" else (850.0 if Quality.preset == "medium" else 500.0)
 			var mi := MeshInstance3D.new()
 			mi.position = center
-			mi.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 1, 0.0, Rect2(), center)
+			mi.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 1, Rect2(), center, lods)
 			mi.material_override = mat
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			mi.visibility_range_end = lod_distance
-			mi.visibility_range_end_margin = 150.0
-			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+			mi.lod_bias = _terrain_lod_bias()
 			add_child(mi)
-			# coarse LOD for the same chunk
-			var lo := MeshInstance3D.new()
-			lo.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 4, 1.5, Rect2(), center)
-			lo.position = center
-			lo.material_override = mat
-			lo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			lo.visibility_range_begin = lod_distance
-			lo.visibility_range_begin_margin = 150.0
-			add_child(lo)
 			chunks.append(mi)
 			chunk_pos.append(Vector2(float(near.x0) + (cx + 0.5) * CHUNK * cell, float(near.z0) + (cz + 0.5) * CHUNK * cell))
 
@@ -251,7 +268,7 @@ func _build_far() -> void:
 	var span := float(near.cell) * (int(near.n) - 1)
 	var hole := Rect2(float(near.x0), float(near.z0), span, span)
 	var mi := MeshInstance3D.new()
-	mi.mesh = _grid_mesh(far, far_h, 0, 0, (n - 1) / step * step, step, 0.0, hole)
+	mi.mesh = _grid_mesh(far, far_h, 0, 0, (n - 1) / step * step, step, hole)
 	mi.material_override = mat
 	mi.position.y = -2.5
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
