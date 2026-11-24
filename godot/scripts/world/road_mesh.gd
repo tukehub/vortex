@@ -33,7 +33,7 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	surface_mat.shader = ROAD_SHADER
 	surface_mat.set_shader_parameter("tex_asphalt", load("res://assets/textures/asphalt_diff.jpg"))
 	surface_mat.set_shader_parameter("tex_asphalt_n", load("res://assets/textures/asphalt_nor.jpg"))
-	surface_mat.set_shader_parameter("tex_asphalt_r", load("res://assets/textures/asphalt_rough.jpg"))
+	surface_mat.set_shader_parameter("tex_asphalt_r", load("res://assets/textures/asphalt_arm.jpg"))
 	surface_mat.set_shader_parameter("half_w", hw)
 	surface_mat.set_shader_parameter("track_len", track.L)
 	surface_mat.set_shader_parameter("wetness", wet)

@@ -57,8 +57,13 @@ func build(data: Dictionary, terrain: Terrain, keep_clear: Array = []) -> void:
 	mat = ShaderMaterial.new()
 	mat.shader = SHADER
 	mat.set_shader_parameter("turf", preload("res://assets/textures/grass_diff.jpg"))
+	mat.set_shader_parameter("paving_tex", preload("res://assets/textures/promenade_paving_diff.jpg"))
+	mat.set_shader_parameter("paving_n", preload("res://assets/textures/promenade_paving_nor.jpg"))
+	mat.set_shader_parameter("paving_arm", preload("res://assets/textures/promenade_paving_arm.jpg"))
 	var node := MeshInstance3D.new()
 	node.name = "PromenadeGround"
+	# Tangents for the paving normal map (UVs are metres along / across).
+	st.generate_tangents()
 	node.mesh = st.commit()
 	node.material_override = mat
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

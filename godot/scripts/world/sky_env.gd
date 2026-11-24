@@ -9,7 +9,7 @@ const HDRI := {
 	"sunset": "res://assets/hdri/sky_sunset.hdr",
 	"day": "res://assets/hdri/sky_day.hdr",
 	"golden": "res://assets/hdri/sky_golden.hdr",
-	"rain": "res://assets/hdri/sky_night.hdr",
+	"rain": "res://assets/hdri/sky_rain_night.hdr",
 	"snow": "res://assets/hdri/sky_overcast.hdr",
 	"rainy": "res://assets/hdri/sky_overcast.hdr",
 }
@@ -259,7 +259,9 @@ func _panorama_path(id: String) -> String:
 func _sky_energy(id: String) -> float:
 	match id:
 		"night": return 0.73 if city_id == "tirane" else 0.9
-		"rain", "snow": return 0.35
+		# The overcast night sky is ~3x the clear night's mean radiance.
+		"rain": return 0.18
+		"snow": return 0.35
 		"rainy": return 0.54 if city_id == "tirane" else 0.60
 		"dusk": return 0.8
 		"sunset": return 0.32 if city_id == "tirane" else 0.9

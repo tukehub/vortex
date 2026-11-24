@@ -232,25 +232,6 @@
       }
     ]
   },
-  "asphalt_wet": {
-    "source": "polyhaven",
-    "id": "asphalt_04",
-    "name": "Asphalt 04",
-    "authors": [
-      "Jenelle van Heerden",
-      "Sergej Majboroda"
-    ],
-    "licence": "CC0-1.0",
-    "page": "https://polyhaven.com/a/asphalt_04",
-    "files": [
-      {
-        "path": "godot/assets/textures/asphalt_wet_arm.jpg",
-        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_04/asphalt_04_arm_1k.jpg",
-        "md5": "f7c460aa60610485c71e8eb7fc6dae8a",
-        "bytes": 554776
-      }
-    ]
-  },
   "pole_metal": {
     "source": "ambientcg",
     "id": "Metal032",

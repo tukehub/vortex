@@ -84,8 +84,14 @@ func build(terrain: Terrain) -> bool:
 				_ruin(ring, 1.4, 4.6, 0.8, col, seed)
 		built[kind] = int(built.get(kind, 0)) + 1
 	var stone_mat := LandmarkKit.material(0.93)
-	# Grey rubble limestone: the cobble photograph reads as coursed rubble.
-	stone_mat.albedo_texture = preload("res://assets/textures/cobble_diff.jpg")
+	# Rubble limestone masonry (Poly Haven Castle Wall Slates).
+	stone_mat.albedo_texture = preload("res://assets/textures/castle_wall_diff.jpg")
+	stone_mat.albedo_color = Color(1.08, 1.08, 1.08)
+	stone_mat.normal_enabled = true
+	stone_mat.normal_texture = preload("res://assets/textures/castle_wall_nor.jpg")
+	stone_mat.roughness_texture = preload("res://assets/textures/castle_wall_arm.jpg")
+	stone_mat.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+	stone_mat.roughness = 1.0
 	stone_mat.uv1_triplanar = true
 	stone_mat.uv1_scale = Vector3.ONE * 0.32
 	add_child(LandmarkKit.mesh_node(_stone, stone_mat, "CastleMasonry", REACH))
