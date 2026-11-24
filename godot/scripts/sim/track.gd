@@ -47,6 +47,14 @@ var PAIR := PackedInt32Array()
 ## closes over JOIN_TAPER before the road splits again (an island ahead).
 var EDGE_L := PackedFloat32Array()
 var EDGE_R := PackedFloat32Array()
+## Roundabout islands (track.json "islands": [x, z, radius]): the road runs
+## right up to each island's kerb, round a circle. ISLE[i] is the side (-1
+## left, 1 right) of sample i that faces an island within ISLAND_ZONE of its
+## kerb, 0 elsewhere; that side has no kerb or barrier, and its edge reaches
+## the island (or half way to another pass, in the gores between them).
+var islands: Array[Vector3] = []
+var ISLE := PackedFloat32Array()
+const ISLAND_ZONE := 75.0
 ## Lungomare's median (track.json "median"): 0..1 per sample on both passes,
 ## easing in and out over its first and last metres.
 var MEDIAN := PackedFloat32Array()
@@ -96,6 +104,7 @@ func build(data: Dictionary, reverse := false) -> void:
 	_frames()
 	_grid_build()
 	_join_build(data, reverse)
+	_island_build(data)
 
 
 # Closed Catmull-Rom through the control points, resampled to ~2 m arc length.
@@ -435,6 +444,51 @@ func _alongside_grid(i: int) -> int:
 					bd = score
 					best = j
 	return best
+
+
+func _island_build(data: Dictionary) -> void:
+	ISLE.resize(M)
+	ISLE.fill(0.0)
+	islands.clear()
+	for row: Array in data.get("islands", []):
+		islands.append(Vector3(float(row[0]), float(row[1]), float(row[2])))
+	if islands.is_empty() or EDGE_L.size() != M:
+		return
+	for i in M:
+		var p := Vector2(X[i], Z[i])
+		var n := Vector2(NX[i], NZ[i])
+		for isle: Vector3 in islands:
+			var c := Vector2(isle.x, isle.y)
+			if p.distance_to(c) > isle.z + ISLAND_ZONE:
+				continue
+			var side := 1.0 if (c - p).dot(n) > 0.0 else -1.0
+			ISLE[i] = side
+			var reach := _reach_toward(i, n * side, c, isle.z)
+			if side < 0.0:
+				EDGE_L[i] = maxf(EDGE_L[i], reach)
+			else:
+				EDGE_R[i] = maxf(EDGE_R[i], reach)
+
+
+## How far the road reaches from sample i along `dir`: to the island kerb, or
+## half way to the next pass of the lap, whichever comes first.
+func _reach_toward(i: int, dir: Vector2, centre: Vector2, radius: float) -> float:
+	var p := Vector2(X[i], Z[i])
+	var t := half_w
+	while t < 80.0:
+		var q := p + dir * t
+		if q.distance_to(centre) < radius + 0.3:
+			# Back off to 0.3 m short of the kerb, finely.
+			while t > half_w and (p + dir * t).distance_to(centre) < radius + 0.3:
+				t -= 0.1
+			return maxf(half_w, t)
+		var k := nearest(q.x, q.y, half_w + 2.0)
+		if k >= 0:
+			var gap := absi(k - i)
+			if mini(gap, M - gap) * ds_h > 60.0 and Vector2(X[k], Z[k]).distance_to(q) < half_w:
+				return maxf(half_w, (t + half_w) * 0.5)
+		t += 1.0
+	return half_w
 
 
 ## Signed offset of the joined road's middle at `s` (0: not joined).

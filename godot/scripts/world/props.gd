@@ -33,9 +33,9 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 	_tirana = city_id == "tirane"
 	track_lamps = p.get("track_lamps", [])
 	if track != null and track.PAIR.size() == track.M:
-		# The baked lamps down a divider now stand in the middle of one road
-		# (Vlorë): keep that road clear for driving.
-		track_lamps = track_lamps.filter(func(l: Array) -> bool: return not in_joined_road(track, float(l[0]), float(l[2])))
+		# The baked lamps down a divider, or between a roundabout's
+		# carriageways, now stand on open tarmac (Vlorë): keep it clear.
+		track_lamps = track_lamps.filter(func(l: Array) -> bool: return not in_open_road(track, float(l[0]), float(l[2])))
 	landmarks = p.get("landmarks", [])
 	road_marks = p.get("road_marks", {})
 	var models := Landmarks.new()
@@ -190,6 +190,20 @@ static func in_joined_road(track: RaceTrack, x: float, z: float) -> bool:
 		return false
 	var middle := track.JOIN[k]
 	return absf(at.y - middle) < absf(middle) - track.half_w + 0.6
+
+
+## True on a joined road's middle or a roundabout's apron: tarmac with no
+## kerb between it and the lanes.
+static func in_open_road(track: RaceTrack, x: float, z: float) -> bool:
+	if in_joined_road(track, x, z):
+		return true
+	for isle: Vector3 in track.islands:
+		var c := Vector2(isle.x, isle.y)
+		var q := Vector2(x, z)
+		var r := q.distance_to(c)
+		if r > isle.z and r < 85.0 and r < RoadMesh.apron_reach(track, c, isle.z, (q - c).angle()) - 0.6:
+			return true
+	return false
 
 
 func _build_lamps(lamps: Array, tl: Array, track: RaceTrack, reverse: bool) -> void:

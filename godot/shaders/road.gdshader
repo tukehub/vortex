@@ -21,17 +21,23 @@ uniform vec2 stone_section = vec2(0.0); // start and length in metres
 // Road marks (plan 3.5): zebra crossings as (s, width) along the lap, from
 // props.json "road_marks" (OSM highway=crossing nodes, or one before each
 // signalised junction where none is mapped), and procedural manholes, kerb
-// gullies and repaired patches placed by hashing the lap into cells.
+// gullies placed by hashing the lap into cells. The asphalt is one
+// continuous surface: no repaired patches.
 const int MAX_CROSSINGS = 48;
 uniform vec2 crossings[48];
 uniform int crossing_count = 0;
 // R8, one texel per CROSSING_CELL metres of lap: crossing index + 1, or 0.
 uniform sampler2D crossing_map : filter_nearest, repeat_disable;
 const float CROSSING_CELL = 8.0;
-uniform float detail = 1.0; // 0 skips manholes, gullies and patches (low quality)
+uniform float detail = 1.0; // 0 skips manholes and gullies (low quality)
 
 uniform float showcase_length = 0.0;
 uniform float showcase_direction = 1.0;
+
+// Mean linear luminance of asphalt_diff.jpg (sRGB-decoded), for crack filling.
+const float ASPHALT_MEAN = 0.107;
+// Cracks are its darkest ~4%; they fill to the median tone.
+const float ASPHALT_FILL = 0.093;
 
 varying vec2 ruv;
 varying vec3 wpos;
@@ -43,7 +49,7 @@ float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 // Sin-free cell hash for the road hardware: float32-exact on every GPU, so
-// RoadMesh.hardware_near() can tell where covers and patches are.
+// RoadMesh.hardware_near() can tell where covers and gullies are.
 float cell_hash(float c, float salt) {
 	vec3 p3 = fract(vec3(c, salt, c) * 0.1031);
 	p3 += dot(p3, p3.yzx + 33.33);
@@ -79,9 +85,19 @@ void fragment() {
 	vec2 tuv = vec2(across, along) / 5.0;
 	// second asphalt sample rotated to kill repetition
 	vec2 tuv2 = vec2(along, -across) / 7.3;
-	vec3 asphalt = mix(texture(tex_asphalt, tuv).rgb, texture(tex_asphalt, tuv2).rgb, 0.5) * asphalt_tint;
-	vec3 n1 = texture(tex_asphalt_n, tuv).rgb;
-	vec3 n2 = texture(tex_asphalt_n, tuv2).rgb;
+	// The asphalt photo carries long cracks; blended with its 90-degree
+	// rotated copy they crossed every 5-7 m and the road read as laid in
+	// slabs. Keep the aggregate, fill the cracks: the darkest texels are
+	// lifted to the photo's median tone and lose their groove.
+	vec3 a1 = texture(tex_asphalt, tuv).rgb;
+	vec3 a2 = texture(tex_asphalt, tuv2).rgb;
+	float crack1 = smoothstep(0.45, 0.22, dot(a1, vec3(0.333)) / ASPHALT_MEAN);
+	float crack2 = smoothstep(0.45, 0.22, dot(a2, vec3(0.333)) / ASPHALT_MEAN);
+	a1 = mix(a1, vec3(ASPHALT_FILL), crack1);
+	a2 = mix(a2, vec3(ASPHALT_FILL), crack2);
+	vec3 asphalt = mix(a1, a2, 0.5) * asphalt_tint;
+	vec3 n1 = mix(texture(tex_asphalt_n, tuv).rgb, vec3(0.5, 0.5, 1.0), crack1);
+	vec3 n2 = mix(texture(tex_asphalt_n, tuv2).rgb, vec3(0.5, 0.5, 1.0), crack2);
 	// The second sample's UVs are rotated 90 degrees; rotate its tangent-space
 	// direction back before blending or the surface grain lights incorrectly.
 	vec3 nrm = mix(n1, vec3(1.0 - n2.g, n2.r, n2.b), 0.5);
@@ -100,21 +116,6 @@ void fragment() {
 	float wear = exp(-pow((lane_pos - 0.3) * 6.0, 2.0)) + exp(-pow((lane_pos - 0.7) * 6.0, 2.0));
 	wear *= 1.0 - joined * step(half_w, abs(across));
 	asphalt *= 1.0 - 0.09 * wear;
-
-	// Patch seams use broad, staggered cells. Mipmapped asphalt roughness
-	// breaks up the edge without introducing a second detail map.
-	if (showcase > 0.0 && detail > 0.5) {
-		vec2 patch_uv = vec2(wpos.x / 4.7, wpos.z / 8.3);
-		patch_uv.x += mod(floor(patch_uv.y), 2.0) * 0.5;
-		vec2 joints = abs(fract(patch_uv) - 0.5);
-		vec2 widths = vec2(0.42, 0.41) + (aggregate - 0.5) * 0.085;
-		float seam = max(joints.x - widths.x, joints.y - widths.y);
-		float patch_aa = max(0.018, max(fwidth(patch_uv.x), fwidth(patch_uv.y)));
-		float repaired = (1.0 - smoothstep(-patch_aa, patch_aa, seam))
-			* step(0.76, hash(floor(patch_uv))) * showcase;
-		asphalt *= 1.0 - repaired * (0.12 + aggregate * 0.15);
-		rough = mix(rough, 0.63, repaired * 0.7);
-	}
 
 	asphalt *= 1.0 - showcase * (0.17 + 0.10 * gutter + 0.042 * wear);
 
@@ -147,32 +148,6 @@ void fragment() {
 	// Street hardware set into the asphalt.
 	float grate = 0.0;
 	if (detail > 0.5) {
-		// Repaired patches: darker, finer asphalt in a sealed rectangle.
-		float pc = floor(along / 31.0);
-		if (showcase <= 0.0 && cell_hash(pc, 4.7) < 0.38) {
-			float plen = 1.6 + cell_hash(pc, 1.3) * 4.5;
-			float pwid = 1.0 + cell_hash(pc, 2.9) * 2.4;
-			float ps = (pc + 0.15 + 0.7 * cell_hash(pc, 8.1)) * 31.0;
-			float pa = (cell_hash(pc, 5.5) * 2.0 - 1.0) * max(0.0, half_w - pwid * 0.5 - 0.8);
-			vec2 q = abs(vec2(across - pa, along - ps)) - vec2(pwid, plen) * 0.5;
-			float sdist = max(q.x, q.y);
-			if (sdist < 0.0) {
-				// Fresh patches are black and close-grained; age greys them
-				// toward the road around them.
-				float age = cell_hash(pc, 9.9);
-				// Relative to the road it sits in (the texture is sRGB, so the
-				// surrounding asphalt is only ~0.1 in linear light).
-				float grey = dot(asphalt, vec3(0.333));
-				vec3 fresh = vec3(grey * 0.42) * (0.92 + 0.16 * vnoise(vec2(across, along) * 3.0));
-				asphalt = mix(fresh, asphalt * 0.92, 0.08 + 0.7 * age);
-				// Matte: the sky must not sheen off it at a grazing angle.
-				nrm = mix(nrm, vec3(0.5, 0.5, 1.0), 0.25 * (1.0 - age));
-				rough = mix(0.96, rough, age);
-				// Bitumen seal along the cut, a little ragged.
-				float seam = 1.0 - smoothstep(0.02, 0.07 + 0.03 * vnoise(vec2(across, along) * 9.0), -sdist);
-				asphalt = mix(asphalt, vec3(0.025), seam * 0.8);
-			}
-		}
 		// Round cast-iron manhole covers in the middle of a lane.
 		float mc = floor(along / 22.0);
 		if (cell_hash(mc, 6.1) < 0.5) {

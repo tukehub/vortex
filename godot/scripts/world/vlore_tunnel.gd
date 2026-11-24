@@ -5,7 +5,11 @@ extends Node3D
 const ARCH_STEPS := 16
 const SPRING := 3.5
 const RISE := 3.4
-const ROCK := Color("#aa9b81")
+const ROCK := Color("#a3a098")
+## Bare limestone: pale grey faces, darker bedding bands, a few shadowed
+## cracks; only the foot of the slope weathers a little warmer.
+const ROCK_DARK := Color("#76736c")
+const ROCK_FOOT := Color("#8a8473")
 var _lights: Array[OmniLight3D] = []
 
 
@@ -35,8 +39,12 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 			var rise := sin(angle)
 			var bank := (1.0 + inland * across) * 0.5
 			inner.append(centre + normal * (half * across) + Vector3.UP * (SPRING + RISE * rise))
-			var spread := lerpf(16.5, 44.0, bank) + 1.1 * sin(j * 2.7 + i * 0.51)
-			var top := 8.3 + 12.1 * rise + 4.4 * bank + 1.0 * sin(i * 0.56 + j)
+			# Broken rock, not a smooth mound: every vertex juts in or out by
+			# up to 2.4 m and the crest steps between bedding planes.
+			var jut := _hash(i, j) * 2.0 - 1.0
+			var spread := lerpf(16.5, 44.0, bank) + 2.4 * jut + 1.1 * sin(j * 2.7 + i * 0.51)
+			var top := 8.3 + 12.1 * rise + 4.4 * bank + 1.6 * (_hash(j, i + 31) * 2.0 - 1.0)
+			top = lerpf(top, snappedf(top, 2.6), 0.45)
 			outer.append(centre + normal * (spread * across) + Vector3.UP * top)
 		inner.push_back(centre - normal * half - Vector3.UP * 2.0)
 		inner.insert(0, centre + normal * half - Vector3.UP * 2.0)
@@ -75,20 +83,20 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 		previous = inner
 		previous_outer = outer
 	var rock_mat := LandmarkKit.material()
-	# Pale limestone headland (Poly Haven Rock Face 03), darkened to the old
-	# rock's brightness so the portal light and emission still balance.
-	rock_mat.albedo_texture = preload("res://assets/textures/limestone_diff.jpg")
-	rock_mat.albedo_color = Color(0.70, 0.70, 0.70)
+	# Grey limestone: the colour is the vertex stone (the Rock Face 03 photo
+	# is ochre, it read as earth); the photo's relief and roughness stay.
+	rock_mat.albedo_color = Color(1.0, 1.0, 1.0)
 	rock_mat.normal_enabled = true
 	rock_mat.normal_texture = preload("res://assets/textures/limestone_nor.jpg")
 	rock_mat.roughness_texture = preload("res://assets/textures/limestone_arm.jpg")
 	rock_mat.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
 	rock_mat.roughness = 1.0
 	rock_mat.uv1_triplanar = true
-	rock_mat.uv1_scale = Vector3.ONE * 0.22
+	rock_mat.uv1_scale = Vector3.ONE * 0.16
+	rock_mat.normal_scale = 1.6
 	rock_mat.emission_enabled = true
-	rock_mat.emission = Color("#8a745b")
-	rock_mat.emission_energy_multiplier = 0.17
+	rock_mat.emission = Color("#6f6d68")
+	rock_mat.emission_energy_multiplier = 0.12
 	add_child(LandmarkKit.mesh_node(headland, rock_mat, "CliffAndPortals", 1100.0))
 	var liner := LandmarkKit.material()
 	liner.albedo_texture = preload("res://assets/textures/concrete_wall_diff.jpg")
@@ -162,7 +170,16 @@ func _process(_dt: float) -> void:
 
 
 func _rock_tint(ring: int, segment: int) -> Color:
-	var stone := ROCK.lightened((sin(ring * 2.1 + segment * 3.0) + 1.0) * 0.105)
-	if segment > 4 and segment < 15:
-		stone = stone.lerp(Color("#555b35"), 0.39 + 0.24 * sin(ring * 0.51 + segment * 0.83))
+	# Bedding: bands by height up the face, broken along the cliff.
+	var band := 0.5 + 0.5 * sin(segment * 1.31 + sin(ring * 0.37) * 1.6)
+	var stone := ROCK.lerp(ROCK_DARK, band * 0.45 + _hash(ring, segment) * 0.15)
+	if _hash(ring + 11, segment + 5) > 0.86:
+		stone = stone.darkened(0.28)   # a crack in shadow
+	if segment < 3 or segment > 15:
+		stone = stone.lerp(ROCK_FOOT, 0.35)
 	return stone
+
+
+## Repeatable 0..1 noise per (a, b), so the rock is the same every race.
+static func _hash(a: int, b: int) -> float:
+	return fposmod(sin(a * 12.9898 + b * 78.233) * 43758.5453, 1.0)

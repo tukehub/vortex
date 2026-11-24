@@ -23,8 +23,9 @@ func _ready() -> void:
 	var interior := -1
 	var plain := -1
 	for i in track.M:
-		if track.PAIR[i] < 0:
+		if track.PAIR[i] < 0 and track.ISLE[i] == 0.0:
 			check(is_equal_approx(track.EDGE_L[i], hw) and is_equal_approx(track.EDGE_R[i], hw), "a single carriageway keeps its own edges")
+		if track.PAIR[i] < 0:
 			continue
 		joined_m += track.ds
 		check(track.JOIN[i] < 0.0 and absf(track.JOIN[i]) > 5.5 and absf(track.JOIN[i]) < 6.6, "the other carriageway joins on the driver's left, 6 m to the middle")
@@ -66,7 +67,7 @@ func _ready() -> void:
 	race.physics(c, 1.0 / 60.0)
 	check(c.d <= hw - 1.1 + 0.001, "the outer edge is where it was")
 	var single := 0
-	while track.PAIR[single] >= 0:
+	while track.PAIR[single] >= 0 or track.ISLE[single] != 0.0:
 		single += 1
 	_place(c, single * track.ds + 1.0, -10.0, 25.0)
 	race.physics(c, 1.0 / 60.0)
@@ -106,9 +107,9 @@ func _ready() -> void:
 	var barriers: PackedVector3Array = (road.get_node("RoadsideBarriers") as MeshInstance3D).mesh.get_faces()
 	var in_middle := 0
 	for v in barriers:
-		if Props.in_joined_road(track, v.x, v.z):
+		if Props.in_open_road(track, v.x, v.z):
 			in_middle += 1
-	check(in_middle == 0, "no barrier stands in the joined road (%d vertices)" % in_middle)
+	check(in_middle == 0, "no barrier stands in the joined road or round an island (%d vertices)" % in_middle)
 	var median_node := road.get_node_or_null("LungomarePavedMedian") as MeshInstance3D
 	check(median_node != null, "Lungomare has its median")
 	if median_node != null:
@@ -118,14 +119,35 @@ func _ready() -> void:
 			top = maxf(top, v.y - track.height(at.x))
 		check(top > 0.09 and top < 0.12, "the median stands 10 cm proud (%.3f m)" % top)
 	for lamp: Array in scene.props.track_lamps:
-		check(not Props.in_joined_road(track, float(lamp[0]), float(lamp[2])), "no lamp post stands in the road")
+		check(not Props.in_open_road(track, float(lamp[0]), float(lamp[2])), "no lamp post stands in the road")
 	var signs := road.get_node("RouteSigns")
 	var boards: PackedVector3Array = signs.band.mesh.get_faces()
 	var boards_in_road := 0
 	for v in boards:
-		if Props.in_joined_road(track, v.x, v.z):
+		if Props.in_open_road(track, v.x, v.z):
 			boards_in_road += 1
 	check(boards_in_road == 0, "corner boards stand off the joined road (%d)" % boards_in_road)
+	# Roundabouts: the road runs to each island's kerb, round a circle.
+	check(track.islands.size() == 2, "Sheshi Pavarsia and Flag Square have islands")
+	var aprons := road.get_node_or_null("RoundaboutAprons") as MeshInstance3D
+	check(aprons != null and aprons.mesh.get_faces().size() > 0, "asphalt fills round the islands")
+	for isle: Vector3 in track.islands:
+		var centre := Vector2(isle.x, isle.y)
+		var facing := 0
+		var to_kerb := INF
+		for i in track.M:
+			if track.ISLE[i] == 0.0 or Vector2(track.X[i], track.Z[i]).distance_to(centre) > isle.z + RaceTrack.ISLAND_ZONE:
+				continue
+			facing += 1
+			var side := track.ISLE[i]
+			var reach := track.EDGE_L[i] if side < 0.0 else track.EDGE_R[i]
+			var edge := Vector2(track.X[i], track.Z[i]) + Vector2(track.NX[i], track.NZ[i]) * side * reach
+			to_kerb = minf(to_kerb, edge.distance_to(centre) - isle.z)
+		check(facing > 20, "the lap faces the island at (%.0f, %.0f)" % [centre.x, centre.y])
+		check(to_kerb >= 0.0 and to_kerb < 1.2, "the road reaches the island's kerb (%.2f m)" % to_kerb)
+		for angle in [0.0, 1.6, 3.2, 4.8]:
+			var q := centre + Vector2(cos(angle), sin(angle)) * (isle.z + 0.5)
+			check(Props.in_open_road(track, q.x, q.y) or track.dist_to(q.x, q.y) < track.half_w + 1.0, "tarmac all round the kerb")
 	# A car with its left wheels on the crown rolls and rises.
 	var visual: CarVisual = scene.cars[0]
 	var car := scene.race.cars[0]

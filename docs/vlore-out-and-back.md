@@ -128,6 +128,33 @@ Regression: `tests/vlore_one_road` (levels, edges, median profile and drag,
 head-on contact across the passes, no barrier/lamp/chevron in the road,
 car heave and roll, reverse joins on the right, two-way cities untouched).
 
+## Roundabouts, sight lines, the tunnel and the asphalt
+
+- **Roundabouts are circles** (`track.json` `"islands"`, written by
+  `build_city` from the islands baked into props): every sample within 75 m
+  of an island's kerb opens its island side (`RaceTrack.ISLE`): no kerb,
+  barrier, shoulder or chevron board there, and its wall reaches the kerb
+  (or half way to the other pass in the gores). `RoadMesh.add_island_aprons`
+  fills asphalt from the kerb out under the road, with the road's material.
+  Lamps that stood there are dropped (`Props.in_open_road`).
+- **Sight lines** (`cities.py` `'sightlines'`, `build_city.blocks_sightline`):
+  buildings whose roofs cross a driver's line of sight are left out. Kuzum
+  Baba's temple and tomb are in view ahead on the return up the boulevard and
+  after the Flag Square turn; Teatri Petro Marko's facade from both legs
+  between the Muradie Mosque and the stadium. 12 buildings cleared.
+- **Uji i Ftohtë** is grey limestone: faceted, jutting faces and bedding
+  bands in the vertex stone; the ochre Rock Face photo only lends relief.
+- **Asphalt** is continuous: the photo's cracks (its darkest ~4%) fill to
+  its median tone, so the two crossed samples no longer draw a slab grid, and
+  the procedural repaired patches are gone.
+
+![Sheshi Pavarsia](images/vlore-r2-skela_roundabout.webp)
+![Kuzum Baba ahead on the return](images/vlore-r2-kuzum_500.webp)
+![Teatri Petro Marko](images/vlore-r2-petro_60.webp)
+![Uji i Ftohtë](images/vlore-r2-tunnel.webp)
+
+Captures: `tests/vlore_round2_visual.tscn`.
+
 ## The sea by the sports courts
 
 After the photographs of that shore at night:
