@@ -41,7 +41,8 @@ func build(terrain: Terrain, bay := false) -> bool:
 		Quality.budget_changed.connect(_quality)
 		_quality()
 	else:
-		set_process(false)
+		# Lake surfaces stay fixed, including when built before entering the tree.
+		process_mode = Node.PROCESS_MODE_DISABLED
 	return true
 
 
