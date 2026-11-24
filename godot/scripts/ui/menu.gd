@@ -186,7 +186,27 @@ func _set_garage_car(id: String) -> void:
 	RaceReflections.hide_from_probes(garage_car)
 
 
+## Seconds since the last touch, key or pointer move; Quality idles the
+## frame rate after IDLE_AFTER of them.
+const IDLE_AFTER := 4.0
+var _idle_t := 0.0
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag or event is InputEventMouse \
+			or event is InputEventKey or event is InputEventJoypadButton:
+		_idle_t = 0.0
+		Quality.set_idle_paced(false)
+
+
+func _exit_tree() -> void:
+	Quality.set_idle_paced(false)
+
+
 func _process(dt: float) -> void:
+	_idle_t += dt
+	# A LAN session keeps the chosen rate: the lobby polls its peers here.
+	Quality.set_idle_paced(_idle_t > IDLE_AFTER and _garage_pointer == NO_POINTER and Game.net == null)
 	_poll_lobby()
 	garage_pivot.position.x = move_toward(garage_pivot.position.x, _car_x, dt * 6.0)
 	if _garage_cam != null:

@@ -184,10 +184,10 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	assert(track.L > 8800.0 and track.L < 10400.0, "the Vlorë out-and-back stays near 9.5 km")
 	# Out and back on the seafront road: two one-way carriageways of two
-	# lanes, a divider between them.
+	# lanes, joined into one road (tests/vlore_one_road).
 	assert(bool(data.get("one_way", false)) and int(data.get("lanes", 0)) == 2, "Vlorë is raced on one-way carriageways")
 	assert(is_equal_approx(track.half_w, 4.5), "each carriageway is 9 m wide")
-	assert(scene.road.surface_mat.get_shader_parameter("one_way") == true, "no yellow centre line on a one-way carriageway")
+	assert(scene.road.surface_mat.get_shader_parameter("one_way") == true, "a dashed lane line, not a centre line, down each carriageway")
 	# Outbound, from the line on Bulevardi Ismail Qemali past Kuzum Baba
 	# down to the waterfront courts; back the same way after the far loop.
 	var outbound := ["petro_marko", "flamurtari", "skela_roundabout", "independence_museum",
@@ -223,8 +223,8 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	assert(mosque.size() == 2 and square.size() == 1, "the lap ends with a turn round Flag Square")
 	assert(back < mosque[0] and mosque[0] < square[0] and square[0] < mosque[1] and mosque[1] < track.L,
 		"the run to the line passes the Muradie Mosque and turns round Flag Square")
-	# The two passes never share road: wherever the lap comes back past
-	# itself, the carriageways stay a divider apart.
+	# The two passes never overlap: wherever the lap comes back past itself,
+	# each keeps its own carriageway (side by side, as one road).
 	var tight := INF
 	var grid := {}
 	var pts := PackedVector2Array()

@@ -32,6 +32,10 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 	var p: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	_tirana = city_id == "tirane"
 	track_lamps = p.get("track_lamps", [])
+	if track != null and track.PAIR.size() == track.M:
+		# The baked lamps down a divider now stand in the middle of one road
+		# (Vlorë): keep that road clear for driving.
+		track_lamps = track_lamps.filter(func(l: Array) -> bool: return not in_joined_road(track, float(l[0]), float(l[2])))
 	landmarks = p.get("landmarks", [])
 	road_marks = p.get("road_marks", {})
 	var models := Landmarks.new()
@@ -176,6 +180,16 @@ static func _box(st: SurfaceTool, c: Vector3, size: Vector3, col: Color) -> void
 		st.set_normal(n)
 		st.set_color(col)
 		st.add_vertex(quad[3])
+
+
+## True when (x, z) is on a joined road's tarmac, between the two passes.
+static func in_joined_road(track: RaceTrack, x: float, z: float) -> bool:
+	var at := track.locate_xz(x, z)
+	var k := posmod(roundi(at.x / track.ds), track.M)
+	if track.PAIR[k] < 0:
+		return false
+	var middle := track.JOIN[k]
+	return absf(at.y - middle) < absf(middle) - track.half_w + 0.6
 
 
 func _build_lamps(lamps: Array, tl: Array, track: RaceTrack, reverse: bool) -> void:

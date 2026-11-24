@@ -816,6 +816,13 @@ static func update_headlight_budget(visuals: Array[CarVisual], focus: Vector3) -
 		visual._apply_headlights()
 
 
+## Wheel track (m) the median's height is read under, and what it does to
+## the body: metres up, radians of roll (positive: right side up).
+const WHEEL_TRACK := 1.6
+var median_heave := 0.0
+var median_roll := 0.0
+
+
 ## Place and animate from the sim state. Call once per rendered frame.
 func apply_state(c: CarState, track: RaceTrack, dt: float, pose: Dictionary = {}) -> void:
 	_apply_damage(c)
@@ -838,11 +845,21 @@ func apply_state(c: CarState, track: RaceTrack, dt: float, pose: Dictionary = {}
 		roll = -c.steer * 0.035 * clampf(c.v / 30.0, 0.0, 1.0) - c.drift * 0.03 * signf(c.steer)
 		pitch += (-0.02 if c.gas_on else 0.0) + (0.035 if c.braking else 0.0)
 	p.y += float(pose.get("hop", c.hop))
+	# Lungomare's median: each side of the car rides up its own wheels' height
+	# of the hump, through a stiff suspension (about 40 ms to settle).
+	var d_now := float(pose.get("d", c.d))
+	var lift_l := track.median_lift(s, d_now - WHEEL_TRACK * 0.5)
+	var lift_r := track.median_lift(s, d_now + WHEEL_TRACK * 0.5)
+	var settle := 1.0 - exp(-maxf(dt, 0.0) * 26.0)
+	median_heave = lerpf(median_heave, (lift_l + lift_r) * 0.5, settle)
+	median_roll = lerpf(median_roll, atan2(lift_r - lift_l, WHEEL_TRACK), settle)
+	p.y += median_heave
+	roll += median_roll
 	base_pos = p
 	var b := Basis.from_euler(Vector3(pitch, yaw_g, roll))
 	global_transform = Transform3D(b, p)
-	var ground := track.pos(s, float(pose.get("d", c.d)))
-	ground.y += 0.025
+	var ground := track.pos(s, d_now)
+	ground.y += 0.025 + track.median_lift(s, d_now)
 	contact_shadow.global_transform = Transform3D(Basis.from_euler(Vector3(asin(clampf(t.y, -0.5, 0.5)), yaw_g, 0.0)), ground)
 	contact_shadow.transparency = clampf(float(pose.get("hop", c.hop)) / 1.5, 0.0, 1.0)
 	_animate(c, dt, c.def.grip * (29.0 if c.is_player and not c.autopilot else 22.0) * (1.0 + c.drift * 0.5) * (1.8 if c.hbrake_t > 0.0 else 1.0))

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bjw78tf5k74q3"
-path="res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.ctex"
+path.s3tc="res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.s3tc.ctex"
+path.etc2="res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "b63241d4f8a3c9922295a6009f1a5925"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/props/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg"
-dest_files=["res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.ctex"]
+dest_files=["res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.s3tc.ctex", "res://.godot/imported/blloku_cafe_furniture_outdoor_table_chair_set_01_chair_arm_1k.jpg-dbbe54921e06fe9bd1a369bb40a3d57b.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

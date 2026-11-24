@@ -7,9 +7,9 @@
 ## The circuit
 
 Vlorë is now raced out and back on the seafront road, like the real
-boulevard: **two one-way carriageways of two lanes, 9 m each, 3 m of divider
-between them** (centrelines 6 m either side of the mapped road). Lap
-≈ 9.5 km:
+boulevard: **two one-way carriageways of two lanes, 9 m each, side by side as
+one 21 m road** (centrelines 6 m either side of the mapped road; see
+[One road](#one-road) below). Lap ≈ 9.5 km:
 
 1. **Out** (right-hand carriageway, the sea side): from the line on
    Bulevardi Ismail Qemali, 100 m before Kuzum Baba, south past Petro Marko
@@ -66,6 +66,68 @@ python3 tools/pipeline/fetch_osm.py vlore     # falls back to the OSM API
 VORTEX_OSM_API=1 python3 tools/pipeline/build_city.py vlore
 ```
 
+## One road
+
+Where the other pass of the lap runs alongside the opposite way, the two
+carriageways are one road with nothing between them: no kerbs, barriers or
+shoulders down the middle, asphalt across the old 3 m gap (it was a ditch:
+the terrain there lies 0.5–1.5 m below the road), and a solid centre line.
+On Lungomare a rounded median runs down the middle instead of the line.
+
+- **Where** (`RaceTrack._join_build`, any track with `one_way`): a sample
+  whose nearest sample of another pass (more than 60 m along the lap) is
+  within 13 m and heads the opposite way within 25°. That is 6.1 km of the
+  9.5 km lap, in five runs; they end where the passes split round Sheshi
+  Pavarsia, at the turning island and at the Dhimitër Konomi merge.
+  `JOIN` is the signed offset to the road's middle (6.0 m, on the driver's
+  left; on the right in reverse), `PAIR` the alongside sample.
+- **Level across**: the pipeline sampled each carriageway's elevation on
+  its own, up to 0.75 m apart across the same street. Joined samples meet
+  half way (eased over 50 m from each split), so the road is level within
+  1 cm and a car on the far side sits on the tarmac.
+- **Edges**: `EDGE_L` / `EDGE_R` are what the walls in `Race.physics` use.
+  Joined, the reach on that side is the far edge of the other carriageway
+  (16.5 m); it closes back to the carriageway's own edge over the 80 m
+  before each split, so a car on the far side is eased back before the
+  island nose. Bots keep to their own lanes.
+- **Oncoming cars**: cars on opposite passes that meet on the shared road
+  collide (`Race._contact_across`): momentum is exchanged in world space,
+  and above 14 m/s closing speed both take damage.
+- **Mesh** (`RoadMesh`): cross sections have seven vertices; on the joined
+  side the surface runs to the middle and tucks 15 cm past it, 3 cm down,
+  under the other pass's half. UV2 tells `road.gdshader` which side is
+  joined: no edge line, gutter or gullies there, zebras run to the middle,
+  each half paints its half of the centre line. The 110 baked lamps that
+  stood in the old divider are dropped (`Props.in_joined_road`); corner
+  chevrons on a joined side stand past the far edge, or are left out where
+  the road is about to split.
+
+### The Lungomare median
+
+`track.json` `"median"`: entry and exit of the seafront stretch on the
+outbound pass (`cities.py` `'median'`, written by `build_city.median_ends`);
+the game flags the matching samples of the return pass too (912 m each way).
+
+- **Profile** (`RaceTrack.median_lift`): 2 m across, a 0.9 m flat crown
+  10 cm up, smoothstep shoulders down to the road; it eases in and out over
+  6 m at its ends. The mesh (`RoadMesh.add_paved_median`, cobble top and
+  concrete shoulders) uses the same profile the cars ride over.
+- **Felt**: on its slopes the car loses up to ~2.5 m/s² of speed and is
+  pushed off downhill (`MEDIAN_DRAG`, `MEDIAN_PUSH`); each side of the car
+  rises with its wheels' height of the hump through a stiff suspension
+  (`CarVisual.median_heave` / `median_roll`: 5 cm and 3.6° with one side on
+  the crown); mounting it gives the player a haptic tap, a soft knock and a
+  small camera nudge.
+
+![The boulevard as one road](images/vlore-one-road-boulevard.webp)
+![Lungomare's median from above](images/vlore-one-road-median.webp)
+![A car with its left wheels on the median](images/vlore-one-road-median-car.webp)
+
+Captures: `tests/vlore_one_road_visual.tscn` (lavapipe, Mobile renderer).
+Regression: `tests/vlore_one_road` (levels, edges, median profile and drag,
+head-on contact across the passes, no barrier/lamp/chevron in the road,
+car heave and roll, reverse joins on the right, two-way cities untouched).
+
 ## The sea by the sports courts
 
 After the photographs of that shore at night:
@@ -110,7 +172,8 @@ Not verified on a phone: frame time at the seafront on the target devices.
 - `tests/city_worlds` (Vlorë): one-way two-lane layout, 9 m carriageways,
   landmarks passed out and back in order, courts once on the far loop,
   tunnel → turnaround order, Muradie → Flag Square turn → Muradie → line,
-  carriageways never closer than a divider, islands clear of the road.
+  carriageways never overlapping, islands clear of the road.
+- `tests/vlore_one_road`: the joined road and the Lungomare median.
 - `tests/vlore_kuzum_baba`: the line on the first (outbound) pass.
 - `tests/sea_rocks`: stones along the waterline, off the road, near the
   courts; both LODs; thinner on Low; spray only when `fx_extras`.

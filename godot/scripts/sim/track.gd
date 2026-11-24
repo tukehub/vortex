@@ -34,6 +34,32 @@ var _t := 0.0
 const CELL := 30.0
 var _grid := {}
 
+## One road both ways (track.json "one_way", Vlorë's out-and-back): where the
+## other pass of the lap runs alongside, the opposite way, about a carriageway
+## away, the two carriageways are one road with nothing between them.
+## JOIN[i]: signed metres from the centreline to the middle of that road
+## (negative: on the driver's left), 0 where no pass runs alongside.
+## PAIR[i]: the alongside pass's sample, or -1.
+var JOIN := PackedFloat32Array()
+var PAIR := PackedInt32Array()
+## Drivable reach either side of the centreline (metres, both positive):
+## half_w, or out to the far edge of the other carriageway where joined. It
+## closes over JOIN_TAPER before the road splits again (an island ahead).
+var EDGE_L := PackedFloat32Array()
+var EDGE_R := PackedFloat32Array()
+## Lungomare's median (track.json "median"): 0..1 per sample on both passes,
+## easing in and out over its first and last metres.
+var MEDIAN := PackedFloat32Array()
+## Centre to centre: two carriageways and at most a 4 m strip between them.
+const JOIN_MAX_APART := 13.0
+const JOIN_TAPER := 80.0
+## The median: rounded, 10 cm at its crown, 2 m across. Tyres feel the
+## slopes; the crown is flat for 0.9 m.
+const MEDIAN_H := 0.10
+const MEDIAN_HALF := 1.0
+const MEDIAN_TOP := 0.45
+const MEDIAN_EASE := 6.0
+
 
 static func load_city(city_id: String, reverse := false) -> RaceTrack:
 	var path := "res://assets/cities/%s/track.json" % city_id
@@ -69,6 +95,7 @@ func build(data: Dictionary, reverse := false) -> void:
 	_resample(pts)
 	_frames()
 	_grid_build()
+	_join_build(data, reverse)
 
 
 # Closed Catmull-Rom through the control points, resampled to ~2 m arc length.
@@ -279,6 +306,185 @@ func locate_xz(x: float, z: float) -> Vector2:
 	var along := dx * tx + dz * tz
 	var d := dx * NX[i] + dz * NZ[i]
 	return Vector2(mod_s(i * ds + along), d)
+
+
+## Which samples have the other pass alongside, how far away, and the edges
+## and median that follow from it (see JOIN). Elevations of the two passes
+## meet: the pipeline sampled each carriageway's centre on its own, up to
+## 0.75 m apart across the same street, and one road is level across.
+func _join_build(data: Dictionary, reverse: bool) -> void:
+	JOIN.resize(M)
+	JOIN.fill(0.0)
+	PAIR.resize(M)
+	PAIR.fill(-1)
+	EDGE_L.resize(M)
+	EDGE_L.fill(half_w)
+	EDGE_R.resize(M)
+	EDGE_R.fill(half_w)
+	MEDIAN.resize(M)
+	MEDIAN.fill(0.0)
+	if not bool(data.get("one_way", false)) or M < 8:
+		return
+	var other_y := PackedFloat32Array()
+	other_y.resize(M)
+	var hint := -1
+	for i in M:
+		var j := _alongside_near(i, hint) if hint >= 0 else -1
+		if j < 0:
+			j = _alongside_grid(i)
+		hint = j
+		if j < 0:
+			continue
+		# The nearest point of the other pass's polyline, not just its sample.
+		var p := Vector2(X[i], Z[i])
+		var best := Vector3(X[j], Y[j], Z[j])
+		var best_d := INF
+		for k: int in [posmod(j - 1, M), j]:
+			var a := Vector3(X[k], Y[k], Z[k])
+			var b := Vector3(X[(k + 1) % M], Y[(k + 1) % M], Z[(k + 1) % M])
+			var ab := Vector2(b.x - a.x, b.z - a.z)
+			var u := clampf((p - Vector2(a.x, a.z)).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
+			var q := a.lerp(b, u)
+			var dq := p.distance_squared_to(Vector2(q.x, q.z))
+			if dq < best_d:
+				best_d = dq
+				best = q
+		PAIR[i] = j
+		JOIN[i] = ((best.x - X[i]) * NX[i] + (best.z - Z[i]) * NZ[i]) * 0.5
+		other_y[i] = best.y
+	# Metres to the nearest sample without a pass alongside, either way round.
+	var reach := PackedFloat32Array()
+	reach.resize(M)
+	reach.fill(INF)
+	for sweep in 2:
+		var run := INF
+		for n in M * 2:
+			var i := n % M if sweep == 0 else M - 1 - (n % M)
+			run = 0.0 if PAIR[i] < 0 else run + ds_h
+			reach[i] = minf(reach[i], run)
+	for i in M:
+		if PAIR[i] < 0:
+			continue
+		var level := smoothstep(0.0, 50.0, reach[i])
+		Y[i] += (other_y[i] - Y[i]) * 0.5 * level
+		var far := half_w + 2.0 * absf(JOIN[i]) * smoothstep(0.0, JOIN_TAPER, reach[i])
+		if JOIN[i] < 0.0:
+			EDGE_L[i] = far
+		else:
+			EDGE_R[i] = far
+	_frames()
+	if data.has("median"):
+		var ends: Array = data.median
+		var entry: Array = ends[1 if reverse else 0]
+		var exit: Array = ends[0 if reverse else 1]
+		var start := locate_xz(float(entry[0]), float(entry[1])).x
+		var length := mod_s(locate_xz(float(exit[0]), float(exit[1])).x - start)
+		var steps := int(length / ds)
+		for k in steps + 1:
+			var x := k * ds
+			var i := posmod(roundi((start + x) / ds), M)
+			if PAIR[i] >= 0:
+				MEDIAN[i] = smoothstep(0.0, MEDIAN_EASE, minf(x, length - x))
+		for i in M:
+			if PAIR[i] >= 0 and MEDIAN[i] <= 0.0:
+				MEDIAN[i] = MEDIAN[PAIR[i]]
+
+
+func _alongside_score(i: int, j: int) -> float:
+	var gap := absi(j - i)
+	if mini(gap, M - gap) * ds_h <= 60.0:
+		return INF
+	var dx := X[j] - X[i]
+	var dz := Z[j] - Z[i]
+	var d2 := dx * dx + dz * dz
+	if d2 > JOIN_MAX_APART * JOIN_MAX_APART:
+		return INF
+	# Antiparallel within 25 degrees: the same street the other way, not a
+	# junction or a merge coming in at an angle.
+	var ti := Vector2(TX[i], TZ[i]).normalized()
+	var tj := Vector2(TX[j], TZ[j]).normalized()
+	return d2 if ti.dot(tj) < -0.9 else INF
+
+
+## The alongside sample near last sample's (they move one sample a step).
+func _alongside_near(i: int, hint: int) -> int:
+	var best := -1
+	var bd := INF
+	for k in range(-6, 7):
+		var j := posmod(hint + k, M)
+		var score := _alongside_score(i, j)
+		if score < bd:
+			bd = score
+			best = j
+	return best
+
+
+func _alongside_grid(i: int) -> int:
+	var cx := int(floor(X[i] / CELL))
+	var cz := int(floor(Z[i] / CELL))
+	var best := -1
+	var bd := INF
+	for ix in range(cx - 1, cx + 2):
+		for iz in range(cz - 1, cz + 2):
+			var key := _gkey(ix, iz)
+			if not _grid.has(key):
+				continue
+			for j in _grid[key]:
+				var score := _alongside_score(i, j)
+				if score < bd:
+					bd = score
+					best = j
+	return best
+
+
+## Signed offset of the joined road's middle at `s` (0: not joined).
+func join_offset(s: float) -> float:
+	if JOIN.size() != M:
+		return 0.0
+	locate(s)
+	return lerpf(JOIN[_i0], JOIN[_i1], _t)
+
+
+func joined(s: float) -> bool:
+	if PAIR.size() != M:
+		return false
+	locate(s)
+	return PAIR[_i0] >= 0 and PAIR[_i1] >= 0
+
+
+## Drivable reach on the driver's left / right at `s` (metres, positive).
+func edge_left(s: float) -> float:
+	if EDGE_L.size() != M:
+		return half_w
+	locate(s)
+	return lerpf(EDGE_L[_i0], EDGE_L[_i1], _t)
+
+
+func edge_right(s: float) -> float:
+	if EDGE_R.size() != M:
+		return half_w
+	locate(s)
+	return lerpf(EDGE_R[_i0], EDGE_R[_i1], _t)
+
+
+## Height of Lungomare's median above the road at (s, d): 0 off it.
+func median_lift(s: float, d: float) -> float:
+	# Tracks built by hand (tests) have no join data.
+	if MEDIAN.size() != M:
+		return 0.0
+	locate(s)
+	var w := lerpf(MEDIAN[_i0], MEDIAN[_i1], _t)
+	if w <= 0.0:
+		return 0.0
+	var x := absf(d - lerpf(JOIN[_i0], JOIN[_i1], _t))
+	if x >= MEDIAN_HALF:
+		return 0.0
+	return MEDIAN_H * w * (1.0 - smoothstep(MEDIAN_TOP, MEDIAN_HALF, x))
+
+
+## d(height)/d(d) of the median under (s, d): positive where it rises to the right.
+func median_slope(s: float, d: float) -> float:
+	return (median_lift(s, d + 0.05) - median_lift(s, d - 0.05)) / 0.1
 
 
 func stats() -> Dictionary:

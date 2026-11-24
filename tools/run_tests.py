@@ -26,10 +26,15 @@ def godot(name, *arguments, expected_noise=()):
     return run.stdout
 
 
+# A texture imported lossless or without mipmaps bloats the APK and the GPU's
+# memory traffic; the headless import never fixes that by itself.
+if subprocess.run([sys.executable, str(root / 'tools/texture_budget.py')]).returncode:
+    sys.exit('texture budget failed')
+
 # The progress test feeds a damaged save file on purpose; the engine reports it.
 EXPECTED_NOISE = {'progress': ['ConfigFile parse error at user://progress_test.cfg']}
 
-for scene in ['readiness', 'city_worlds', 'flow_test', 'wall_contact', 'driving_dynamics', 'road_geometry', 'lana_river', 'simulation_timing', 'reverse_race', 'car_visual_regression', 'tirana_turns', 'adaptive_pickups', 'two_thumb_controls', 'combat_recovery', 'combat_ui', 'visual_performance', 'route_readability', 'string_table', 'progress', 'music', 'camera_dynamics', 'handling', 'rubber_band', 'combat_counterplay', 'ui_motion', 'arena_sim', 'arena_flow', 'cup', 'shop', 'tutorial', 'audio_mix', 'announcer', 'player_name', 'lockstep_replay', 'net_session', 'online_flow', 'wheel_steering', 'street_props', 'tree_lod', 'coastal_cover', 'road_marks', 'car_detail', 'vlore_kuzum_baba', 'sea_rocks', 'vehicle_rigs']:
+for scene in ['readiness', 'city_worlds', 'flow_test', 'wall_contact', 'driving_dynamics', 'road_geometry', 'lana_river', 'simulation_timing', 'reverse_race', 'car_visual_regression', 'tirana_turns', 'adaptive_pickups', 'two_thumb_controls', 'combat_recovery', 'combat_ui', 'visual_performance', 'route_readability', 'string_table', 'progress', 'music', 'camera_dynamics', 'handling', 'rubber_band', 'combat_counterplay', 'ui_motion', 'arena_sim', 'arena_flow', 'cup', 'shop', 'tutorial', 'audio_mix', 'announcer', 'player_name', 'lockstep_replay', 'net_session', 'online_flow', 'wheel_steering', 'street_props', 'tree_lod', 'coastal_cover', 'road_marks', 'car_detail', 'vlore_kuzum_baba', 'sea_rocks', 'vehicle_rigs', 'vlore_one_road']:
     godot(scene, 'res://tests/' + scene + '.tscn', expected_noise=EXPECTED_NOISE.get(scene, ()))
 
 # Phones run the Mobile renderer and desktop Forward+. Headless Godot keeps the

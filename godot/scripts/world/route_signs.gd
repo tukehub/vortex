@@ -20,6 +20,21 @@ var posts: MultiMeshInstance3D
 var bands: Array[Dictionary] = []
 
 
+## Lateral offset of the band at `s` for a band meant at `d`: `d` itself,
+## past the far edge of a joined road on that side, or NAN where that road
+## is narrowing to split (the band would stand on the other carriageway).
+static func _offset(track: RaceTrack, s: float, d: float) -> float:
+	if track.PAIR.size() != track.M:
+		return d
+	var k := posmod(roundi(s / track.ds), track.M)
+	if RoadMesh.joined_side(track, k) != signf(d):
+		return d
+	var edge := track.EDGE_L[k] if d < 0.0 else track.EDGE_R[k]
+	if edge < track.half_w + 2.0 * absf(track.JOIN[k]) - 0.05:
+		return NAN
+	return signf(d) * (edge + OUTSIDE)
+
+
 func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -30,9 +45,15 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 		var d := -float(turn.side) * (track.half_w + OUTSIDE)
 		var count := maxi(2, ceili(length / STEP) + 1)
 		var points: Array[Vector3] = []
+		# Where the other carriageway runs alongside on the outside of the
+		# bend (one road, Vlorë), the band stands beyond that road's far edge;
+		# where the two are about to split it is left out, never in the road.
+		var shown: Array[bool] = []
 		for i in count:
 			var s := from + length * float(i) / float(count - 1)
-			var p := track.pos(s, d)
+			var at_d := _offset(track, s, d)
+			shown.append(not is_nan(at_d))
+			var p := track.pos(s, d if is_nan(at_d) else at_d)
 			if height_at.is_valid():
 				p.y = maxf(p.y, float(height_at.call(p.x, p.z)))
 			points.append(p)
@@ -42,6 +63,9 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 			var a := points[i]
 			var b := points[i + 1]
 			var next_u := u + a.distance_to(b) / CHEVRON
+			if not shown[i] or not shown[i + 1] or a.distance_to(b) > STEP * 4.0:
+				u = next_u
+				continue
 			var quad := [a + Vector3.UP * BOTTOM, b + Vector3.UP * BOTTOM, b + Vector3.UP * TOP, a + Vector3.UP * TOP]
 			var uvs := [Vector2(u, 1.0), Vector2(next_u, 1.0), Vector2(next_u, 0.0), Vector2(u, 0.0)]
 			var normal := (b - a).cross(Vector3.UP).normalized()
@@ -55,7 +79,7 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 		for i in count:
 			if i > 0:
 				travelled += points[i - 1].distance_to(points[i])
-			if travelled >= next_post or i == count - 1:
+			if shown[i] and (travelled >= next_post or i == count - 1):
 				post_transforms.append(Transform3D(Basis.IDENTITY, points[i] + Vector3.UP * 0.6))
 				next_post = travelled + POST_EVERY
 		bands.append({"turn": turn, "from": track.mod_s(from), "to": track.mod_s(from + length), "length": length, "d": d, "points": points})

@@ -134,6 +134,9 @@ CITIES = {
         ],
         'tunnel': ((40.4212347, 19.4876934), (40.4205612, 19.4869312)),
         'turnaround': ((40.4191404, 19.4866541), (40.4197696, 19.4902821)),
+        # Both carriageways are one road; along Lungomare a rounded 10 cm
+        # median runs down its middle (the seafront stretch below).
+        'median': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943)},
         'scenery_clearances': [
             ((40.47210, 19.49228), (42, 66)),  # the modeled Muradie street fronts
             ((40.42090, 19.48733), (63, 67)),  # rock and tunnel portals

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://mgy8vmh30fw7"
-path="res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.ctex"
+path.s3tc="res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.s3tc.ctex"
+path.etc2="res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "f3fc35eb58f0650dc0a8650128bd0d09"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/crowd/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg"
-dest_files=["res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.ctex"]
+dest_files=["res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.s3tc.ctex", "res://.godot/imported/rp_nathan_animated_003_walking_opt_rp_nathan_animated_003_dif.jpg-f2f51a63393cb3b43c9103f358df32cc.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

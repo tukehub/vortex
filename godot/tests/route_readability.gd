@@ -117,7 +117,14 @@ func ground_checks(city: String) -> void:
 		for j in [1, 2]:
 			var v := vertices[i + j]
 			max_gap = maxf(max_gap, absf(v.y - terrain.height_at(v.x, v.z) - 0.015))
-	check(vertices.size() == track.M * 8 and max_gap < 0.001, "every shoulder edge in %s meets sampled terrain" % city)
+	# No shoulder on a side where the other carriageway joins (Vlorë).
+	var open := 0
+	for side: float in [-1.0, 1.0]:
+		for i in track.M:
+			if RoadMesh.open_side(track, i, side):
+				open += 1
+	check(vertices.size() == (track.M * 2 - open) * 4 and max_gap < 0.001, "every shoulder edge in %s meets sampled terrain" % city)
+	check((open > 0) == (city == "vlore"), "only Vlorë's out-and-back has an open, joined side")
 	var surface_before := road.surface.mesh.get_instance_id()
 	var dry := road.kerb_mat.roughness
 	road.set_wet(1.0)

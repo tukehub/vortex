@@ -77,21 +77,33 @@ void fragment() {
 	float far_w = clamp((cam_dist - 120.0) / 500.0, 0.0, 1.0);
 	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
 
-	vec3 grass = texture(tex_grass, uv_n).rgb;
-	vec3 rock = texture(tex_rock, uv_n).rgb;
-	vec3 urban = texture(tex_urban, uv_n).rgb;
-	if (two_scale) {
-		grass = mix(grass, texture(tex_grass, uv_f).rgb, far_w);
-		rock = mix(rock, texture(tex_rock, uv_f).rgb, far_w);
-		urban = mix(urban, texture(tex_urban, uv_f).rgb, far_w);
+	// Each scale is fetched only where it has weight: inside 120 m the far
+	// tiles, beyond 620 m the near tiles and their normals. The weights are 0
+	// where the branches switch, so a quad straddling the seam cannot show
+	// a wrong mip level. Phones skip three to six of the ~16 fetches a pixel.
+	vec3 grass = vec3(0.0);
+	vec3 rock = vec3(0.0);
+	vec3 urban = vec3(0.0);
+	vec3 n_grass = vec3(0.5, 0.5, 1.0);
+	vec3 n_rock = n_grass;
+	vec3 n_urban = n_grass;
+	float near_w = two_scale ? 1.0 - far_w : 1.0;
+	if (near_w > 0.0) {
+		grass = texture(tex_grass, uv_n).rgb * near_w;
+		rock = texture(tex_rock, uv_n).rgb * near_w;
+		urban = texture(tex_urban, uv_n).rgb * near_w;
+		n_grass = mix(texture(tex_grass_n, uv_n).rgb, n_grass, far_w);
+		n_rock = mix(texture(tex_rock_n, uv_n).rgb, n_rock, far_w);
+		n_urban = mix(texture(tex_urban_n, uv_n).rgb, n_urban, far_w);
+	}
+	if (near_w < 1.0) {
+		grass += texture(tex_grass, uv_f).rgb * far_w;
+		rock += texture(tex_rock, uv_f).rgb * far_w;
+		urban += texture(tex_urban, uv_f).rgb * far_w;
 	}
 	grass *= grass_tint;
 	urban *= urban_tint;
 	vec3 road = texture(tex_road, uv_n * 0.5).rgb * 0.85;
-
-	vec3 n_grass = mix(texture(tex_grass_n, uv_n).rgb, vec3(0.5, 0.5, 1.0), far_w);
-	vec3 n_rock = mix(texture(tex_rock_n, uv_n).rgb, vec3(0.5, 0.5, 1.0), far_w);
-	vec3 n_urban = mix(texture(tex_urban_n, uv_n).rgb, vec3(0.5, 0.5, 1.0), far_w);
 
 	float rock_w = smoothstep(0.35, 0.65, slope + (vnoise(wpos.xz * 0.02) - 0.5) * 0.3);
 	// high altitude -> rock & snow
@@ -165,15 +177,19 @@ void fragment() {
 		float beach = (1.0 - smoothstep(16.0, 34.0, to_water)) * on_grid;
 		float sand_w = beach * (1.0 - road_w) * (1.0 - smoothstep(3.0, 6.0, above)) * smoothstep(0.75, 0.9, wnrm.y);
 		float wet_sand = 1.0 - smoothstep(0.0, 0.6, above);
-		vec2 sand_uv = wpos.xz / SAND_TILE;
-		vec3 grain = texture(tex_sand, sand_uv).rgb / SAND_MEAN;
-		// The grain fades with distance like the other near textures.
-		grain = mix(grain, vec3(1.0), far_w);
-		vec3 sand_arm = texture(tex_sand_arm, sand_uv).rgb;
-		base = mix(base, sand_color * grain * sand_arm.r * (1.0 - 0.35 * wet_sand), sand_w);
-		rough = mix(rough, mix(sand_arm.g, 0.45, wet_sand), sand_w);
-		vec3 sand_n = mix(texture(tex_sand_n, sand_uv).rgb, vec3(0.5, 0.5, 1.0), far_w);
-		nrm = mix(nrm, mix(sand_n, vec3(0.5, 0.5, 1.0), wet_sand * 0.6), sand_w);
+		// The beach is a thin band: fetch its three maps only on it (sand_w
+		// eases in from 0, so the branch edge never shows).
+		if (sand_w > 0.0) {
+			vec2 sand_uv = wpos.xz / SAND_TILE;
+			vec3 grain = texture(tex_sand, sand_uv).rgb / SAND_MEAN;
+			// The grain fades with distance like the other near textures.
+			grain = mix(grain, vec3(1.0), far_w);
+			vec3 sand_arm = texture(tex_sand_arm, sand_uv).rgb;
+			base = mix(base, sand_color * grain * sand_arm.r * (1.0 - 0.35 * wet_sand), sand_w);
+			rough = mix(rough, mix(sand_arm.g, 0.45, wet_sand), sand_w);
+			vec3 sand_n = mix(texture(tex_sand_n, sand_uv).rgb, vec3(0.5, 0.5, 1.0), far_w);
+			nrm = mix(nrm, mix(sand_n, vec3(0.5, 0.5, 1.0), wet_sand * 0.6), sand_w);
+		}
 		// Mapped rivers and ponds keep their painted water above the sea.
 		water_w = smoothstep(0.3, 0.8, sp.b) * step(0.3, above);
 		base = mix(base, sand_color * 0.4, 1.0 - step(0.0, above));

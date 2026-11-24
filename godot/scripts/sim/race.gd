@@ -14,6 +14,10 @@ const RACE_RESTITUTION := 0.08
 const WALL_SCRAPE_FREE_SPEED := 3.0
 const WALL_DRAG_GAIN := 1.2
 const WALL_MAX_DRAG := 18.0
+## On the median's slopes (rise per metre up to ~0.27): m/s^2 of speed lost
+## and of sideways shove per unit slope.
+const MEDIAN_DRAG := 9.0
+const MEDIAN_PUSH := 14.0
 const PickupDirector = preload("res://scripts/sim/pickup_director.gd")
 const CombatRules = preload("res://scripts/sim/combat_rules.gd")
 
@@ -615,11 +619,19 @@ func physics(c: CarState, dt: float) -> void:
 	c.lat_v *= exp(-4.0 * dt)
 	c.progress += s_step
 	c.s = T.mod_s(c.progress)
-	# walls
-	var lim := hw - 1.1
-	if c.d > lim or c.d < -lim:
+	# Lungomare's rounded median: the tyres climb a 10 cm hump, which scrubs a
+	# little speed and tips the car off its slopes.
+	var slope := T.median_slope(c.s, c.d)
+	if slope != 0.0:
+		c.v = move_toward(c.v, 0.0, MEDIAN_DRAG * absf(slope) * dt)
+		c.lat_v -= slope * MEDIAN_PUSH * dt
+	# walls; where the other carriageway runs alongside with nothing between
+	# (Vlorë), the road reaches its far edge
+	var lim_r := T.edge_right(c.s) - 1.1
+	var lim_l := T.edge_left(c.s) - 1.1
+	if c.d > lim_r or c.d < -lim_l:
 		var sd := 1.0 if c.d > 0.0 else -1.0
-		c.d = sd * lim
+		c.d = lim_r if sd > 0.0 else -lim_l
 		var into := (v * sin(c.yaw) + c.lat_v) * sd
 		if into > 0.0:
 			# Slide along the barrier instead of reflecting the heading and
@@ -685,11 +697,18 @@ func collisions(dt: float = 1.0 / 60.0) -> void:
 				continue
 			# This is only a broad phase; the actual contact test below uses
 			# rendered world positions and both cars' headings, even on bends.
+			# Where the two passes share one road, a car on the far side can
+			# meet one from the other pass, far away along the lap.
+			var across_passes := false
 			if absf(T.wrap_s(b.s - a.s)) > 8.0 or absf(b.d - a.d) > 8.0:
-				continue
+				if not (T.joined(a.s) and T.joined(b.s)):
+					continue
+				across_passes = true
 			var ap := T.pos(a.s, a.d)
 			var bp := T.pos(b.s, b.d)
 			var delta := Vector2(bp.x - ap.x, bp.z - ap.z)
+			if across_passes and delta.length_squared() > 36.0:
+				continue
 			var at3 := T.tangent(a.s)
 			var bt3 := T.tangent(b.s)
 			var an3 := T.normal(a.s)
@@ -727,6 +746,9 @@ func collisions(dt: float = 1.0 / 60.0) -> void:
 			b.progress += correction.dot(bt) * (ma / tot) / maxf(0.8, 1.0 - T.curv(b.s) * b.d)
 			a.s = T.mod_s(a.progress)
 			b.s = T.mod_s(b.progress)
+			if across_passes:
+				_contact_across(a, b, contact_axis, af, an, bf, bn)
+				continue
 			var side_contact := absf(contact_axis.dot(an)) > absf(contact_axis.dot(at))
 			if side_contact:
 				var sg := 1.0 if contact_axis.dot(an) >= 0.0 else -1.0
@@ -757,6 +779,32 @@ func collisions(dt: float = 1.0 / 60.0) -> void:
 						damage(front, (dv - 14.0) * 0.4, rear, "bump", Vector2(0.0, 1.0))
 					if dv > 3.0:
 						emit({"t": "bump", "a": rear, "b": front, "dv": dv, "side": false})
+
+
+## Two cars from opposite passes of a shared road touch: often head-on, so
+## exchange momentum in world space (`axis` points from a to b) instead of
+## along one lap direction. Closing speed beyond 14 m/s damages both.
+func _contact_across(a: CarState, b: CarState, axis: Vector2, af: Vector2, an: Vector2, bf: Vector2, bn: Vector2) -> void:
+	var va := af * a.v + an * a.lat_v
+	var vb := bf * b.v + bn * b.lat_v
+	var closing := (va - vb).dot(axis)
+	if closing <= 0.0:
+		return
+	var ma: float = a.def.mass
+	var mb: float = b.def.mass
+	var impulse := (1.0 + RACE_RESTITUTION) * closing / (1.0 / ma + 1.0 / mb)
+	va -= axis * (impulse / ma)
+	vb += axis * (impulse / mb)
+	a.v = va.dot(af)
+	b.v = vb.dot(bf)
+	a.lat_v = clampf((va - af * a.v).dot(an), -6.0, 6.0)
+	b.lat_v = clampf((vb - bf * b.v).dot(bn), -6.0, 6.0)
+	if closing > 14.0:
+		# Blow directions in each car's frame (x right, y forward).
+		damage(a, (closing - 14.0) * 0.6, b, "bump", Vector2(-axis.dot(an), -axis.dot(af)))
+		damage(b, (closing - 14.0) * 0.6, a, "bump", Vector2(axis.dot(bn), axis.dot(bf)))
+	if closing > 3.0:
+		emit({"t": "bump", "a": a, "b": b, "dv": closing, "side": false})
 
 
 func damage(c: CarState, dmg: float, by: CarState, kind: String, dir := Vector2.ZERO) -> void:

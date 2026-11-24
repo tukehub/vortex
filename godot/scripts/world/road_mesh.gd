@@ -62,27 +62,33 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 		Quality.budget_changed.connect(apply_quality)
 
 
+## Lungomare's mountable median down the middle of the joined road: 2 m
+## across, rounded shoulders up to a 10 cm crown (RaceTrack.median_lift, the
+## same profile the cars ride over). Off a joined road it follows the
+## centreline.
 func add_paved_median(track: RaceTrack, start: float, length_m: float) -> void:
-	# Traversable chamfered curbs keep the race's continuous road width.
 	var mesh := LandmarkKit.begin()
-	var steps := maxi(1, ceili(length_m / 3.0))
-	var lateral := [-0.97, -0.68, 0.68, 0.97]
-	var heights := [0.021, 0.105, 0.105, 0.021]
+	var steps := maxi(1, ceili(length_m / 2.0))
+	var across := [-1.0, -0.84, -0.68, -0.54, -0.45, 0.45, 0.54, 0.68, 0.84, 1.0]
 	var curb := Color("#cec5ac")
 	var brick := Color("#b1a18a")
-	for i in steps:
+	var previous: Array[Vector3] = []
+	for i in steps + 1:
 		var a := length_m * i / steps
-		var b := length_m * (i + 1) / steps
-		var width_a := maxf(0.03, smoothstep(0.0, 6.0, minf(a, length_m - a)))
-		var width_b := maxf(0.03, smoothstep(0.0, 6.0, minf(b, length_m - b)))
-		var row_a: Array[Vector3] = []
-		var row_b: Array[Vector3] = []
-		for j in lateral.size():
-			row_a.append(track.pos(start + a, lateral[j] * width_a) + Vector3.UP * heights[j] * width_a)
-			row_b.append(track.pos(start + b, lateral[j] * width_b) + Vector3.UP * heights[j] * width_b)
-		for j in lateral.size() - 1:
-			var color := brick.lerp(brick.darkened(0.08), 0.5 + 0.5 * sin(i * 2.1)) if j == 1 else curb
-			LandmarkKit.quad_facing(mesh, row_a[j], row_b[j], row_b[j + 1], row_a[j + 1], color, Vector3.UP)
+		var at := start + a
+		var ease := smoothstep(0.0, RaceTrack.MEDIAN_EASE, minf(a, length_m - a))
+		var middle := track.join_offset(at) if track.joined(at) else 0.0
+		var lift_y := pair_rise(track, at)
+		var row: Array[Vector3] = []
+		for x: float in across:
+			var profile := RaceTrack.MEDIAN_H * ease * (1.0 - smoothstep(RaceTrack.MEDIAN_TOP, RaceTrack.MEDIAN_HALF, absf(x)))
+			row.append(track.pos(at, middle + x) + Vector3.UP * (lift_y + maxf(0.006, profile)))
+		if not previous.is_empty():
+			for j in across.size() - 1:
+				var top := absf(across[j]) < RaceTrack.MEDIAN_TOP + 0.01 and absf(across[j + 1]) < RaceTrack.MEDIAN_TOP + 0.01
+				var color := brick.lerp(brick.darkened(0.08), 0.5 + 0.5 * sin(i * 2.1)) if top else curb.darkened(0.05 * absf(across[j]))
+				LandmarkKit.quad_facing(mesh, previous[j], row[j], row[j + 1], previous[j + 1], color, Vector3.UP)
+		previous = row
 	var mat := LandmarkKit.material(0.89)
 	mat.albedo_texture = preload("res://assets/textures/cobble_diff.jpg")
 	mat.uv1_triplanar = true
@@ -92,13 +98,23 @@ func add_paved_median(track: RaceTrack, start: float, length_m: float) -> void:
 	add_child(median)
 
 
+## Rise from this pass's centreline to the middle of the joined road at `s`
+## (half the height step to the other pass; ~0 once the passes are levelled).
+static func pair_rise(track: RaceTrack, s: float) -> float:
+	var k := posmod(roundi(s / track.ds), track.M)
+	return (track.Y[track.PAIR[k]] - track.Y[k]) * 0.5 if track.PAIR[k] >= 0 else 0.0
+
+
 ## Zebra crossings (plan 3.5) from props.json "road_marks": world [x, z,
-## width, inferred] rows, projected onto this lap (either direction). At most
-## MAX_CROSSINGS, nearest the start first; returns the (s, width) pairs used.
-const MAX_CROSSINGS := 24
+## width, inferred] rows, projected onto this lap (either direction). Where
+## the two passes are one road (Vlorë), a crossing is painted on both halves.
+## At most MAX_CROSSINGS, nearest the start first; returns the (s, width)
+## pairs used.
+const MAX_CROSSINGS := 48
 
 func set_crossings(track: RaceTrack, rows: Array, include_showcase := false) -> PackedVector2Array:
 	var marks := PackedVector2Array()
+	var mirrors := PackedVector2Array()
 	for row in rows:
 		if marks.size() >= MAX_CROSSINGS:
 			break
@@ -106,7 +122,23 @@ func set_crossings(track: RaceTrack, rows: Array, include_showcase := false) -> 
 		var z := float(row[1])
 		if track.dist_to(x, z) > track.half_w + 1.0:
 			continue
-		marks.append(Vector2(track.locate_xz(x, z).x, float(row[2])))
+		var at := track.locate_xz(x, z)
+		marks.append(Vector2(at.x, float(row[2])))
+		var k := posmod(roundi(at.x / track.ds), track.M)
+		if track.PAIR.size() == track.M and track.PAIR[k] >= 0:
+			# Antiparallel: forward along this pass is back along the other.
+			mirrors.append(Vector2(track.mod_s(track.PAIR[k] * track.ds - (at.x - k * track.ds)), float(row[2])))
+	for mirror in mirrors:
+		if marks.size() >= MAX_CROSSINGS:
+			break
+		# The other half may have its own mapped node for the same crossing.
+		var clear := true
+		for mark in marks:
+			if absf(track.wrap_s(mark.x - mirror.x)) <= 55.0:
+				clear = false
+				break
+		if clear:
+			marks.append(mirror)
 	if include_showcase and _showcase:
 		var direction := -1.0 if _reverse else 1.0
 		for distance: float in [Showcase.CROSSINGS.x, Showcase.CROSSINGS.y, Showcase.CROSSINGS.z]:
@@ -215,9 +247,14 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 	var M := track.M
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# ring of M+1 (closed) cross sections with 5 verts each: -hw-KERB_W, -hw, 0, hw, hw+KERB_W
-	var xs := [-hw - KERB_W - 0.6, -hw, 0.0, hw, hw + KERB_W + 0.6]
-	var ring := xs.size()
+	# Cross sections of 7 verts: shoulder, its middle, -hw, 0, hw, middle,
+	# shoulder. Where the other pass runs alongside (Vlorë), that side runs on
+	# to the middle of the joined road instead, and tucks 15 cm past it, 3 cm
+	# down, under the other pass's half: one surface, no seam to see through.
+	# UV2 tells the shader: x = side joined (-1 left, 1 right, 0), y = metres
+	# from the centreline to the road's middle.
+	var shoulder := KERB_W + 0.6
+	var ring := 7
 	for i in M + 1:
 		var k := i % M
 		var s := i * track.ds
@@ -227,14 +264,27 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 		var up := Vector3(track.TX[k], track.TY[k], track.TZ[k]).cross(Vector3(nx, 0.0, nz)).normalized()
 		if up.y < 0.0:
 			up = -up
-		for xi in ring:
-			var d: float = xs[xi]
-			var ys := -0.02 if (xi == 0 or xi == ring - 1) else 0.0
-			var v := p + Vector3(nx, 0.0, nz) * d + Vector3(0, ys, 0)
+		var side_joined := joined_side(track, k)
+		var mid := absf(track.JOIN[k]) if side_joined != 0.0 else hw + shoulder
+		# The two passes meet half way between their centres' heights.
+		var mid_dy := pair_rise(track, k * track.ds)
+		var cols: Array[Vector3] = []   # across, rise, alpha
+		for side: float in [-1.0, 1.0]:
+			var pair: Array[Vector3]
+			if side == side_joined:
+				pair = [Vector3(side * (mid + 0.15), mid_dy - 0.03, 1.0), Vector3(side * mid, mid_dy, 1.0)]
+			else:
+				pair = [Vector3(side * (hw + shoulder), -0.02, 0.0), Vector3(side * (hw + shoulder * 0.5), -0.01, 0.5)]
+			if side > 0.0:
+				pair.reverse()
+				cols.append_array([Vector3(-hw, 0.0, 1.0), Vector3(0.0, 0.0, 1.0), Vector3(hw, 0.0, 1.0)])
+			cols.append_array(pair)
+		for col in cols:
 			st.set_normal(up)
-			st.set_uv(Vector2(d, s))
-			st.set_color(Color(1, 1, 1, 1.0 if abs(d) <= hw else 0.0))
-			st.add_vertex(v)
+			st.set_uv(Vector2(col.x, s))
+			st.set_uv2(Vector2(side_joined, mid))
+			st.set_color(Color(1, 1, 1, col.z))
+			st.add_vertex(p + Vector3(nx, 0.0, nz) * col.x + Vector3(0, col.y, 0))
 	for i in M:
 		var a := i * ring
 		var b := (i + 1) * ring
@@ -254,6 +304,19 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 	add_child(surface)
 
 
+## -1 or 1: the side of sample k on which the other pass runs alongside as
+## one road (no kerb, barrier or shoulder there); 0: none.
+static func joined_side(track: RaceTrack, k: int) -> float:
+	if track.PAIR.size() != track.M or track.PAIR[k] < 0:
+		return 0.0
+	return -1.0 if track.JOIN[k] < 0.0 else 1.0
+
+
+## True when the segment from sample i to the next is joined on `side`.
+static func open_side(track: RaceTrack, i: int, side: float) -> bool:
+	return joined_side(track, i) == side or joined_side(track, (i + 1) % track.M) == side
+
+
 func _build_kerbs(track: RaceTrack, hw: float) -> void:
 	var M := track.M
 	var st := SurfaceTool.new()
@@ -261,6 +324,8 @@ func _build_kerbs(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
+			if open_side(track, i, side):
+				continue
 			var k0 := i
 			var k1 := (i + 1) % M
 			var seg_col := KERB_RED if (i / 3) % 2 == 0 else KERB_WHITE
@@ -312,6 +377,8 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in track.M:
+			if open_side(track, i, side):
+				continue
 			var j := (i + 1) % track.M
 			var color := KERB_RED if int(i * track.ds / 8.0) % 2 == 0 else KERB_WHITE
 			if _showcase:
@@ -355,6 +422,8 @@ func _build_skirt(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
+			if open_side(track, i, side):
+				continue
 			var k0 := i
 			var k1 := (i + 1) % M
 			var pts: Array[Vector3] = []
