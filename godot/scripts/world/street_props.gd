@@ -39,7 +39,7 @@ var chunks := {}
 var detailed := {}
 var meshes := {}
 var near_meshes := {}
-var _body: StandardMaterial3D
+var _body: ShaderMaterial
 var _glass: StandardMaterial3D
 var _lamp: StandardMaterial3D
 
@@ -155,11 +155,14 @@ func _apply_budget() -> void:
 func _make_materials() -> void:
 	if _body != null:
 		return
-	_body = StandardMaterial3D.new()
-	_body.vertex_color_use_as_albedo = true
-	_body.roughness = 0.7
-	# Cylinders are wound either way; these meshes are a few hundred triangles.
-	_body.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Cylinders are wound either way (the shader draws both faces); these
+	# meshes are a few hundred triangles.
+	_body = ShaderMaterial.new()
+	_body.shader = preload("res://shaders/street_furniture.gdshader")
+	_body.set_shader_parameter("metal", preload("res://assets/textures/pole_metal_diff.jpg"))
+	_body.set_shader_parameter("metal_n", preload("res://assets/textures/pole_metal_nor.jpg"))
+	_body.set_shader_parameter("metal_arm", preload("res://assets/textures/pole_metal_arm.jpg"))
+	_body.set_shader_parameter("detail", Quality.preset != "low")
 	_glass = StandardMaterial3D.new()
 	_glass.albedo_color = Color(0.62, 0.74, 0.8, 0.35)
 	_glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

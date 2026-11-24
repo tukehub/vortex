@@ -69,6 +69,10 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 	mat.set_shader_parameter("tex_urban", load("res://assets/textures/concrete_diff.jpg"))
 	mat.set_shader_parameter("tex_urban_n", load("res://assets/textures/concrete_nor.jpg"))
 	mat.set_shader_parameter("tex_road", load("res://assets/textures/asphalt_diff.jpg"))
+	if has_water:
+		mat.set_shader_parameter("tex_sand", load("res://assets/textures/sand_diff.jpg"))
+		mat.set_shader_parameter("tex_sand_n", load("res://assets/textures/sand_nor.jpg"))
+		mat.set_shader_parameter("tex_sand_arm", load("res://assets/textures/sand_arm.jpg"))
 	if city_id == "tirane":
 		# The central square is a paved public space.  Blend it into the terrain
 		# rather than placing another mesh above the race road.

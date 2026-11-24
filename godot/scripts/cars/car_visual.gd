@@ -863,10 +863,13 @@ func apply_world(c: ArenaCar, dt: float) -> void:
 		wreck_roll = 0.0
 		roll = -c.steer * 0.045 * clampf(c.v / 20.0, 0.0, 1.0) - c.drift * 0.04 * signf(c.steer)
 		pitch = (-0.02 if c.gas_on else 0.0) + (0.035 if c.braking else 0.0)
-	var p := Vector3(c.x, c.hop, c.z)
+	# On the oval's banked edge the car sits on the slope, tilted with it.
+	var ground := Arena.ground(c.at())
+	var tilt := Basis(Quaternion(Vector3.UP, Arena.ground_normal(c.at())))
+	var p := Vector3(c.x, ground + c.hop, c.z)
 	base_pos = p
-	global_transform = Transform3D(Basis.from_euler(Vector3(pitch, yaw_g, roll)), p)
-	contact_shadow.global_transform = Transform3D(Basis.from_euler(Vector3(0.0, yaw_g, 0.0)), Vector3(c.x, 0.025, c.z))
+	global_transform = Transform3D(tilt * Basis.from_euler(Vector3(pitch, yaw_g, roll)), p)
+	contact_shadow.global_transform = Transform3D(tilt * Basis.from_euler(Vector3(0.0, yaw_g, 0.0)), Vector3(c.x, ground + 0.025, c.z))
 	contact_shadow.transparency = clampf(c.hop / 1.5, 0.0, 1.0)
 	# The wheels show the lock the driver holds, eased off with speed.
 	_animate(c, dt, 22.0 * float(c.def.grip), 0.5 / (1.0 + absf(c.v) * 0.04))

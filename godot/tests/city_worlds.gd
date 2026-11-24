@@ -86,6 +86,39 @@ func _ready() -> void:
 					assert(scene.terrain.near_h[k] >= surface + 0.24, "land must stay above the surface")
 			assert(wet > 0)
 			print("SEA: ", city.id, " surface ", surface, " m, ", wet, " water cells")
+		if city.id == "shkoder":
+			# The centre loop shares Tirana's street trees and city facades.
+			var street_trees := scene.props.vegetation
+			assert(street_trees != null and street_trees.name == "StreetTrees", "Shkodër plants the shared street trees")
+			assert(street_trees.entries.size() > 0)
+			assert(scene.buildings.facade_mat.shader == Buildings.FACADE_SHADER, "Shkodër uses the shared city facades")
+			assert(scene.track.L > 3000.0 and scene.track.L < 4000.0, "the centre loop is about 3.5 km")
+			var shk_marks: Node = null
+			for child in scene.props.get_children():
+				if child is Landmarks:
+					shk_marks = child
+			for id in ["mosque", "flagpole"]:
+				var at := (shk_marks.get_node(id) as Node3D).global_position
+				assert(scene.track.dist_to(at.x, at.z) > scene.track.half_w + 8.0, "landmark off the road: " + id)
+			# Rozafa from its mapped outlines: curtain wall, gate, towers, ruins.
+			var castle := shk_marks.get_node_or_null("rozafa/RozafaCastle") as RozafaCastle
+			assert(castle != null, "Rozafa is built from its mapped outlines")
+			assert(castle.merlons > 300 and castle.slits > 100, "the curtain wall is crenellated with arrow slits")
+			for kind in ["gate", "tower", "citadel", "church", "minaret", "museum", "cistern", "ruin"]:
+				assert(int(castle.built.get(kind, 0)) > 0, "Rozafa has its " + kind)
+			assert(int(castle.built.tower) == 8 and int(castle.built.gate) == 1)
+			var masonry := castle.get_node("CastleMasonry") as MeshInstance3D
+			var box := masonry.get_aabb()
+			assert(box.size.x > 250.0 and box.size.z > 200.0, "the walls ring the whole hilltop")
+			assert(masonry.visibility_range_end >= 2500.0, "the castle stays in sight from the lap")
+			assert(castle.get_node_or_null("CastleFlag") != null, "the flag flies over the citadel")
+			var root := castle.get_parent() as Node3D
+			for p: Array in JSON.parse_string(FileAccess.get_file_as_string(RozafaCastle.DATA)).wall:
+				var world := root.position + Vector3(float(p[0]), 0, float(p[1]))
+				assert(scene.track.dist_to(world.x, world.z) > 1000.0, "the castle stands well off the lap")
+				break
+			print("SHKODER: ", snappedf(scene.track.L, 1.0), " m lap, ", street_trees.entries.size(), " street trees; Rozafa ",
+				castle.built, ", ", castle.merlons, " merlons")
 		if city.id == "vlore":
 			# Lungomare: palms on the sea side, on dry ground and clear of the
 			# road; café terraces on the land side.
@@ -134,7 +167,7 @@ func _ready() -> void:
 			assert((flag.material_override as ShaderMaterial).get_shader_parameter("use_tex"), "the great flag shows the eagle")
 			_test_vlore_circuit(scene, marks)
 			print("VLORE LANDMARKS: stadium facade ", snappedf(gap, 0.1), " m from the race line")
-		else:
+		elif not FileAccess.file_exists("res://assets/cities/%s/water_near.bin" % city.id):
 			assert(scene.sea == null, "inland cities have no sea")
 		await get_tree().process_frame
 		print("CITY WORLD: ", city.id, " loaded with six cars")

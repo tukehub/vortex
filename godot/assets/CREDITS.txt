@@ -22,6 +22,9 @@ Guri i bazamentit të statujës: Stone Wall, Charlotte Baglioni dhe Dario Barres
 Pemët (model i thjeshtuar dhe gjethet): Tree Small 02 nga Rico Cilliers dhe Rob Tuytel — CC0 1.0 (https://polyhaven.com/a/tree_small_02).
 Pisha (trungu dhe gjethja e përshtatur): Pine Tree 01 nga Rob Tuytel dhe Rico Cilliers — CC0 1.0 (https://polyhaven.com/a/pine_tree_01).
 Mobiliet e kafeneve: Outdoor Table Chair Set 01 nga James Ray Cock — CC0 1.0 (https://polyhaven.com/a/outdoor_table_chair_set_01); gjeometri e thjeshtuar për pajisje celulare.
+Rëra e plazhit (Coast Sand 04), shkëmbi gëlqeror (Rock Face 03), shtrimi i shëtitores (Precast Stone Paving), lëvorja e palmave (Palm Tree Bark), muret e kështjellës (Castle Wall Slates), suvaja (White Stucco), qepenat (Painted Metal Shutter) dhe qielli i natës me shi (Kloppenheim 07 Pure Sky): Poly Haven — CC0 1.0 (polyhaven.com).
+Koshi i mbeturinave (Metal Trash Can), feneri i shëtitores (Street Lamp 01), kutia elektrike (Utility Box 01) dhe stoli (Painted Wooden Bench): Poly Haven — CC0 1.0. Autorët dhe skedarët: tools/cc0_assets.lock.json.
+Metali i shtyllave: Metal032 nga ambientCG (ambientcg.com) — CC0 1.0.
 Semaforët: “Traffic Light - Complex” nga Urban Mini Props Pack - Free; i kthyer dhe i thjeshtuar në rreth 5 600 trekëndësha për pajisje celulare.
 
 [b]Fotografia e pemës[/b]
@@ -43,7 +46,9 @@ Efektet e fuqive, përplasjeve, shpërthimeve dhe menysë: Sci-Fi Sounds, Impact
 Motori: Car Sound Effects Pack nga GGBotNet dhe racing car engine sound loops nga domasx2 (opengameart.org) — CC0 1.0.
 Era: wind whoosh loop nga SketchMan3 (opengameart.org) — CC0 1.0.
 Komentatori (anglisht): Voiceover Pack nga Kenney (kenney.nl, opengameart.org/content/voiceover-pack-40-lines), zëri i Jeffrey M. Smith — CC0 1.0; shkurtuar dhe normalizuar (tools/build_voice.py).
-Fërkimi i gomave, gërvishtja dhe shiu janë sintetizuar proceduralisht (tools/gen_sfx.py).
+Fërkimi i gomave: Chrysler LHS tire squeal 01–03 nga audible-edge (freesound.org/s/71736, 71737, 71738) — CC0 1.0; të prera, filtruara dhe bashkuara në një lak (tools/build_cc0_audio.py).
+Tingujt e rezultatit: Music Jingles nga Kenney (kenney.nl/assets/music-jingles) — CC0 1.0.
+Gërvishtja dhe shiu janë sintetizuar proceduralisht (tools/gen_sfx.py).
 Përplasja anësore: regjistrim nga PauliusI, CC0; shkurtuar, filtruar dhe ulur në volum.
 freesound.org/people/PauliusI/sounds/346299/
 

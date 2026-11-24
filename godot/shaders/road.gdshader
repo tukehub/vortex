@@ -78,7 +78,7 @@ void fragment() {
 	// The second sample's UVs are rotated 90 degrees; rotate its tangent-space
 	// direction back before blending or the surface grain lights incorrectly.
 	vec3 nrm = mix(n1, vec3(1.0 - n2.g, n2.r, n2.b), 0.5);
-	float aggregate = texture(tex_asphalt_r, tuv).r;
+	float aggregate = texture(tex_asphalt_r, tuv).g;  // asphalt_02 ARM: G = roughness
 	float rough = aggregate * 0.45 + 0.5;
 	// A darker, matte gutter ties the asphalt to the physical curb. The outer
 	// edge blends toward the shoulder instead of reading as a bright raised slab.

@@ -1,0 +1,356 @@
+{
+  "sand": {
+    "source": "polyhaven",
+    "id": "coast_sand_04",
+    "name": "Coast Sand 04",
+    "authors": [
+      "Dario Barresi",
+      "Rob Tuytel"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/coast_sand_04",
+    "files": [
+      {
+        "path": "godot/assets/textures/sand_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_04/coast_sand_04_diff_1k.jpg",
+        "md5": "24ff279e160cdcad409bad4201e57dd2",
+        "bytes": 1036502
+      },
+      {
+        "path": "godot/assets/textures/sand_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_04/coast_sand_04_nor_gl_1k.jpg",
+        "md5": "af1befdc1dd08790bcc0086227af0ca8",
+        "bytes": 1307593
+      },
+      {
+        "path": "godot/assets/textures/sand_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_04/coast_sand_04_arm_1k.jpg",
+        "md5": "202224f696f787fe0acd832d18810388",
+        "bytes": 890871
+      }
+    ]
+  },
+  "limestone": {
+    "source": "polyhaven",
+    "id": "rock_face_03",
+    "name": "Rock Face 03",
+    "authors": [
+      "Dario Barresi",
+      "Rico Cilliers"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/rock_face_03",
+    "files": [
+      {
+        "path": "godot/assets/textures/limestone_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_face_03/rock_face_03_diff_1k.jpg",
+        "md5": "e4c34abb1aad5befe12754fad507147a",
+        "bytes": 927082
+      },
+      {
+        "path": "godot/assets/textures/limestone_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_face_03/rock_face_03_nor_gl_1k.jpg",
+        "md5": "cbd30858439ece391480c5e67e09de89",
+        "bytes": 1146788
+      },
+      {
+        "path": "godot/assets/textures/limestone_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rock_face_03/rock_face_03_arm_1k.jpg",
+        "md5": "351c58daba868568fb5a191194aa5302",
+        "bytes": 793241
+      }
+    ]
+  },
+  "promenade_paving": {
+    "source": "polyhaven",
+    "id": "precast_stone_paving",
+    "name": "Precast Stone Paving",
+    "authors": [
+      "Dimitrios Savva"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/precast_stone_paving",
+    "files": [
+      {
+        "path": "godot/assets/textures/promenade_paving_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/precast_stone_paving/precast_stone_paving_diff_1k.jpg",
+        "md5": "8ebba4cc556d5e4f4f1a064377a52326",
+        "bytes": 706920
+      },
+      {
+        "path": "godot/assets/textures/promenade_paving_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/precast_stone_paving/precast_stone_paving_nor_gl_1k.jpg",
+        "md5": "c85a36795ee5c5c6ba641722520457fd",
+        "bytes": 715203
+      },
+      {
+        "path": "godot/assets/textures/promenade_paving_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/precast_stone_paving/precast_stone_paving_arm_1k.jpg",
+        "md5": "3ea9dc5d062d43733057d27cb7d81b98",
+        "bytes": 606246
+      }
+    ]
+  },
+  "palm_bark": {
+    "source": "polyhaven",
+    "id": "palm_tree_bark",
+    "name": "Palm Tree Bark",
+    "authors": [
+      "Dimitrios Savva",
+      "Rico Cilliers"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/palm_tree_bark",
+    "files": [
+      {
+        "path": "godot/assets/textures/palm_bark_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_tree_bark/palm_tree_bark_diff_1k.jpg",
+        "md5": "d9c9ffbc6c32e51f81696416c0fc661e",
+        "bytes": 1974940
+      },
+      {
+        "path": "godot/assets/textures/palm_bark_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_tree_bark/palm_tree_bark_nor_gl_1k.jpg",
+        "md5": "c98b2f2f05b5178b68e74c3272a4fe77",
+        "bytes": 1514646
+      },
+      {
+        "path": "godot/assets/textures/palm_bark_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/palm_tree_bark/palm_tree_bark_arm_1k.jpg",
+        "md5": "87ddc2127e429d08a2b853e5b34165db",
+        "bytes": 1644244
+      }
+    ]
+  },
+  "castle_wall": {
+    "source": "polyhaven",
+    "id": "castle_wall_slates",
+    "name": "Castle Wall Slates",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/castle_wall_slates",
+    "files": [
+      {
+        "path": "godot/assets/textures/castle_wall_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/castle_wall_slates/castle_wall_slates_diff_1k.jpg",
+        "md5": "0f32f47b63c6303ba0d2c79d6672a402",
+        "bytes": 625282
+      },
+      {
+        "path": "godot/assets/textures/castle_wall_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/castle_wall_slates/castle_wall_slates_nor_gl_1k.jpg",
+        "md5": "e2909f4123b3dce0a4774de14e5f8685",
+        "bytes": 1072473
+      },
+      {
+        "path": "godot/assets/textures/castle_wall_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/castle_wall_slates/castle_wall_slates_arm_1k.jpg",
+        "md5": "64f46720879286eb74fa194210910640",
+        "bytes": 298965
+      }
+    ]
+  },
+  "stucco": {
+    "source": "polyhaven",
+    "id": "white_stucco",
+    "name": "White Stucco",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/white_stucco",
+    "files": [
+      {
+        "path": "godot/assets/textures/stucco_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_stucco/white_stucco_diff_1k.jpg",
+        "md5": "34b66656dbf2a90eec29306deb1a20d0",
+        "bytes": 557550
+      },
+      {
+        "path": "godot/assets/textures/stucco_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_stucco/white_stucco_nor_gl_1k.jpg",
+        "md5": "3e70f3be77f582fd41a9a08c8e8a6e66",
+        "bytes": 932038
+      },
+      {
+        "path": "godot/assets/textures/stucco_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_stucco/white_stucco_arm_1k.jpg",
+        "md5": "8528cc4a2fe3c4c047161682ecacdf7f",
+        "bytes": 323604
+      }
+    ]
+  },
+  "shutter": {
+    "source": "polyhaven",
+    "id": "painted_metal_shutter",
+    "name": "Painted Metal Shutter",
+    "authors": [
+      "Charlotte Baglioni",
+      "Dario Barresi",
+      "Rico Cilliers"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/painted_metal_shutter",
+    "files": [
+      {
+        "path": "godot/assets/textures/shutter_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_metal_shutter/painted_metal_shutter_diff_1k.jpg",
+        "md5": "b2b648a56ca737d51999525e857f499a",
+        "bytes": 627333
+      },
+      {
+        "path": "godot/assets/textures/shutter_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_metal_shutter/painted_metal_shutter_nor_gl_1k.jpg",
+        "md5": "a18c51114f00627f9e48254e870ceb91",
+        "bytes": 730726
+      },
+      {
+        "path": "godot/assets/textures/shutter_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_metal_shutter/painted_metal_shutter_arm_1k.jpg",
+        "md5": "be0154e168d571f601cff127181d5ca0",
+        "bytes": 606809
+      }
+    ]
+  },
+  "asphalt": {
+    "source": "polyhaven",
+    "id": "asphalt_02",
+    "name": "Asphalt 02",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/asphalt_02",
+    "files": [
+      {
+        "path": "godot/assets/textures/asphalt_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_arm_1k.jpg",
+        "md5": "33820445f43af5e5ee484674b6939271",
+        "bytes": 296770
+      }
+    ]
+  },
+  "pole_metal": {
+    "source": "ambientcg",
+    "id": "Metal032",
+    "name": "Metal 032",
+    "authors": [
+      "ambientCG"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://ambientcg.com/view?id=Metal032",
+    "files": [
+      {
+        "path": "godot/assets/textures/pole_metal_diff.jpg",
+        "url": "https://ambientcg.com/get?file=Metal032_1K-JPG.zip",
+        "md5": "b03499887a1f9708bfe31f7c54777a9f",
+        "bytes": 701900
+      },
+      {
+        "path": "godot/assets/textures/pole_metal_nor.jpg",
+        "url": "https://ambientcg.com/get?file=Metal032_1K-JPG.zip",
+        "md5": "f12eb8322379ad566b673f078e295195",
+        "bytes": 341948
+      },
+      {
+        "path": "godot/assets/textures/pole_metal_arm.jpg",
+        "url": "https://ambientcg.com/get?file=Metal032_1K-JPG.zip",
+        "md5": "b8ab79a65cfeb4f698d8ce9d6bb52065",
+        "bytes": 86769
+      }
+    ]
+  },
+  "sky_rain_night": {
+    "source": "polyhaven",
+    "id": "kloppenheim_07_puresky",
+    "name": "Kloppenheim 07 (Pure Sky)",
+    "authors": [
+      "Greg Zaal",
+      "Jarod Guest"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/kloppenheim_07_puresky",
+    "files": [
+      {
+        "path": "godot/assets/hdri/sky_rain_night.hdr",
+        "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_07_puresky_2k.hdr",
+        "md5": "154e49aa2e8b0e62191beb216c88832e",
+        "bytes": 5003360
+      }
+    ]
+  },
+  "street_bin": {
+    "source": "polyhaven",
+    "id": "metal_trash_can",
+    "name": "Metal Trash Can",
+    "authors": [
+      "GurJas Studios"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/metal_trash_can",
+    "files": [
+      {
+        "path": "godot/assets/props/street_bin/street_bin.glb",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/metal_trash_can/metal_trash_can_1k.gltf",
+        "md5": "a549c7588919fc769c883b63fe5578b0",
+        "bytes": 4988804
+      }
+    ]
+  },
+  "promenade_lamp": {
+    "source": "polyhaven",
+    "id": "street_lamp_01",
+    "name": "Street Lamp 01",
+    "authors": [
+      "Josh Dean"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/street_lamp_01",
+    "files": [
+      {
+        "path": "godot/assets/props/promenade_lamp/promenade_lamp.glb",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/street_lamp_01/street_lamp_01_1k.gltf",
+        "md5": "9006c9648f5069b43c1e567e3cdf128a",
+        "bytes": 2471576
+      }
+    ]
+  },
+  "utility_box": {
+    "source": "polyhaven",
+    "id": "utility_box_01",
+    "name": "Utility Box 01",
+    "authors": [
+      "James Ray Cock"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/utility_box_01",
+    "files": [
+      {
+        "path": "godot/assets/props/utility_box/utility_box.glb",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/utility_box_01/utility_box_01_1k.gltf",
+        "md5": "0cd6a456ec2330c7d8b099fc6ab4b400",
+        "bytes": 1976064
+      }
+    ]
+  },
+  "bench": {
+    "source": "polyhaven",
+    "id": "painted_wooden_bench",
+    "name": "Painted Wooden Bench",
+    "authors": [
+      "Kirill Sannikov"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/painted_wooden_bench",
+    "files": [
+      {
+        "path": "godot/assets/props/bench/bench.glb",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/painted_wooden_bench/painted_wooden_bench_1k.gltf",
+        "md5": "91c4a2d1b74c835bfbecaa41fcea7df4",
+        "bytes": 1988600
+      }
+    ]
+  }
+}

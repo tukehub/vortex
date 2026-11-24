@@ -53,9 +53,9 @@ const POINTS_CITIES := ["tirane", "vlore"]
 const CITIES := [
 	{"id": "tirane", "env": "day", "laps": 2, "neon": "#ff2d6f", "horizon": "flat", "hdri": "day", "stars": 0},
 	{"id": "vlore", "env": "sunset", "laps": 2, "neon": "#ffd23a", "horizon": "sea", "hdri": "sunset", "stars": 4},
-	{"id": "berat", "env": "dusk", "laps": 2, "neon": "#ffb347", "horizon": "mountains", "hdri": "dusk", "stars": 7},
-	{"id": "gjirokaster", "env": "rain", "laps": 2, "neon": "#3d9dff", "horizon": "mountains", "hdri": "rain", "stars": 10},
-	{"id": "shkoder", "env": "golden", "laps": 2, "neon": "#4ee0ff", "horizon": "mountains", "hdri": "golden", "stars": 13},
+	{"id": "shkoder", "env": "golden", "laps": 2, "neon": "#4ee0ff", "horizon": "mountains", "hdri": "golden", "stars": 7},
+	{"id": "berat", "env": "dusk", "laps": 2, "neon": "#ffb347", "horizon": "mountains", "hdri": "dusk", "stars": 10},
+	{"id": "gjirokaster", "env": "rain", "laps": 2, "neon": "#3d9dff", "horizon": "mountains", "hdri": "rain", "stars": 13},
 	{"id": "tetove", "env": "day", "laps": 2, "neon": "#ff5fc8", "horizon": "mountains", "hdri": "day", "stars": 16},
 ]
 

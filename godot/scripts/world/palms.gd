@@ -3,7 +3,8 @@ extends Node3D
 ## Procedural date palms for a seafront promenade (props.json "palms":
 ## [x, y, z, scale, yaw]). Two shared meshes, a slightly leaning tapered trunk
 ## and a crown of split fan fronds, drawn as two MultiMeshes: two draw calls
-## for the whole promenade. No textures.
+## for the whole promenade. Trunks carry Poly Haven Palm Tree Bark
+## (palm_trunk.gdshader); crowns stay vertex-coloured.
 
 const TRUNK_HEIGHT := 7.5
 
@@ -75,10 +76,12 @@ func build(entries: Array) -> void:
 	if entries.is_empty():
 		return
 	name = "Palms"
-	var trunk_mat := StandardMaterial3D.new()
-	trunk_mat.vertex_color_use_as_albedo = true
-	trunk_mat.vertex_color_is_srgb = true
-	trunk_mat.roughness = 0.9
+	var trunk_mat := ShaderMaterial.new()
+	trunk_mat.shader = preload("res://shaders/palm_trunk.gdshader")
+	trunk_mat.set_shader_parameter("bark", preload("res://assets/textures/palm_bark_diff.jpg"))
+	trunk_mat.set_shader_parameter("bark_n", preload("res://assets/textures/palm_bark_nor.jpg"))
+	trunk_mat.set_shader_parameter("bark_arm", preload("res://assets/textures/palm_bark_arm.jpg"))
+	trunk_mat.set_shader_parameter("detail", Quality.preset != "low")
 	var crown_mat := StandardMaterial3D.new()
 	crown_mat.vertex_color_use_as_albedo = true
 	crown_mat.vertex_color_is_srgb = true

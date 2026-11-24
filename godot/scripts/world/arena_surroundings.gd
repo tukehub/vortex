@@ -1,7 +1,7 @@
 class_name ArenaSurroundings
 extends Node3D
 ## Each city's landmarks keep their bearings from the central monument.
-## Grandstands, flags, lamps and trees sit outside the wall and clear of the
+## Grandstands, flags, lamps and trees ring the oval outside the wall and clear of the
 ## chase camera. Repeated scenery uses MultiMeshes to limit draw calls.
 
 const FLAG_SHADER := preload("res://shaders/flag_wave.gdshader")
@@ -26,10 +26,10 @@ var rng := RandomNumberGenerator.new()
 var placed_landmarks: Array = []    # [{id, position, radius}]
 
 
-func build(half_x: float, half_z: float, corner: float, city_id := "tirane") -> void:
+func build(half_x: float, half_z: float, city_id := "tirane") -> void:
 	rng.seed = 7071912                # same square every round
 	_landmarks(half_x, half_z, city_id)
-	var stands := stand_segments(half_x, half_z, corner)
+	var stands := stand_segments(half_x, half_z)
 	_stands(stands)
 	_flags_and_lamps(stands)
 	_trees(half_x, half_z, city_id)
@@ -37,7 +37,7 @@ func build(half_x: float, half_z: float, corner: float, city_id := "tirane") -> 
 		var entries := []
 		for side in [-1.0, 1.0]:
 			for index in range(-3, 4):
-				entries.append([index * 27.0, 0.0, side * (half_z + 23.0), rng.randf_range(1.1, 1.45), rng.randf() * TAU])
+				entries.append([index * 27.0, 0.0, side * (half_z + 26.0), rng.randf_range(1.1, 1.45), rng.randf() * TAU])
 		var palms := Palms.new()
 		add_child(palms)
 		palms.build(entries)
@@ -84,7 +84,11 @@ func _landmarks(half_x: float, half_z: float, city_id: String) -> void:
 
 
 ## Keep mapped city blocks behind the arena park. Cull whole chunks so a cut
-## through a roof or facade cannot appear beside the playing boundary.
+## through a roof or facade cannot appear beside the playing boundary. The
+## city carries three layers: the building shells, the street-level facade
+## bays laid over them, and the far skyline. All three are culled and lowered
+## together, or bays and skyline blocks of removed buildings are left
+## standing on the square as loose, half-dithered walls.
 func _vlore_backdrop(centre: Dictionary, turn: float, half_size: Vector2) -> void:
 	var city := Buildings.new()
 	city.name = "VloreSkyline"
@@ -94,6 +98,7 @@ func _vlore_backdrop(centre: Dictionary, turn: float, half_size: Vector2) -> voi
 	city.load_city("vlore")
 	var park := Rect2(-half_size, half_size * 2.0).grow(LANDMARK_CLEARANCE)
 	var skyline := park.grow(370.0)
+	var kept: Array[Dictionary] = []      # {footprint, drop} of the shells left standing
 	for chunk in city.chunk_nodes.duplicate():
 		var bounds: AABB = chunk.global_transform * chunk.get_aabb()
 		var footprint := Rect2(bounds.position.x, bounds.position.z, bounds.size.x, bounds.size.z)
@@ -102,8 +107,33 @@ func _vlore_backdrop(centre: Dictionary, turn: float, half_size: Vector2) -> voi
 			chunk.free()
 		else:
 			# The arena is level while the source blocks rest on surveyed terrain.
-			chunk.position.y -= maxf(0.0, bounds.position.y)
-
+			var drop := maxf(0.0, bounds.position.y)
+			chunk.position.y -= drop
+			kept.append({"footprint": footprint, "drop": drop})
+	var layers: Array[Node] = []
+	if city.frontages != null:
+		layers.append_array(city.frontages.find_children("*", "MultiMeshInstance3D", true, false))
+	for node in city.find_children("*", "MeshInstance3D", true, false):
+		if not city.chunk_nodes.has(node):
+			layers.append(node)
+	for item in layers:
+		if not is_instance_valid(item):
+			continue
+		var node := item as GeometryInstance3D
+		var bounds := node.global_transform * node.get_aabb()
+		var footprint := Rect2(bounds.position.x, bounds.position.z, bounds.size.x, bounds.size.z)
+		if park.intersects(footprint) or not skyline.intersects(footprint):
+			node.free()
+			continue
+		# Settle with the shell it dresses (the deepest drop it overlaps), so
+		# the bays stay on their walls.
+		var drop := -1.0
+		for shell in kept:
+			if (shell.footprint as Rect2).intersects(footprint):
+				drop = maxf(drop, float(shell.drop))
+		if drop < 0.0:
+			drop = maxf(0.0, bounds.position.y)
+		node.position.y -= drop
 
 
 ## Slides a footprint outward along its bearing until it clears the rectangle.
@@ -121,20 +151,35 @@ func _clear_of_square(offset: Vector2, radius: float, hx: float, hz: float) -> V
 
 
 # ------------------------------------------------------------------ stands
-## Straight runs of grandstand: [origin, along, outward normal, length].
-static func stand_segments(half_x: float, half_z: float, corner: float) -> Array:
+## A point on the oval `out` metres beyond the wall of a half_x x half_z
+## ellipse, at parameter angle `angle`, and its outward normal.
+static func oval_point(half_x: float, half_z: float, angle: float, out: float) -> Array:
+	var p := Vector2(cos(angle) * half_x, sin(angle) * half_z)
+	var n := Vector2(cos(angle) / half_x, sin(angle) / half_z).normalized()
+	return [p + n * out, n]
+
+
+## Straight runs of grandstand round the oval: [origin, along, outward
+## normal, length]. Chords of the ellipse STAND_GAP outside the wall, with
+## an opening in the middle of each long side, as at a street circuit.
+static func stand_segments(half_x: float, half_z: float) -> Array:
 	var segments := []
-	var run_x := half_x - corner - 6.0
-	var run_z := half_z - corner - 6.0
-	for side in [-1.0, 1.0]:
-		# Long sides: two stands with a gap in the middle, as at a street circuit.
-		for half in [-1.0, 1.0]:
-			var from := 8.0 if half > 0.0 else -run_x
-			var to := run_x if half > 0.0 else -8.0
-			segments.append([Vector3(from, 0.0, side * (half_z + STAND_GAP)), Vector3.RIGHT,
-				Vector3(0.0, 0.0, side), to - from])
-		segments.append([Vector3(side * (half_x + STAND_GAP), 0.0, -run_z), Vector3.BACK,
-			Vector3(side, 0.0, 0.0), run_z * 2.0])
+	var count := 28
+	for i in count:
+		var a0 := TAU * i / count
+		var a1 := TAU * (i + 1) / count
+		var mid := (a0 + a1) * 0.5
+		# Openings where the long sides cross the short axis (angle PI/2, 3PI/2).
+		if absf(wrapf(mid - PI * 0.5, -PI, PI)) < 0.12 or absf(wrapf(mid + PI * 0.5, -PI, PI)) < 0.12:
+			continue
+		var from: Vector2 = oval_point(half_x, half_z, a0, STAND_GAP)[0]
+		var to: Vector2 = oval_point(half_x, half_z, a1, STAND_GAP)[0]
+		var along := (to - from).normalized()
+		var out := Vector2(along.y, -along.x)
+		if out.dot(from + to) < 0.0:
+			out = -out
+		segments.append([Vector3(from.x, 0.0, from.y), Vector3(along.x, 0.0, along.y),
+			Vector3(out.x, 0.0, out.y), from.distance_to(to)])
 	return segments
 
 
@@ -280,20 +325,11 @@ func _trees(half_x: float, half_z: float, city_id: String) -> void:
 	var mesh: Mesh = props._tree_meshes()[0]
 	props.free()
 	var ring := STAND_GAP + STAND_STEP * STAND_ROWS + 9.0
-	var hx := half_x + ring
-	var hz := half_z + ring
 	var transforms: Array[Transform3D] = []
 	var perimeter := []
-	var x := -hx
-	while x <= hx:
-		perimeter.append(Vector2(x, -hz))
-		perimeter.append(Vector2(x, hz))
-		x += 13.0
-	var z := -hz + 13.0
-	while z < hz:
-		perimeter.append(Vector2(-hx, z))
-		perimeter.append(Vector2(hx, z))
-		z += 13.0
+	var count := int(TAU * sqrt((half_x * half_x + half_z * half_z) * 0.5) / 13.0)
+	for i in count:
+		perimeter.append(oval_point(half_x, half_z, TAU * i / count, ring)[0])
 	for p in perimeter:
 		var blocked := false
 		for landmark in placed_landmarks:

@@ -1,6 +1,6 @@
 class_name ArenaScene
 extends Node3D
-## Points mode: the walled square, its cars, the camera, sound and UI around
+## Points mode: the walled oval, its cars, the camera, sound and UI around
 ## the Arena simulation. States: countdown -> play -> over -> results.
 
 const DT := 1.0 / 60.0
@@ -22,6 +22,8 @@ const STEP_SIZE := Vector2(13.6, 24.4)
 const STEP_HEIGHT := 0.6
 const CORNICE := 0.4
 const SURROUNDINGS := 280.0      # paving beyond the wall, out to the landmarks
+const BERM := 10.0               # outside the wall the bank falls back to the level
+const OVAL_SEGMENTS := 160
 
 var city_id: String
 var arena: Arena
@@ -83,7 +85,7 @@ func _ready() -> void:
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sprite.shaded = false
 		sprite.pixel_size = 0.011
-		sprite.position = Vector3(float(p.x), 1.5, float(p.z))
+		sprite.position = Vector3(float(p.x), 1.5 + Arena.ground(Vector2(float(p.x), float(p.z))), float(p.z))
 		sprite.texture = PowerupIcons.texture(str(p.type))
 		add_child(sprite)
 		pads.append(sprite)
@@ -189,6 +191,13 @@ func _build_world() -> void:
 	ground.material_override = paving
 	ground.name = "SquarePaving"
 	add_child(ground)
+	# The banked lip round the oval, in the same stone (the shaders tile in
+	# world space, so the joints run on across the seam).
+	var bank := MeshInstance3D.new()
+	bank.name = "SquareBank"
+	bank.mesh = _bank_mesh()
+	bank.material_override = paving
+	add_child(bank)
 	add_child(_wall_mesh())
 	# The island in the middle carries the statue.
 	var island := MeshInstance3D.new()
@@ -233,7 +242,7 @@ func _build_world() -> void:
 	var surroundings := ArenaSurroundings.new()
 	surroundings.name = "Surroundings"
 	add_child(surroundings)
-	surroundings.build(Arena.HALF_X, Arena.HALF_Z, Arena.CORNER, city_id)
+	surroundings.build(Arena.HALF_X, Arena.HALF_Z, city_id)
 
 
 func _build_skanderbeg(stone: StandardMaterial3D) -> void:
@@ -262,24 +271,61 @@ func _build_skanderbeg(stone: StandardMaterial3D) -> void:
 		add_child(statue)
 
 
-## The barrier: the rounded rectangle of Arena.wall(), as a striped band.
-func _wall_mesh() -> MeshInstance3D:
+## The oval of Arena.wall(), closed, counter-clockwise seen from above.
+static func oval_outline(segments := OVAL_SEGMENTS) -> PackedVector2Array:
 	var outline := PackedVector2Array()
-	var inner := Vector2(Arena.HALF_X - Arena.CORNER, Arena.HALF_Z - Arena.CORNER)
-	var corners := [Vector2(inner.x, inner.y), Vector2(-inner.x, inner.y), Vector2(-inner.x, -inner.y), Vector2(inner.x, -inner.y)]
-	for k in 4:
-		for step in 13:
-			var angle := k * PI * 0.5 + step * PI * 0.5 / 12.0
-			outline.append(corners[k] + Vector2(cos(angle), sin(angle)) * Arena.CORNER)
+	for i in segments:
+		var angle := TAU * i / segments
+		outline.append(Vector2(cos(angle) * Arena.HALF_X, sin(angle) * Arena.HALF_Z))
+	return outline
+
+
+## The bank: rings stepped in from the wall over Arena.BANK at Arena.ground()
+## heights, then a short berm back down to the level outside the wall.
+func _bank_mesh() -> ArrayMesh:
+	var outline := oval_outline()
+	var offsets := [-BERM, 0.0]       # negative: outside the wall
+	for k in 7:
+		offsets.append(Arena.BANK * (k + 1) / 6.0)   # the last ring is past the bank: level
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings := []
+	for t: float in offsets:
+		var ring := []
+		for p in outline:
+			var inward := -(Arena.wall(p).n as Vector2)
+			var q := p + inward * t
+			var y := Arena.RIM * (1.0 + t / BERM) if t < 0.0 else (Arena.RIM if t == 0.0 else Arena.ground(q))
+			ring.append(Vector3(q.x, y, q.y))
+		rings.append(ring)
+	for r in rings.size() - 1:
+		var outer: Array = rings[r]
+		var inner: Array = rings[r + 1]
+		for i in outline.size():
+			var j := (i + 1) % outline.size()
+			for v in [outer[i], inner[i], outer[j], outer[j], inner[i], inner[j]]:
+				st.set_uv(Vector2((v as Vector3).x, (v as Vector3).z))
+				st.add_vertex(v)
+	st.generate_normals()
+	st.generate_tangents()
+	return st.commit()
+
+
+## The barrier round the oval of Arena.wall(), its foot on the rim of the bank.
+func _wall_mesh() -> MeshInstance3D:
+	var outline := oval_outline()
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var run := 0.0
+	var foot := Arena.RIM - 0.05
+	var top := Arena.RIM + WALL_HEIGHT
 	for i in outline.size():
 		var a := outline[i]
 		var b := outline[(i + 1) % outline.size()]
 		var length := a.distance_to(b)
-		var normal := Vector3(-(a.x + b.x), 0.0, -(a.y + b.y)).normalized()
-		var quad := [Vector3(a.x, 0.0, a.y), Vector3(b.x, 0.0, b.y), Vector3(b.x, WALL_HEIGHT, b.y), Vector3(a.x, WALL_HEIGHT, a.y)]
+		var out := Arena.wall((a + b) * 0.5).n as Vector2
+		var normal := Vector3(-out.x, 0.0, -out.y)
+		var quad := [Vector3(a.x, foot, a.y), Vector3(b.x, foot, b.y), Vector3(b.x, top, b.y), Vector3(a.x, top, a.y)]
 		var uvs := [Vector2(run / 6.0, 1.0), Vector2((run + length) / 6.0, 1.0), Vector2((run + length) / 6.0, 0.0), Vector2(run / 6.0, 0.0)]
 		for index in [0, 1, 2, 0, 2, 3]:
 			st.set_color(Color.WHITE)
@@ -288,11 +334,12 @@ func _wall_mesh() -> MeshInstance3D:
 			st.add_vertex(quad[index])
 		if city_id == "vlore":
 			var outside := -normal * 0.48
-			var top_a := Vector3(a.x, WALL_HEIGHT, a.y)
-			var top_b := Vector3(b.x, WALL_HEIGHT, b.y)
+			var top_a := Vector3(a.x, top, a.y)
+			var top_b := Vector3(b.x, top, b.y)
 			LandmarkKit.quad_facing(st, top_a, top_b, top_b + outside, top_a + outside, Color.WHITE, Vector3.UP)
 		run += length
 	var mesh := MeshInstance3D.new()
+	mesh.name = "Wall"
 	mesh.mesh = st.commit()
 	var material := StandardMaterial3D.new()
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -458,7 +505,7 @@ func _process(dt: float) -> void:
 	for i in pads.size():
 		var p: Dictionary = arena.pickups[i]
 		pads[i].visible = bool(p.alive)
-		pads[i].position.y = 1.5 + 0.18 * sin(arena.time * 2.4 + i)
+		pads[i].position.y = 1.5 + Arena.ground(Vector2(float(p.x), float(p.z))) + 0.18 * sin(arena.time * 2.4 + i)
 	_draw_weapons(dt)
 	_follow_camera(dt)
 	driving.update(arena.cars, _driving_visuals, cam.global_position, elapsed, state == "play", false, _wall_contacts)
@@ -477,7 +524,7 @@ func _draw_weapons(dt: float) -> void:
 		if node == null:
 			node = _projectile_node(str(p.kind))
 			weapon_nodes[p.id] = node
-		node.position = Vector3(float(p.x), 1.2, float(p.z))
+		node.position = Vector3(float(p.x), 1.2 + Arena.ground(Vector2(float(p.x), float(p.z))), float(p.z))
 		var velocity := Vector3(float(p.vx), 0.0, float(p.vz))
 		if velocity.length() > 0.1 and not (node is Sprite3D):
 			node.look_at(node.position + velocity, Vector3.UP)
@@ -488,14 +535,16 @@ func _draw_weapons(dt: float) -> void:
 			node = _ground_node(str(m.kind))
 			weapon_nodes[m.id] = node
 		var flying := float(m.fly) > 0.0
-		node.position = Vector3(float(m.x), 0.06 + (1.5 * sin(PI * float(m.fly) / 0.65) if flying else 0.0), float(m.z))
+		var under := Vector2(float(m.x), float(m.z))
+		node.position = Vector3(float(m.x), Arena.ground(under) + 0.06 + (1.5 * sin(PI * float(m.fly) / 0.65) if flying else 0.0), float(m.z))
+		node.basis = Basis(Quaternion(Vector3.UP, Arena.ground_normal(under)))
 	for dm in arena.domes:
 		seen[dm.id] = true
 		var node: Node3D = weapon_nodes.get(dm.id)
 		if node == null:
 			node = _dome_node(float(dm.r))
 			weapon_nodes[dm.id] = node
-		node.position = Vector3(float(dm.x), 0.0, float(dm.z))
+		node.position = Vector3(float(dm.x), Arena.ground(Vector2(float(dm.x), float(dm.z))), float(dm.z))
 		var material := (node as MeshInstance3D).material_override as StandardMaterial3D
 		material.albedo_color.a = 0.18 if float(dm.warn) > 0.0 else 0.38 + 0.08 * sin(arena.time * 18.0)
 	for id in weapon_nodes.keys():
@@ -601,7 +650,7 @@ func _follow_camera(dt: float) -> void:
 	_cam_h = player.h if _cam_snap else lerp_angle(_cam_h, player.h, 1.0 - exp(-dt * 4.5))
 	_cam_snap = false
 	var forward := Vector3(-sin(_cam_h), 0.0, cos(_cam_h))
-	var car := Vector3(player.x, player.hop, player.z)
+	var car := Vector3(player.x, player.hop + Arena.ground(player.at()), player.z)
 	var back := 8.6 + (1.4 if player.nitro_t > 0.0 or player.ram_t > 0.0 else 0.0)
 	cam.global_position = car - forward * back + Vector3(_kick.x, 3.5, _kick.y)
 	cam.look_at(car + forward * 6.0 + Vector3.UP * 1.0, Vector3.UP)
@@ -635,7 +684,9 @@ func _limited(key: String, gap: float) -> bool:
 
 
 func _at(e: Dictionary) -> Vector3:
-	return Vector3(float(e.get("x", 0.0)), 0.8, float(e.get("z", 0.0)))
+	var x := float(e.get("x", 0.0))
+	var z := float(e.get("z", 0.0))
+	return Vector3(x, 0.8 + Arena.ground(Vector2(x, z)), z)
 
 
 func _events() -> void:
@@ -681,7 +732,7 @@ func _events() -> void:
 				if c == player:
 					Sfx.haptic("fire")
 			"wall":
-				_wall_contacts[c] = Vector3(e.x, 0.35, e.z)
+				_wall_contacts[c] = Vector3(e.x, 0.35 + Arena.ground(Vector2(e.x, e.z)), e.z)
 				if c == player and _limited("wall", 0.4):
 					Sfx.play("wall_impact", "Impacts", -4.0)
 					_kick_camera(e.dir, minf(0.5, float(e.imp) / 40.0))

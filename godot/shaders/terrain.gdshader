@@ -28,6 +28,13 @@ uniform vec2 shore_origin = vec2(-4500.0);
 uniform float shore_size = 9000.0;
 uniform float beach_span = 60.0;
 uniform vec3 sand_color : source_color = vec3(0.80, 0.72, 0.58);
+// Beach detail (Poly Haven Coast Sand 04, 3.94 m tile): colour divided by its
+// mean so sand_color keeps the tone; ARM green is roughness.
+uniform sampler2D tex_sand : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex_sand_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex_sand_arm : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+const vec3 SAND_MEAN = vec3(0.117, 0.092, 0.053);
+const float SAND_TILE = 3.94;
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 uniform float snow : hint_range(0.0, 1.0) = 0.0;
 uniform float night : hint_range(0.0, 1.0) = 0.0;
@@ -158,9 +165,15 @@ void fragment() {
 		float beach = (1.0 - smoothstep(16.0, 34.0, to_water)) * on_grid;
 		float sand_w = beach * (1.0 - road_w) * (1.0 - smoothstep(3.0, 6.0, above)) * smoothstep(0.75, 0.9, wnrm.y);
 		float wet_sand = 1.0 - smoothstep(0.0, 0.6, above);
-		base = mix(base, sand_color * (1.0 - 0.35 * wet_sand), sand_w);
-		rough = mix(rough, mix(0.9, 0.45, wet_sand), sand_w);
-		nrm = mix(nrm, vec3(0.5, 0.5, 1.0), sand_w * 0.6);
+		vec2 sand_uv = wpos.xz / SAND_TILE;
+		vec3 grain = texture(tex_sand, sand_uv).rgb / SAND_MEAN;
+		// The grain fades with distance like the other near textures.
+		grain = mix(grain, vec3(1.0), far_w);
+		vec3 sand_arm = texture(tex_sand_arm, sand_uv).rgb;
+		base = mix(base, sand_color * grain * sand_arm.r * (1.0 - 0.35 * wet_sand), sand_w);
+		rough = mix(rough, mix(sand_arm.g, 0.45, wet_sand), sand_w);
+		vec3 sand_n = mix(texture(tex_sand_n, sand_uv).rgb, vec3(0.5, 0.5, 1.0), far_w);
+		nrm = mix(nrm, mix(sand_n, vec3(0.5, 0.5, 1.0), wet_sand * 0.6), sand_w);
 		// Mapped rivers and ponds keep their painted water above the sea.
 		water_w = smoothstep(0.3, 0.8, sp.b) * step(0.3, above);
 		base = mix(base, sand_color * 0.4, 1.0 - step(0.0, above));

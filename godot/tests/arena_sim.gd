@@ -70,6 +70,13 @@ func _ready() -> void:
 	check(float(Arena.wall(Vector2(Arena.HALF_X + 2.0, 0.0)).d) < 0.0, "outside the wall the distance is negative")
 	var corner := Vector2(Arena.HALF_X - 1.0, Arena.HALF_Z - 1.0)
 	check(float(Arena.wall(corner).d) < 0.0, "the corners are rounded off")
+	var diagonal := Vector2(cos(0.7) * Arena.HALF_X, sin(0.7) * Arena.HALF_Z)
+	check(absf(float(Arena.wall(diagonal).d)) < 0.01 and absf(float(Arena.wall(diagonal * 1.05).d)) > 0.5, "the wall is an oval")
+	# The bank: level in the middle, a 10 % rise over the last metres.
+	check(Arena.ground(Vector2.ZERO) == 0.0 and Arena.ground(Vector2(Arena.HALF_X - Arena.BANK - 1.0, 0.0)) == 0.0, "the middle is level")
+	var up := Arena.ground(Vector2(Arena.HALF_X - 5.0, 0.0)) - Arena.ground(Vector2(Arena.HALF_X - 15.0, 0.0))
+	check(is_equal_approx(Arena.SLOPE, 0.1) and absf(up - 1.0) < 0.01 and is_equal_approx(Arena.ground(Vector2(Arena.HALF_X, 0.0)), Arena.RIM), "the bank climbs 1 m in 10 m, to the rim at the wall")
+	check(Arena.ground_normal(Vector2(Arena.HALF_X - 5.0, 0.0)).x < -0.09 and Arena.ground_normal(Vector2.ZERO) == Vector3.UP, "the bank leans in toward the middle")
 	for pad in Arena.PADS:
 		var at := Vector2(float(pad[0]), float(pad[1]))
 		check(float(Arena.wall(at).d) > 8.0 and at.length() > Arena.ISLAND + 8.0, "every pickup pad is on open ground")
@@ -147,6 +154,23 @@ func _ready() -> void:
 	run(arena, 6.0)
 	check(p.v > top * 0.85 and p.v <= top * 1.03, "top speed on the square is the scaled-down one (%.1f of %.1f)" % [p.v, top])
 
+	# The bank: climbing it costs speed, a car coming down it gains.
+	arena = new_arena()
+	p = arena.player
+	park(arena, [p])
+	var flat := new_arena()
+	park(flat, [flat.player])
+	place(flat.player, Vector2(-40.0, 0.0), 0.0, 25.0)
+	place(p, Vector2(-40.0, Arena.HALF_Z - Arena.BANK - 1.0), 0.0, 25.0)
+	run(arena, 0.6)
+	run(flat, 0.6)
+	check(p.v < flat.player.v - 0.3, "climbing the bank costs speed")
+	place(p, Vector2(-40.0, Arena.HALF_Z - 2.0), PI, 10.0)
+	place(flat.player, Vector2(-40.0, 0.0), PI, 10.0)
+	run(arena, 0.6)
+	run(flat, 0.6)
+	check(p.v > flat.player.v + 0.3, "coming down the bank gains speed")
+
 	# Walls and the island keep the cars in, without eating all the speed.
 	arena = new_arena()
 	p = arena.player
@@ -167,6 +191,14 @@ func _ready() -> void:
 	place(p, Vector2(Arena.HALF_X - 8.0, 0.0), -PI * 0.5, 30.0)
 	events = run(arena, 0.6)
 	check(of(events, "wreck").size() == 1 and of(events, "wreck")[0].by == null and of(events, "wreck")[0].pts == 0, "a wall can wreck a weak car, to nobody's credit")
+	# A wreck thrown at the wall slides along it, not through it.
+	arena = new_arena()
+	p = arena.player
+	park(arena, [p])
+	place(p, Vector2(Arena.HALF_X - 6.0, 0.0), -PI * 0.5, 40.0)
+	arena.wreck(p)
+	run(arena, 1.0)
+	check(inside(p), "a sliding wreck stays inside the wall")
 
 	# A ram: the car driving in scores, by closing speed.
 	arena = new_arena()
@@ -264,7 +296,7 @@ func _ready() -> void:
 	check(p.slot_type() == "shield", "cycling brings the next item up")
 	p.ctrl.fire = true
 	run(arena, 0.05)
-	check(p.shield_t > 7.0 and arena.item_status(p, false, "shield").reason == "shield_active", "the shield goes up once")
+	check(p.shield_t > Arena.SHIELD_TIME - 0.2 and arena.item_status(p, false, "shield").reason == "shield_active", "the shield goes up once")
 	p.ctrl.fire = true
 	run(arena, 0.05)
 	check(p.nitro_t > 2.0, "nitro fires")
@@ -298,6 +330,27 @@ func _ready() -> void:
 	victim.shield_t = 5.0
 	arena.score_hit(p, victim, 30.0, victim.at())
 	check(victim.health == victim.max_hp and p.score > 0, "a shielded car is hit for points but not for damage")
+	check(p.health < p.max_hp, "a shield is spiked: the rammer takes part of its own blow")
+	# Under nitro a hit is worth half as much again.
+	arena = new_arena()
+	p = arena.player
+	victim = arena.cars.filter(func(c: ArenaCar) -> bool: return c != p)[0]
+	p.nitro_t = 1.0
+	arena.score_hit(p, victim, 20.0, victim.at())
+	check(p.score == roundi(20.0 * Arena.HIT_POINTS * Arena.NITRO_HIT), "a nitro hit pays %d, not %d" % [p.score, roundi(20.0 * Arena.HIT_POINTS)])
+	# A car back from a wreck pays nothing while its grace lasts.
+	arena = new_arena()
+	p = arena.player
+	victim = arena.cars.filter(func(c: ArenaCar) -> bool: return c != p)[0]
+	victim.invuln_t = 1.0
+	arena.score_hit(p, victim, 30.0, victim.at())
+	check(p.score == 0 and p.hits_n == 0, "no points for ramming a car in its respawn grace")
+	# The pickups lean to attack: weapons and charges far outweigh cover.
+	var cover := float(Arena.PICKUPS.shield + Arena.PICKUPS.repair)
+	var total_weight := 0.0
+	for kind in Arena.PICKUPS:
+		total_weight += float(Arena.PICKUPS[kind])
+	check(cover / total_weight < 0.12, "defensive pickups are rare (%.0f%%)" % (cover / total_weight * 100.0))
 
 	# The clock: time up ends the scoring and stops the cars.
 	arena = new_arena({"time": 2.0})

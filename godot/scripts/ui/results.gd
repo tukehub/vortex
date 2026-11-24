@@ -163,8 +163,9 @@ func _ready() -> void:
 	var menu := UiTheme.button(Data.t("results.menu"), Color(0, 0, 0, 0), 180)
 	menu.pressed.connect(func(): Sfx.ui_back(); Game.goto("menu"))
 	hb.add_child(menu)
-	if place == 1:
-		Sfx.play("finish", "UI", -4.0)
+	# Kenney Music Jingles (tools/build_cc0_audio.py): rising for the podium,
+	# falling below it.
+	Sfx.play("result_win" if place == 1 else "result_podium" if place <= 3 else "result_lose", "UI", -4.0)
 	# The grid has to lay its rows out before they can slide to their places.
 	await get_tree().process_frame
 	for i in row_cells.size():

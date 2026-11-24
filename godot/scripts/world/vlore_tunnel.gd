@@ -75,7 +75,15 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 		previous = inner
 		previous_outer = outer
 	var rock_mat := LandmarkKit.material()
-	rock_mat.albedo_texture = preload("res://assets/textures/rock_diff.jpg")
+	# Pale limestone headland (Poly Haven Rock Face 03), darkened to the old
+	# rock's brightness so the portal light and emission still balance.
+	rock_mat.albedo_texture = preload("res://assets/textures/limestone_diff.jpg")
+	rock_mat.albedo_color = Color(0.70, 0.70, 0.70)
+	rock_mat.normal_enabled = true
+	rock_mat.normal_texture = preload("res://assets/textures/limestone_nor.jpg")
+	rock_mat.roughness_texture = preload("res://assets/textures/limestone_arm.jpg")
+	rock_mat.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+	rock_mat.roughness = 1.0
 	rock_mat.uv1_triplanar = true
 	rock_mat.uv1_scale = Vector3.ONE * 0.22
 	rock_mat.emission_enabled = true

@@ -46,6 +46,10 @@ func build(terrain: Terrain, track: RaceTrack, anchors: Array) -> void:
 	_mat = ShaderMaterial.new()
 	_mat.shader = SHADER
 	_mat.set_shader_parameter("water_y", terrain.water_surface + 0.0)
+	_mat.set_shader_parameter("grain", preload("res://assets/textures/limestone_diff.jpg"))
+	_mat.set_shader_parameter("grain_n", preload("res://assets/textures/limestone_nor.jpg"))
+	_mat.set_shader_parameter("grain_arm", preload("res://assets/textures/limestone_arm.jpg"))
+	_mat.set_shader_parameter("detail", Quality.preset != "low")
 	var meshes: Array[ArrayMesh] = []
 	var far_mesh := _stone_mesh(0, 3, 5)
 	for v in VARIANTS:

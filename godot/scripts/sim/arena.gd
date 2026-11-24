@@ -1,24 +1,30 @@
 class_name Arena
 extends RefCounted
-## Points mode: free driving in a walled square, no track. Ram the others for
+## Points mode: free driving in a walled oval bowl, no track. Ram the others for
 ## points; quick hits in a row build a multiplier; a wreck pays a bonus. The
 ## highest score when the clock runs out wins. Node-free and deterministic,
-## fixed 60 Hz steps, like Race. Port of the legacy src/035_arena.js, without
-## its projectile weapons: the pickups here are the ones a car uses on itself.
+## fixed 60 Hz steps, like Race. Port of the legacy src/035_arena.js, with
+## charges (ram, nitro, spiked shield, repair) and thrown or fired weapons.
 
-# The square is a rounded rectangle with a round island in the middle. It is
-# half as large again in area as the legacy square (each side x1.225).
-const HALF_X := 147.0
-const HALF_Z := 103.0
-const CORNER := 32.0
+# The arena is an oval (HALF_X x HALF_Z semi-axes, about the area of the old
+# rounded square) with a round island in the middle. The last BANK metres
+# before the wall rise at a SLOPE grade, so the edge is a banked lip that
+# slows a car climbing it and throws it back into the fight.
+const HALF_X := 165.0
+const HALF_Z := 116.0
+const BANK := 18.0               # width of the banked edge, metres
+const SLOPE := 0.10              # 10 % grade on the bank
+const RIM := BANK * SLOPE        # the wall's foot stands this high
+const GRAVITY := 9.81
 const ISLAND := 15.0
-const PADS := [[-113, -69], [0, -78], [113, -69], [-113, 69], [0, 78], [113, 69], [-73, 0], [73, 0],
-	[-118, 0], [118, 0], [-47, -44], [47, 44], [-47, 44], [47, -44], [0, -39], [0, 39],
-	[-80, -40], [80, 40], [-80, 40], [80, -40], [0, -92], [0, 92]]
-# Pickup weights. Ram, nitro, shield and repair act on the car itself; the
-# rest are weapons. Eagle, bolt, mine and oil can also go backwards.
-const PICKUPS := {"ram": 10, "nitro": 9, "shield": 7, "repair": 6, "eagle": 9, "bolt": 10,
-	"cluster": 8, "barge": 8, "mine": 8, "oil": 8, "shock": 5}
+const PADS := [[-112, -64], [0, -86], [112, -64], [-112, 64], [0, 86], [112, 64], [-80, 0], [80, 0],
+	[-130, 0], [130, 0], [-52, -48], [52, 48], [-52, 48], [52, -48], [0, -43], [0, 43],
+	[-88, -44], [88, 44], [-88, 44], [88, -44], [0, -101], [0, 101]]
+# Pickup weights, tilted to attack. Ram and nitro are charges for hitting
+# harder; shield and repair are the only defensive items and come rarely.
+# Eagle, bolt, mine and oil can also go backwards.
+const PICKUPS := {"ram": 12, "nitro": 6, "shield": 3, "repair": 3, "eagle": 11, "bolt": 12,
+	"cluster": 10, "barge": 10, "mine": 9, "oil": 6, "shock": 6}
 const BACKWARDS := ["eagle", "bolt", "mine", "oil"]
 const SPEED := 0.74              # top speeds are scaled down for the square
 const HIT_SPEED := 4.0           # closing speed that counts as a hit
@@ -30,9 +36,12 @@ const COMBO_MAX := 3
 const WRECK_POINTS := 50
 # Points for landing a weapon, before the multiplier.
 const WEAPON_POINTS := {"eagle": 30, "bolt": 10, "cluster": 6, "barge": 15, "mine": 20, "oil": 10, "shock": 15}
-const RAM_TIME := 1.6
+const RAM_TIME := 2.0
 const NITRO_TIME := 2.6
-const SHIELD_TIME := 8.0
+const NITRO_HIT := 1.5           # points and damage of a hit landed under nitro
+const SHIELD_TIME := 5.0
+const SPIKES := 0.6              # share of a blow a shield throws back at the rammer
+const BARGE_REACH := 18.0
 const WRECK_TIME := 2.4
 
 var arena := true
@@ -162,19 +171,30 @@ func time_left() -> float:
 
 
 ## Signed distance to the outer wall (positive inside) and the outward normal
-## at the nearest wall point.
+## at the nearest wall point. First-order distance to the ellipse: exact on
+## the axes and at the wall, within centimetres across the bank.
 static func wall(p: Vector2) -> Dictionary:
-	var inner := Vector2(HALF_X - CORNER, HALF_Z - CORNER)
-	var nearest := Vector2(clampf(p.x, -inner.x, inner.x), clampf(p.y, -inner.y, inner.y))
-	var out := p - nearest
-	var distance := out.length()
-	if distance > 0.000001:
-		return {"d": CORNER - distance, "n": out / distance}
-	var to_x := HALF_X - absf(p.x)
-	var to_z := HALF_Z - absf(p.y)
-	if to_x < to_z:
-		return {"d": to_x, "n": Vector2(1.0 if p.x >= 0.0 else -1.0, 0.0)}
-	return {"d": to_z, "n": Vector2(0.0, 1.0 if p.y >= 0.0 else -1.0)}
+	var q := Vector2(p.x / HALF_X, p.y / HALF_Z)
+	var g := q.length()
+	if g < 0.000001:
+		return {"d": HALF_Z, "n": Vector2(0.0, 1.0)}
+	var grad := Vector2(p.x / (HALF_X * HALF_X), p.y / (HALF_Z * HALF_Z)) / g
+	var slope := grad.length()
+	return {"d": (1.0 - g) / slope, "n": grad / slope}
+
+
+## Height of the ground: level in the middle, rising at SLOPE over the BANK.
+static func ground(p: Vector2) -> float:
+	return SLOPE * clampf(BANK - float(wall(p).d), 0.0, BANK)
+
+
+## The ground's up vector at `p` (straight up away from the bank).
+static func ground_normal(p: Vector2) -> Vector3:
+	var room := wall(p)
+	if float(room.d) >= BANK or float(room.d) < 0.0:
+		return Vector3.UP
+	var n: Vector2 = room.n
+	return Vector3(-n.x * SLOPE, 1.0, -n.y * SLOPE).normalized()
 
 
 func step(dt: float) -> void:
@@ -245,6 +265,9 @@ func physics(c: ArenaCar, dt: float) -> void:
 		c.wreck_t -= dt
 		c.vx *= exp(-3.0 * dt)
 		c.vz *= exp(-3.0 * dt)
+		var slide := downhill(c.at(), dt)
+		c.vx += slide.x
+		c.vz += slide.y
 		c.x += c.vx * dt
 		c.z += c.vz * dt
 		if c.wreck_t <= 0.0:
@@ -253,7 +276,7 @@ func physics(c: ArenaCar, dt: float) -> void:
 	var def := c.def
 	var f := c.forward()
 	var r := c.right()
-	var velocity := Vector2(c.vx, c.vz)
+	var velocity := Vector2(c.vx, c.vz) + downhill(c.at(), dt) * (1.0 if started and not over else 0.0)
 	var vf := velocity.dot(f)
 	var vl := velocity.dot(r)
 	var steer_in := c.ctrl.steer
@@ -312,6 +335,14 @@ func physics(c: ArenaCar, dt: float) -> void:
 	c.lat = vl
 	c.braking = brake and not drifting and vf > 1.0
 	c.gas_on = gas
+
+
+## Speed gained in `dt` rolling down the bank at `p` (zero on the level).
+static func downhill(p: Vector2, dt: float) -> Vector2:
+	var room := wall(p)
+	if float(room.d) >= BANK or float(room.d) < 0.0:
+		return Vector2.ZERO
+	return -(room.n as Vector2) * GRAVITY * SLOPE / sqrt(1.0 + SLOPE * SLOPE) * dt
 
 
 func collide(impulses: bool) -> void:
@@ -376,17 +407,29 @@ func score_hit(attacker: ArenaCar, victim: ArenaCar, closing: float, point: Vect
 	if _pair_t.has(key) and time - float(_pair_t[key]) < PAIR_COOLDOWN:
 		return
 	_pair_t[key] = time
+	# A car back from a wreck is fair game only once its grace runs out:
+	# no points for camping the respawn.
+	if victim.invuln_t > 0.0:
+		return
 	# A ram charge doubles the points, hits far harder, throws the victim
 	# away and costs the rammer nothing. A shield takes the blow instead.
 	var ram := attacker.ram_t > 0.0
-	var guarded := victim.shield_t > 0.0 or victim.invuln_t > 0.0
-	var gain := award(attacker, victim, roundi(closing * HIT_POINTS) * (2 if ram else 1))
+	var boosted := not ram and attacker.nitro_t > 0.0
+	var guarded := victim.shield_t > 0.0
+	var base := roundi(closing * HIT_POINTS * (NITRO_HIT if boosted else 1.0)) * (2 if ram else 1)
+	var gain := award(attacker, victim, base)
 	var dir := (victim.at() - attacker.at()).normalized()
 	emit({"t": "score", "car": attacker, "victim": victim, "pts": gain, "combo": attacker.combo, "imp": closing,
 		"ram": ram, "x": point.x, "z": point.y, "dir": dir, "guarded": guarded})
+	var dmg := maxf(0.0, closing - 8.0) * 1.9 * (2.5 if ram else (NITRO_HIT if boosted else 1.0)) + (12.0 if ram else 0.0)
 	if guarded:
+		# A spiked shield: the blow comes back at the rammer, unless it is
+		# charging or shielded itself.
+		if attacker.ram_t <= 0.0 and attacker.shield_t <= 0.0:
+			damage(attacker, dmg * SPIKES)
+			attacker.vx -= dir.x * 6.0
+			attacker.vz -= dir.y * 6.0
 		return
-	var dmg := maxf(0.0, closing - 8.0) * 1.9 * (2.5 if ram else 1.0) + (12.0 if ram else 0.0)
 	if ram:
 		victim.vx += dir.x * 16.0
 		victim.vz += dir.y * 16.0
@@ -475,6 +518,23 @@ func respawn(c: ArenaCar) -> void:
 
 func walls(c: ArenaCar) -> void:
 	if c.wreck_t > 0.0:
+		# A wreck still slides: keep it in, quietly, without scrapes or events.
+		for p: Vector2 in c.circles():
+			var room := wall(p)
+			if float(room.d) < ArenaCar.BODY_RADIUS:
+				var n: Vector2 = room.n
+				var depth := ArenaCar.BODY_RADIUS - float(room.d)
+				c.x -= n.x * depth
+				c.z -= n.y * depth
+				var into := Vector2(c.vx, c.vz).dot(n)
+				if into > 0.0:
+					c.vx -= n.x * into
+					c.vz -= n.y * into
+			var from_centre := p.length()
+			var limit := ISLAND + ArenaCar.BODY_RADIUS
+			if from_centre < limit and from_centre > 0.00001:
+				c.x += p.x / from_centre * (limit - from_centre)
+				c.z += p.y / from_centre * (limit - from_centre)
 		return
 	for p: Vector2 in c.circles():
 		var outer := wall(p)
@@ -609,8 +669,8 @@ func use_item(c: ArenaCar, back := false) -> void:
 					continue
 				var away := o.at() - c.at()
 				var distance := maxf(away.length(), 0.001)
-				if distance < 15.0:
-					var force := 1.0 - distance / 15.0
+				if distance < BARGE_REACH:
+					var force := 1.0 - distance / BARGE_REACH
 					hit(o, c, "barge", 12.0 + 12.0 * force, {"slow": 0.9, "push": away / distance * (12.0 + 14.0 * force)})
 			emit({"t": "barge", "car": c, "x": c.x, "z": c.z})
 		"mine", "oil":
@@ -641,6 +701,8 @@ func use_item(c: ArenaCar, back := false) -> void:
 				var room := wall(spot)
 				if float(room.d) < 5.0:
 					spot -= (room.n as Vector2) * (5.0 - float(room.d))
+				if spot.length() < ISLAND + 3.0:
+					spot = (spot.normalized() if spot.length() > 0.001 else Vector2.RIGHT) * (ISLAND + 3.0)
 				domes.append({"id": _nid(), "owner_id": c.id, "x": spot.x, "z": spot.y, "r": 4.8, "warn": 0.9, "life": 7.0, "hit": {}})
 			emit({"t": "shock", "car": c, "target": lead})
 	if used:
@@ -742,6 +804,13 @@ func update_mines(dt: float) -> void:
 			if float(room.d) < 1.5:
 				m.x = float(m.x) - (room.n as Vector2).x * (1.5 - float(room.d))
 				m.z = float(m.z) - (room.n as Vector2).y * (1.5 - float(room.d))
+				m.fly = 0.0
+			var spot := Vector2(m.x, m.z)
+			if spot.length() < ISLAND + 1.5:
+				# Bounced off the monument's island: it lands at its foot.
+				spot = (spot.normalized() if spot.length() > 0.001 else Vector2.RIGHT) * (ISLAND + 1.5)
+				m.x = spot.x
+				m.z = spot.y
 				m.fly = 0.0
 			continue
 		m.life = float(m.life) - dt
@@ -908,7 +977,9 @@ func ai_items(c: ArenaCar) -> void:
 			for p in projs:
 				if int(p.target_id) == c.id or (int(p.owner_id) != c.id and Vector2(p.x, p.z).distance_to(c.at()) < 25.0):
 					threat = true
-			use = threat or (c.health < c.max_hp * 0.5 and roll < 0.25) or roll < 0.04
+			# Spiked: as good for charging in as for taking a blow.
+			var charge := target != null and target == aim_at(c, 28.0, 0.8) and roll < 0.6
+			use = threat or charge or (c.health < c.max_hp * 0.5 and roll < 0.25) or roll < 0.04
 		"repair":
 			use = c.health < c.max_hp * 0.45
 		"eagle":

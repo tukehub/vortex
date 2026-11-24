@@ -14,7 +14,8 @@ Sources (all CC0 1.0), unpacked into one directory passed as --src:
                         SketchMan3 "wind whoosh loop"
                         opengameart.org/content/wind-whoosh-loop
 
-Tyre screech, wall scrape and rain stay procedural (tools/gen_sfx.py), and
+Wall scrape and rain stay procedural (tools/gen_sfx.py), tyre screech and the
+result jingles come from tools/build_cc0_audio.py, and
 wall_impact.wav is an existing recording that this script leaves alone.
 
     python tools/build_sfx.py --src /path/to/sources
