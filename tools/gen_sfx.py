@@ -1,5 +1,6 @@
-"""Procedural sound effects for Vortex (CC0, generated): tyre screech, wall
-scrape and rain. Everything else comes from tools/build_sfx.py.
+"""Procedural sound effects for Vortex (CC0, generated): wall scrape and rain.
+Tyre screech comes from tools/build_cc0_audio.py, everything else from
+tools/build_sfx.py.
 
 Writes 16-bit mono WAVs into godot/assets/sfx. Loops carry a 'smpl' chunk so
 Godot's WAV importer picks up forward looping automatically.
@@ -320,7 +321,6 @@ def main() -> None:
     # other sound is assembled from CC0 recordings by tools/build_sfx.py. The
     # generators above remain as helpers and references.
     items = {
-        "screech_loop": (screech_loop(), True),
         "scrape_loop": (scrape_loop(), True),
         "rain_loop": (rain_loop(), True),
     }
