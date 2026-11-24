@@ -27,7 +27,10 @@ func _ready() -> void:
 			add_child(road)
 			road.build(track, track.half_w, 0.0, Callable(), reverse)
 			var marks := road.set_crossings(track, rows)
-			check(marks.size() == rows.size(), "%s paints every crossing (reverse=%s)" % [city_id, reverse])
+			# Vlorë's one road paints each crossing across the other half too,
+			# unless that half has its own crossing there.
+			var mirrored := marks.size() - rows.size()
+			check(mirrored == 0 if city_id == "tirane" else mirrored > rows.size() / 2, "%s paints every crossing, on both halves of one road (reverse=%s, %d mirrored)" % [city_id, reverse, mirrored])
 			check(int(road.surface_mat.get_shader_parameter("crossing_count")) == marks.size(), "crossing count reaches the shader")
 			var sent: PackedVector2Array = road.surface_mat.get_shader_parameter("crossings")
 			check(sent.size() == RoadMesh.MAX_CROSSINGS, "the shader array is always full length")

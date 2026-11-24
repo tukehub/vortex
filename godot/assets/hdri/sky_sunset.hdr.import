@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://jqcij45qx8vn"
-path="res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.ctex"
+path.bptc="res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.bptc.ctex"
+path.astc="res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.astc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/hdri/sky_sunset.hdr"
-dest_files=["res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.ctex"]
+dest_files=["res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.bptc.ctex", "res://.godot/imported/sky_sunset.hdr-ddd37ac103be10ed12d0eec9aabddcfc.astc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

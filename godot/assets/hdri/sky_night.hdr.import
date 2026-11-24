@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ddobgs6xf5fir"
-path="res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.ctex"
+path.bptc="res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.bptc.ctex"
+path.astc="res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.astc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/hdri/sky_night.hdr"
-dest_files=["res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.ctex"]
+dest_files=["res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.bptc.ctex", "res://.godot/imported/sky_night.hdr-ddae3daf322b209a4c20b2e30b92d050.astc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

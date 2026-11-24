@@ -112,7 +112,9 @@ func _derive_budget() -> void:
 	p.mirror_width = 256 if stage == 0 else (192 if stage == 1 else 128)
 	p.fx_extras = preset != "low" and stage < 2
 	p.paint_flakes = p.fx_extras
-	p.speed_post = p.fx_extras
+	# The radial blur copies and re-reads the whole native-resolution screen
+	# every fast frame. A phone pays that only on high.
+	p.speed_post = p.fx_extras and (renderer == "forward_plus" or preset == "high")
 	p.driving_cars = maxi(0, {"low": 0, "medium": 2, "high": 3}[preset] - stage) if stage < 2 else 0
 	p.fx_flash_limit = maxi(2, {"low": 3, "medium": 5, "high": 8}[preset] - stage * 2)
 	p.fx_ring_limit = maxi(0, {"low": 2, "medium": 4, "high": 6}[preset] - stage * 2)
@@ -132,7 +134,9 @@ func _derive_budget() -> void:
 	# re-renders (one cube face a frame) after every `probe_step` metres;
 	# high adds static probes at the landmarks nearest the road.
 	p.probe = bool(p.probe) and stage < 3
-	p.probe_step = 30.0 if preset == "high" else 45.0
+	# Each step is six cube-face scene renders plus a radiance filter; at
+	# racing speed medium re-rendered almost continuously at 45 m.
+	p.probe_step = 30.0 if preset == "high" else 90.0
 	p.landmark_probes = 6 if preset == "high" and stage < 2 else 0
 	# Street furniture (3.4): benches, bins and bollards only where there is room.
 	p.street_small = preset != "low" and stage < 2
@@ -164,7 +168,24 @@ func _derive_budget() -> void:
 			p[key] = false
 		for key in MESH_OMNI_SHARE:
 			p[key] = mini(int(p[key]), int(MESH_OMNI_SHARE[key]))
-	Engine.max_fps = frame_target
+	Engine.max_fps = _fps_cap()
+
+
+## Menus left alone draw at 30 FPS: the turning garage car does not need 60,
+## and a phone resting on the title screen should not heat up. Any touch
+## brings the chosen rate back at once.
+const IDLE_FPS := 30
+var idle_paced := false
+
+func set_idle_paced(on: bool) -> void:
+	if on == idle_paced:
+		return
+	idle_paced = on
+	Engine.max_fps = _fps_cap()
+
+
+func _fps_cap() -> int:
+	return mini(IDLE_FPS, frame_target) if idle_paced else frame_target
 
 
 func observe_frame(dt: float, active := true) -> void:

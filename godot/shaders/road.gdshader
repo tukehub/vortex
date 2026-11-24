@@ -22,8 +22,8 @@ uniform vec2 stone_section = vec2(0.0); // start and length in metres
 // props.json "road_marks" (OSM highway=crossing nodes, or one before each
 // signalised junction where none is mapped), and procedural manholes, kerb
 // gullies and repaired patches placed by hashing the lap into cells.
-const int MAX_CROSSINGS = 24;
-uniform vec2 crossings[24];
+const int MAX_CROSSINGS = 48;
+uniform vec2 crossings[48];
 uniform int crossing_count = 0;
 // R8, one texel per CROSSING_CELL metres of lap: crossing index + 1, or 0.
 uniform sampler2D crossing_map : filter_nearest, repeat_disable;
@@ -35,6 +35,9 @@ uniform float showcase_direction = 1.0;
 
 varying vec2 ruv;
 varying vec3 wpos;
+// RoadMesh UV2: x = the side (-1 left, 1 right) on which the other pass of
+// an out-and-back runs alongside as one road, y = metres to that road's middle.
+varying vec2 join;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -61,6 +64,7 @@ float vnoise(vec2 p) {
 
 void vertex() {
 	ruv = UV;
+	join = UV2;
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
@@ -69,6 +73,9 @@ void fragment() {
 	float along = ruv.y;
 	float city_s = mod(along * showcase_direction, track_len);
 	float showcase = smoothstep(0.0, 8.0, min(city_s, showcase_length - city_s));
+	// 1 on the half that runs on into the other carriageway: no edge line,
+	// gutter or gully there, and the joined road's centre line at join.y.
+	float joined = clamp(join.x * sign(across), 0.0, 1.0);
 	vec2 tuv = vec2(across, along) / 5.0;
 	// second asphalt sample rotated to kill repetition
 	vec2 tuv2 = vec2(along, -across) / 7.3;
@@ -82,7 +89,7 @@ void fragment() {
 	float rough = aggregate * 0.45 + 0.5;
 	// A darker, matte gutter ties the asphalt to the physical curb. The outer
 	// edge blends toward the shoulder instead of reading as a bright raised slab.
-	float gutter = smoothstep(half_w - 1.0, half_w + 0.3, abs(across));
+	float gutter = smoothstep(half_w - 1.0, half_w + 0.3, abs(across)) * (1.0 - joined);
 	asphalt *= 1.0 - gutter * 0.10;
 	asphalt = mix(asphalt, asphalt * vec3(0.78, 0.74, 0.65), (1.0 - COLOR.a) * 0.6);
 	rough = min(0.98, rough + gutter * 0.08);
@@ -91,6 +98,7 @@ void fragment() {
 	float lane_w = 2.0 * half_w / lane_count;
 	float lane_pos = fract((across + half_w) / lane_w);
 	float wear = exp(-pow((lane_pos - 0.3) * 6.0, 2.0)) + exp(-pow((lane_pos - 0.7) * 6.0, 2.0));
+	wear *= 1.0 - joined * step(half_w, abs(across));
 	asphalt *= 1.0 - 0.09 * wear;
 
 	// Patch seams use broad, staggered cells. Mipmapped asphalt roughness
@@ -116,13 +124,15 @@ void fragment() {
 	// crawling stair-steps (MSAA cannot fix aliasing inside a shader).
 	float aa_x = max(fwidth(across), 0.002);
 	float aa_s = max(fwidth(along), 0.002);
-	float edge = line_mask(abs(abs(across) - (half_w - 0.35)), 0.2, aa_x);
+	float edge = line_mask(abs(abs(across) - (half_w - 0.35)), 0.2, aa_x) * (1.0 - joined);
 	float centre = line_mask(abs(across), 0.17, aa_x);
 	float centre_dash = 0.0;
 	if (one_way) {
 		centre_dash = line_mask(abs(across), 0.12, aa_x);
 		centre = 0.0;
 	}
+	// Each pass paints its half of the joined road's solid centre line.
+	centre = max(centre, joined * line_mask(abs(abs(across) - join.y), 0.12, aa_x));
 	// 3 m dashes, 3 m gaps, with filtered ends.
 	float dash_pos = fract(along / 6.0) * 6.0;
 	float dash = smoothstep(3.0 - aa_s, 3.0 + aa_s, dash_pos) * (1.0 - smoothstep(6.0 - aa_s, 6.0, dash_pos));
@@ -190,7 +200,7 @@ void fragment() {
 		if (cell_hash(gc, 7.3) < 0.85) {
 			float side = cell_hash(gc, 1.9) < 0.5 ? -1.0 : 1.0;
 			vec2 q = vec2(across - side * (half_w - 0.86), along - (gc + 0.5) * 24.0);
-			if (abs(q.x) < 0.26 && abs(q.y) < 0.46) {
+			if (abs(q.x) < 0.26 && abs(q.y) < 0.46 && join.x * side < 0.5) {
 				grate = 1.0;
 				float rim = max(step(0.2, abs(q.x)), step(0.4, abs(q.y)));
 				float slot = step(0.55, fract(q.y / 0.07)) * (1.0 - rim) * step(abs(q.x), 0.17);
@@ -214,12 +224,13 @@ void fragment() {
 		float dz = along - crossings[ci].x;
 		dz -= track_len * round(dz / track_len);
 		no_lines = max(no_lines, 1.0 - smoothstep(hw2 + 0.6, hw2 + 0.6 + aa_s, abs(dz)));
-		float span = (1.0 - smoothstep(hw2 - aa_s, hw2 + aa_s, abs(dz))) * (1.0 - smoothstep(half_w - 0.7 - aa_x, half_w - 0.7 + aa_x, abs(across)));
+		float reach = mix(half_w - 0.7, join.y, joined);
+		float span = (1.0 - smoothstep(hw2 - aa_s, hw2 + aa_s, abs(dz))) * (1.0 - smoothstep(reach - aa_x, reach + aa_x, abs(across)));
 		float bar = 1.0 - smoothstep(0.25 - aa_x, 0.25 + aa_x, abs(fract(across + 0.5) - 0.5));
 		zebra = max(zebra, span * bar);
 		float lane_side = across > 0.0 ? -1.0 : 1.0; // forward lane meets it at negative dz
 		float sd = dz * lane_side - hw2 - 2.2;
-		stop_line = max(stop_line, (1.0 - smoothstep(0.2 - aa_s, 0.2 + aa_s, abs(sd))) * step(abs(across), half_w - 0.4) * step(0.15, abs(across)));
+		stop_line = max(stop_line, (1.0 - smoothstep(0.2 - aa_s, 0.2 + aa_s, abs(sd))) * step(abs(across), mix(half_w - 0.4, join.y - 0.25, joined)) * step(0.15, abs(across)));
 	}
 	lane_line *= 1.0 - no_lines;
 	centre *= 1.0 - no_lines;

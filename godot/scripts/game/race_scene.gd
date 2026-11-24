@@ -716,6 +716,7 @@ func _process(dt: float) -> void:
 						finish_speed_limit = maxf(6.0, finish_speed_limit - 8.0 * DT)
 						player.v = minf(player.v, finish_speed_limit)
 				_events()
+				_median_feedback()
 				_tutorial_update()
 				input.sync_actions()
 				if state == "race" and not last500:
@@ -758,6 +759,21 @@ func _process(dt: float) -> void:
 		Sfx.set_mix(Sfx.danger_of(player), Sfx.space_near(cam.global_position, props.landmarks))
 	else:
 		Sfx.set_mix(0.0, 0.0)
+
+
+## Mounting Lungomare's median: a thump through the phone, a short knock and
+## a nudge of the camera, once per climb onto it.
+var _on_median := false
+
+func _median_feedback() -> void:
+	var on := track.median_lift(player.s, player.d) > 0.02 or \
+		track.median_lift(player.s, player.d - CarVisual.WHEEL_TRACK * 0.5) > 0.02 or \
+		track.median_lift(player.s, player.d + CarVisual.WHEEL_TRACK * 0.5) > 0.02
+	if on and not _on_median and absf(player.v) > 3.0:
+		Sfx.haptic("tap")
+		Sfx.play("impact_soft", "Impacts", -14.0, 0.8)
+		cam.add_kick(Vector2(-signf(track.median_slope(player.s, player.d)), 0.0), 0.03)
+	_on_median = on
 
 
 func _recover_missing_tilt(dt: float) -> void:

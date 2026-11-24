@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dk3xw0q7f1mty"
-path="res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.ctex"
+path.s3tc="res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.s3tc.ctex"
+path.etc2="res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "e4aa5a83f1c39cf3f604aaaf55be1068"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/crowd/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg"
-dest_files=["res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.ctex"]
+dest_files=["res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.s3tc.ctex", "res://.godot/imported/rp_sophia_animated_003_idling_opt_rp_sophia_animated_003_dif.jpg-676dd8da90dbd78a7027f2dc104d26b6.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

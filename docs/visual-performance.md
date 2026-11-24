@@ -149,3 +149,40 @@ that captures drift, wet boost and low-quality screenshots. Software Vulkan
 checks appearance and shader compilation; physical phones are still required
 for frame-time validation.
 
+
+## Heat and package size
+
+The CC0 surfaces, the rain-night sky and a few older maps were imported
+lossless and without mipmaps. A headless import (CI) never converts them:
+Godot does that only when the editor GUI sees a texture used in 3D. They
+shipped as WebP-lossless photos (2–3× their JPEG size) that the phone GPU
+reads uncompressed, every distant pixel from the full-size level; each
+triplanar rock or sand pixel read nine of them. The skies shipped as raw
+RGBE, 8.4 MB each. That is where the APK's jump from 160 to 210 MB came
+from, and a large part of the memory traffic that heats the phone.
+
+| Change | Effect |
+| --- | --- |
+| 3D textures VRAM-compressed (ETC2 on Android) with mipmaps; CC0 normal/ARM detail maps at 512 px, palm bark at 1024 | 1024² map: 4 MB uncompressed in VRAM → 0.7 MB; on disk 1.1–3.2 MB → 0.09–0.7 MB |
+| HDR skies VRAM-compressed (ASTC HDR on Android) | 8.4 → 2.1 MB each, six shipped |
+| Unused maps left out of the export (`asphalt_wet_*`, `brick_*`, `stucco_*`, `shutter_*`, eight roughness maps, a leaf atlas) | −17 MB |
+| Side-road GLBs without generated LODs or shadow meshes (flat ribbons, no shadows) | −6.3 MB |
+| Android asset payload (`.godot/imported` variants + data files, estimated) | 186.8 → 100.9 MB raw, 138.5 → 76.9 MB deflated |
+| Terrain fetches only the scales and beach maps a pixel weighs (branches switch where the weight is 0) | 3–6 of ~16 fetches skipped per terrain pixel |
+| Speed blur on phones only on high (it copies and re-reads the native-resolution screen every fast frame); one fetch in its clear centre | Medium loses the radial blur |
+| Follow reflection probe on medium re-renders every 90 m, not 45 m | Half the cube-face scene passes at racing speed |
+| Menus idle at 30 FPS after 4 s without a touch (not while a LAN session is open) | The garage stops drawing a turning car with shadows at 60 FPS |
+
+`tools/texture_budget.py` holds the import rules (2D UI lossless, splat and
+macro maps lossless with mipmaps, the rest VRAM-compressed with mipmaps);
+`tools/run_tests.py` runs it first and fails on a texture off budget. After
+`--fix`, reimport (`godot --headless --path godot --editor --import`; the
+ASTC HDR encode adds about five minutes the first time).
+
+ASTC HDR needs GPU support. Where a phone lacks it, Godot decompresses the
+sky on load (RGBA16F, 16 MB in VRAM), as before slower to load, not wrong.
+
+Not measured on a phone: frame time, temperature and battery after these
+changes, and the size of the next signed APK (expected near 150 MB). The
+**30 FPS · Bateri** setting still halves GPU work for players who want the
+phone cooler.

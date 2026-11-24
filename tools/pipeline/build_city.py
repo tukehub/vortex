@@ -1087,6 +1087,13 @@ def build_splat(osm, ref, hw, out_png, map_draw=None, map_tf=None, span=SPLAT_SP
     return img
 
 
+def median_ends(ref, proj, cfg):
+    """[[x, z], [x, z]] where a median {'from': ll, 'to': ll} starts and ends,
+    snapped to the lap's first pass by that stretch."""
+    idx = seafront.stretch(ref, proj, cfg)
+    return [[round(float(v), 2) for v in ref.xz[i]] for i in (idx[0], idx[-1])]
+
+
 def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf, seafront_props=None):
     lamps, trees = [], []
     radius = city.get("prop_radius", PROP_RADIUS)
@@ -1451,7 +1458,10 @@ def build(cid, route_only=False):
         'id': cid, 'name': city['name'], 'hw': hw, 'length': round(length, 1), 'pts': pts,
         'style': city['style'], 'sea_level': sea_level,
         **({'tunnel': portals} if 'tunnel' in city else {}),
-        **{key: [proj.to_xz(*ll) for ll in city[key]] for key in ('stone_street', 'median', 'turnaround') if key in city},
+        **{key: [proj.to_xz(*ll) for ll in city[key]] for key in ('stone_street', 'turnaround') if key in city},
+        # A mountable median down the middle of a joined road: entry and exit
+        # on the first pass (the game finds the other pass alongside).
+        **({'median': median_ends(ref, proj, city['median'])} if 'median' in city else {}),
         # Lanes per carriageway and one-way traffic (an out-and-back circuit
         # races each direction on its own carriageway).
         **({'lanes': city['lanes']} if 'lanes' in city else {}),
