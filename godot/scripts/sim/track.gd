@@ -26,6 +26,9 @@ var TY := PackedFloat32Array()
 var TZ := PackedFloat32Array()
 var bbox := Rect2()
 var centre := Vector2.ZERO
+## Stretches the field slows down for (track.json "slow": roundabouts):
+## each [start s, length m, speed m/s] in lap order.
+var slow_zones: Array = []
 
 var _i0 := 0
 var _i1 := 0
@@ -69,6 +72,44 @@ func build(data: Dictionary, reverse := false) -> void:
 	_resample(pts)
 	_frames()
 	_grid_build()
+	_slow_zones(data.get("slow", []))
+
+
+## Every stretch of the lap within a zone's radius of its centre
+## ([x, z, radius m, km/h]) becomes one slow zone.
+func _slow_zones(zones: Array) -> void:
+	slow_zones = []
+	for zone: Array in zones:
+		var at := Vector2(float(zone[0]), float(zone[1]))
+		var r2 := float(zone[2]) * float(zone[2])
+		var v := float(zone[3]) / 3.6
+		var start := -1
+		# Begin outside the zone so a stretch is never split by the wrap.
+		var first := 0
+		while first < M and Vector2(X[first], Z[first]).distance_squared_to(at) < r2:
+			first += 1
+		for k in M + 1:
+			var i := (first + k) % M
+			var inside := k < M and Vector2(X[i], Z[i]).distance_squared_to(at) < r2
+			if inside and start < 0:
+				start = first + k
+			elif not inside and start >= 0:
+				slow_zones.append([mod_s(start * ds), (first + k - start) * ds, v])
+				start = -1
+
+
+## The slowest a slow zone asks for between `s` and `s + reach`, as the speed
+## allowed now when braking at `decel` to reach it in time (INF when none).
+func slow_speed(s: float, decel: float, reach: float) -> float:
+	var best := INF
+	for zone: Array in slow_zones:
+		var ahead := wrap_s(float(zone[0]) - s)
+		var into := -ahead
+		if into >= 0.0 and into <= float(zone[1]):
+			best = minf(best, float(zone[2]))
+		elif ahead > 0.0 and ahead <= reach:
+			best = minf(best, sqrt(float(zone[2]) * float(zone[2]) + 2.0 * decel * ahead))
+	return best
 
 
 # Closed Catmull-Rom through the control points, resampled to ~2 m arc length.

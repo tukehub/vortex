@@ -175,6 +175,8 @@ func _build_world() -> void:
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
+	var rings: Array = tj.get("roundabouts", [])
+	road.open_edges = RoundaboutRing.open_edges(track, rings)
 	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
 	road.set_layout(int(tj.get("lanes", 4)), bool(tj.get("one_way", false)))
 	if tj.has("tunnel"):
@@ -195,7 +197,7 @@ func _build_world() -> void:
 	var route_signs := RouteSigns.new()
 	route_signs.name = "RouteSigns"
 	road.add_child(route_signs)
-	route_signs.build(track, route_guide, terrain.height_at)
+	route_signs.build(track, route_guide, terrain.height_at, road.open_edges)
 	buildings = Buildings.new()
 	var side_path := "res://assets/cities/%s/roads.glb" % city_id
 	if Quality.preset != "low" and ResourceLoader.exists(side_path):
@@ -216,6 +218,15 @@ func _build_world() -> void:
 	props.load_city(city_id, terrain, track, reverse)
 	props.set_night(sky.night)
 	road.set_crossings(track, props.road_marks.get("crossings", []), true)
+	for ring: Array in rings:
+		var island := float(ring[2]) - track.half_w - 0.8
+		for anchor: Dictionary in props.landmarks:
+			if anchor.has("radius") and Vector2(float(anchor.x) - float(ring[0]), float(anchor.z) - float(ring[1])).length() < 4.0:
+				island = float(anchor.radius)
+		var dressing := RoundaboutRing.new()
+		dressing.name = "Roundabout"
+		road.add_child(dressing)
+		dressing.build(track, ring, island, terrain.height_at)
 	reflections = RaceReflections.new()
 	reflections.name = "Reflections"
 	add_child(reflections)
@@ -240,6 +251,9 @@ func _build_sea_rocks() -> void:
 	for anchor: Dictionary in props.landmarks:
 		if SeaRocks.ANCHORS.has(anchor.get("id", "")):
 			anchors.append({"x": anchor.x, "z": anchor.z, "radius": SeaRocks.ANCHORS[anchor.id]})
+	# Rock armour along the shore in front of the beach club's deck.
+	if props.resort != null and not props.resort.club_anchor.is_empty():
+		anchors.append({"x": props.resort.club_anchor.x, "z": props.resort.club_anchor.z, "radius": SeaRocks.CLUB_REACH})
 	if anchors.is_empty():
 		return
 	sea_rocks = SeaRocks.new()

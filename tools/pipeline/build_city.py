@@ -30,6 +30,7 @@ from water import process_city as build_water_mask  # noqa: E402
 import coastal_macro
 import coastal_vegetation
 import seafront  # noqa: E402
+import vlore_resort  # noqa: E402
 import street_props  # noqa: E402
 import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
@@ -39,6 +40,7 @@ from side_roads import build_side_roads
 
 SAMPLE = 2.0          # m, centreline sample spacing used for smoothing
 OUT_SPACING = 6.0     # m, spacing of exported control points
+ROUNDABOUT_KMH = 55   # what the field slows to round a roundabout
 SPLAT_SIZE = 2048
 SPLAT_SPAN = 6000.0   # m
 CHUNK = 250.0
@@ -329,43 +331,57 @@ def _through_centre(centreline, centre, radius):
     return np.vstack([head, [centre], tail])
 
 
+def _spline_open(points, spacing):
+    """Centripetal Catmull-Rom through `points` (first and last two act as
+    end tangents and are not part of the curve), resampled at `spacing`."""
+    pts = np.asarray(points, float)
+    out = []
+    for i in range(1, len(pts) - 2):
+        p0, p1, p2, p3 = pts[i - 1:i + 3]
+        t0 = 0.0
+        t1 = t0 + np.linalg.norm(p1 - p0) ** 0.5
+        t2 = t1 + np.linalg.norm(p2 - p1) ** 0.5
+        t3 = t2 + np.linalg.norm(p3 - p2) ** 0.5
+        n = max(2, int(np.linalg.norm(p2 - p1) / 0.5))
+        for t in np.linspace(t1, t2, n, endpoint=False):
+            a1 = (t1 - t) / (t1 - t0) * p0 + (t - t0) / (t1 - t0) * p1
+            a2 = (t2 - t) / (t2 - t1) * p1 + (t - t1) / (t2 - t1) * p2
+            a3 = (t3 - t) / (t3 - t2) * p2 + (t - t2) / (t3 - t2) * p3
+            b1 = (t2 - t) / (t2 - t0) * a1 + (t - t0) / (t2 - t0) * a2
+            b2 = (t3 - t) / (t3 - t1) * a2 + (t - t1) / (t3 - t1) * a3
+            out.append((t2 - t) / (t2 - t1) * b1 + (t - t1) / (t2 - t1) * b2)
+    out.append(pts[-2])
+    return _resample_open(np.array(out), spacing)
+
+
 def route_out_and_back(graph, city, proj, hw):
     """A street circuit raced both ways on the same roads (right-hand traffic):
     the outbound leg keeps to the right carriageway of the shared roads, the
     return to the other, `offset` metres either side of the mapped centreline,
-    so a kerbed divider runs between them. At each roundabout on the way both
-    legs swing out to the ring radius, outbound round one side of the island
-    and back round the other; at the near end the return turns anticlockwise
-    round the first roundabout into the outbound leg. The far end is an
-    one-way loop (`loop` waypoints, from the merge point round to the road
-    that comes back to it).
+    so a kerbed divider runs between them. Roundabouts on the shared road are
+    driven through their centre here; shape_roundabouts() later swings each
+    pass round its island on a true ring. At the near end a one-way loop
+    (`near_loop` control points) takes the return carriageway round into the
+    outbound one; the far end is a one-way loop (`loop` waypoints, from the
+    merge point round to the road that comes back to it).
     Returns the closed raw centreline."""
     spec = city['out_and_back']
     offset = float(spec['offset'])
-    rings = [(np.asarray(proj.to_xz(*ll), float), float(r)) for ll, r in spec['roundabouts']]
-    near_centre, near_radius = rings[0]
     shared = _path_through(graph, [proj.to_xz(*ll) for ll in spec['shared']])
     shared = _resample_open(shared, SAMPLE)
-    shared = np.vstack([[near_centre], shared[np.linalg.norm(shared - near_centre, axis=1) >= near_radius * 1.6]])
-    for centre, radius in rings[1:]:
-        shared = _through_centre(shared, centre, radius)
+    for ll, radius, _entry in spec.get('roundabouts', ()):
+        shared = _through_centre(shared, np.asarray(proj.to_xz(*ll), float), float(radius))
     shared = _resample_open(shared, SAMPLE)
     shared = smooth_closed(np.vstack([shared, shared[::-1]]), 5, 2)[:len(shared)]
     tangent = np.gradient(shared, axis=0)
     tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-9)
     right = np.column_stack((-tangent[:, 1], tangent[:, 0]))
-    off = np.full(len(shared), offset)
-    for centre, radius in rings:
-        d = np.linalg.norm(shared - centre, axis=1)
-        reach = radius * 2.4
-        bulge = np.where(d < reach, 0.5 + 0.5 * np.cos(np.pi * np.clip(d / reach, 0.0, 1.0)), 0.0)
-        off = np.maximum(off, offset + (radius - offset) * bulge)
-    outbound = shared + right * off[:, None]
-    back = (shared - right * off[:, None])[::-1]
-    # Near end: anticlockwise round the island from the return into the outbound leg.
-    t0, r0 = tangent[0], right[0]
-    theta = np.linspace(0.0, np.pi, 24)[1:-1]
-    arc = near_centre + near_radius * (np.cos(theta)[:, None] * -r0 + np.sin(theta)[:, None] * -t0)
+    outbound = shared + right * offset
+    back = (shared - right * offset)[::-1]
+    # Near end: the one-way loop from the end of the return carriageway
+    # (heading away from the shared road) round to the start of the outbound.
+    ctrl = [proj.to_xz(*ll) for ll in spec['near_loop']]
+    near = _spline_open([back[-6], back[-1], *ctrl, outbound[0], outbound[5]], SAMPLE)[1:-1]
     # Far end: the one-way loop from the merge point back to it.
     # Open: it ends on the inland road short of the junction, and the merge
     # join below turns it into the return carriageway.
@@ -378,9 +394,100 @@ def route_out_and_back(graph, city, proj, hw):
     loop = loop[int(np.argmax(keep)):]
     loop, back, join = _merge_join(loop, back, outbound, hw)
     log(f'  out-and-back: shared {np.sum(np.linalg.norm(np.diff(shared, axis=0), axis=1)):.0f} m, '
-        f'loop {np.sum(np.linalg.norm(np.diff(loop, axis=0), axis=1)):.0f} m, offset {offset} m, '
+        f'loop {np.sum(np.linalg.norm(np.diff(loop, axis=0), axis=1)):.0f} m, '
+        f'near loop {np.sum(np.linalg.norm(np.diff(near, axis=0), axis=1)):.0f} m, offset {offset} m, '
         f'merge turn radius {join["radius"]:.0f} m, clearance {join["clearance"]:.1f} m, cut {join["cut"]:.0f} m')
-    return np.vstack([outbound, loop, back, arc])
+    return np.vstack([outbound, loop, back, near])
+
+
+def _arc(centre, start, end, sense, spacing):
+    """Points from `start` to `end` round `centre`: sense +1 sweeps toward
+    increasing atan2(z, x) (a right-hand turn in x-east, z-south), -1 the other way."""
+    a0 = math.atan2(start[1] - centre[1], start[0] - centre[0])
+    a1 = math.atan2(end[1] - centre[1], end[0] - centre[0])
+    sweep = (a1 - a0) % (2 * math.pi) if sense > 0 else -((a0 - a1) % (2 * math.pi))
+    r = float(np.linalg.norm(np.asarray(start) - centre))
+    n = max(2, int(abs(sweep) * r / spacing) + 1)
+    ang = a0 + sweep * np.linspace(0.0, 1.0, n)
+    return centre + r * np.column_stack([np.cos(ang), np.sin(ang)])
+
+
+def roundabout_pass(path, centre, ring, entry):
+    """One pass of an open path (travel order) round a roundabout island,
+    right-hand traffic: from the approach line a right-hand entry curve of
+    radius `entry` meets the ring (radius `ring` about `centre`, the island on
+    the left), the path follows the ring round and leaves on a right-hand
+    exit curve onto the departure line. The approach and departure lines are
+    the path itself 90..55 m before and after its closest point to the
+    centre. Returns (path, info)."""
+    d = np.linalg.norm(path - centre, axis=1)
+    ic = int(np.argmin(d))
+    na, nb = int(55 / SAMPLE), int(90 / SAMPLE)
+    if ic - nb < 0 or ic + nb >= len(path):
+        raise ValueError('roundabout: the pass needs 90 m of road either side')
+    a_pt, t_in = path[ic - na], path[ic - na] - path[ic - nb]
+    b_pt, t_out = path[ic + na], path[ic + nb] - path[ic + na]
+    t_in, t_out = t_in / np.linalg.norm(t_in), t_out / np.linalg.norm(t_out)
+    right = lambda t: np.array([-t[1], t[0]])
+    if (centre - a_pt) @ right(t_in) > 0.0:
+        raise ValueError('roundabout: the island must be on the left of the pass')
+
+    def tangent_param(p, t, first):
+        q = p + right(t) * entry - centre
+        bq = q @ t
+        disc = bq * bq - (q @ q - (ring + entry) ** 2)
+        if disc < 0.0:
+            raise ValueError('roundabout: the approach misses the ring')
+        return -bq - math.sqrt(disc) if first else -bq + math.sqrt(disc)
+
+    u = tangent_param(a_pt, t_in, True)
+    v = tangent_param(b_pt, t_out, False)
+    l1, l2 = a_pt + t_in * u, b_pt + t_out * v
+    c1, c2 = l1 + right(t_in) * entry, l2 + right(t_out) * entry
+    t1 = centre + (c1 - centre) * ring / (ring + entry)
+    t2 = centre + (c2 - centre) * ring / (ring + entry)
+    curve = np.vstack([_arc(c1, l1, t1, +1, SAMPLE * 0.5), _arc(centre, t1, t2, -1, SAMPLE * 0.5)[1:],
+                       _arc(c2, t2, l2, +1, SAMPLE * 0.5)[1:]])
+    i1 = int(np.argmin(np.linalg.norm(path[:ic] - l1, axis=1)))
+    i2 = ic + int(np.argmin(np.linalg.norm(path[ic:] - l2, axis=1)))
+    if i1 < 2 or i2 > len(path) - 3:
+        raise ValueError('roundabout: the entry or exit curve runs off the pass')
+    a1, a2 = (math.atan2(p[1] - centre[1], p[0] - centre[0]) for p in (t1, t2))
+    out = np.vstack([path[:i1], curve, path[i2 + 1:]])
+    return out, {'entry_at': float(np.linalg.norm(l1 - centre)), 'ring_deg': math.degrees((a1 - a2) % (2 * math.pi))}
+
+
+def shape_roundabouts(dense, city, proj):
+    """Swing every pass of the closed lap round each roundabout island on a
+    true ring (roundabout_pass): after smoothing, which would otherwise pull
+    the ring in toward the island."""
+    for ll, ring, entry in city.get('out_and_back', {}).get('roundabouts', ()):
+        centre = np.asarray(proj.to_xz(*ll), float)
+        near = np.linalg.norm(dense - centre, axis=1) < ring + 70.0
+        # Rotate the lap so it does not start inside a pass.
+        start = int(np.argmin(near)) if near[0] else 0
+        lap = np.roll(dense, -start, axis=0)
+        near = np.roll(near, -start)
+        runs, i = [], 0
+        while i < len(lap):
+            if near[i]:
+                j = i
+                while j + 1 < len(lap) and near[j + 1]:
+                    j += 1
+                runs.append((i, j))
+                i = j + 1
+            else:
+                i += 1
+        pieces, last = [], 0
+        for i0, i1 in runs:
+            lo, hi = max(0, i0 - int(60 / SAMPLE)), min(len(lap), i1 + int(60 / SAMPLE) + 1)
+            shaped, info = roundabout_pass(lap[lo:hi], centre, float(ring), float(entry))
+            log(f'  roundabout {ll}: pass enters {info["entry_at"]:.0f} m out, {info["ring_deg"]:.0f} deg of ring')
+            pieces += [lap[last:lo], shaped]
+            last = hi
+        pieces.append(lap[last:])
+        dense, _ = resample_closed(np.vstack(pieces), SAMPLE)
+    return dense
 
 
 def check_carriageways_apart(dense, hw, gap=0.5):
@@ -853,7 +960,89 @@ def overlaps_landmark_bounds(points, zones):
                for x0, z0, x1, z1 in zones)
 
 
-def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS, palette=None):
+def infill_planner(ref, proj, cfg, hw, zones, mask=None, nm=None):
+    """Street frontage where the map has none along a stretch of the lap
+    (`from` .. `to` in lap order): plain 4-7 storey blocks set back behind
+    the pavement on both sides, each skipped where it would touch a mapped
+    building, a keepout, the water or another part of the lap. Returns a
+    function of the mapped footprints giving the extra ones."""
+    from scipy.spatial import cKDTree
+    idx = seafront.stretch(ref, proj, cfg)
+    lo, hi = cfg.get('levels', (4, 7))
+    lap = cKDTree(ref.xz)
+
+    def plan(footprints):
+        mapped = [np.array(r) for _bid, _t, r in footprints if len(r) >= 3]
+        centres = cKDTree(np.array([r.mean(axis=0) for r in mapped]))
+        out = []
+        for side in (1.0, -1.0):
+            k, along = 0, 0.0
+            while k < len(idx):
+                i = idx[k]
+                width = 16.0 + 12.0 * rnd(f'infill{side}', k)
+                depth = 12.0 + 4.0 * rnd(f'infill{side}d', k)
+                setback = hw + 6.0
+                t, n = ref.tan[i], ref.nrm[i] * side
+                c = ref.xz[i] + n * (setback + depth / 2.0)
+                ring = [c + t * sx * width / 2 + n * sz * depth / 2 for sx, sz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+                arr = np.array(ring)
+                ok = not overlaps_landmark_bounds(arr, zones)
+                ok = ok and lap.query(arr)[0].min() > setback - 1.0 and lap.query(c)[0] > setback
+                if ok:
+                    for j in centres.query_ball_point(c, width + 40.0):
+                        m = mapped[j]
+                        if (m[:, 0].max() >= arr[:, 0].min() - 2 and m[:, 0].min() <= arr[:, 0].max() + 2 and
+                                m[:, 1].max() >= arr[:, 1].min() - 2 and m[:, 1].min() <= arr[:, 1].max() + 2):
+                            ok = False
+                            break
+                if ok and mask is not None and any(seafront.is_water(mask, nm, *q) for q in arr):
+                    ok = False
+                if ok:
+                    levels = int(lo + (hi - lo + 1) * rnd(f'infill{side}l', k))
+                    out.append((f'infill_{int(side)}_{k}', {'building': 'apartments', 'building:levels': str(levels)},
+                                [tuple(map(float, q)) for q in ring]))
+                # Next block: its width plus a gap further along.
+                step = width + 5.0 + 6.0 * rnd(f'infill{side}g', k)
+                while k < len(idx) - 1 and along < step:
+                    along += float(np.linalg.norm(ref.xz[idx[k + 1]] - ref.xz[idx[k]]))
+                    k += 1
+                if along < step:
+                    break
+                along = 0.0
+        log(f'  infill: {len(out)} blocks along {len(idx) * SAMPLE:.0f} m of road')
+        return out
+    return plan
+
+
+def sea_side_clearance(ref, proj, cfg, mask, nm):
+    """A footprint test for build_buildings: True for buildings between the
+    race road and the sea along a stretch of shore road (`from` .. `to`, in
+    lap order from the first pass by `from`), within `reach` metres of the
+    road. The sea side is probed per sample on the water mask."""
+    from scipy.spatial import cKDTree
+    idx = seafront.stretch(ref, proj, cfg)
+    reach = float(cfg.get('reach', 300.0))
+    sides = {}
+    for i in idx:
+        for r in np.arange(6.0, reach + 200.0, 5.0):
+            hit = [side for side in (1.0, -1.0) if seafront.is_water(mask, nm, *(ref.xz[i] + side * r * ref.nrm[i]))]
+            if hit:
+                sides[i] = hit[0]
+                break
+    tree = cKDTree(ref.xz)
+
+    def seaward(ring):
+        centre = ring.mean(axis=0)
+        d, i = tree.query(centre)
+        if d > reach or int(i) not in sides:
+            return False
+        lat = (ring - ref.xz[i]) @ ref.nrm[i]
+        return bool(np.all(lat * sides[int(i)] > 0.0))
+    log(f'  sea-side clearance: {len(idx) * SAMPLE:.0f} m of road, sea found beside {len(sides)} samples')
+    return seaward
+
+
+def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS, palette=None, sea_clear=None, infill=None):
     excluded_ids = set(landmark_buildings)
     excluded_ways = set(excluded_ids)
     for rel in osm.rels:
@@ -877,16 +1066,22 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
             continue
         for k, ring in enumerate(osm.rings_of_relation(rel)):
             footprints.append((f"r{rel['id']}_{k}", tags, ring))
+    if infill is not None:
+        footprints += infill(footprints)
     log(f'  buildings: {len(footprints)} footprints')
 
     chunks = {}
     kept = 0
+    seaward = 0
     pal = PALETTES.get(palette or style, PALETTES['old'])
     for bid, tags, ring in footprints:
         ring = clean_ring(ring)
         if len(ring) < 3:
             continue
         if overlaps_landmark_bounds(ring, landmark_zones):
+            continue
+        if sea_clear is not None and sea_clear(np.array(ring)):
+            seaward += 1
             continue
         arr = np.array(ring)
         cx, cz = arr.mean(axis=0)
@@ -1025,7 +1220,7 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
         if mi is not None:
             roots.append(g.node(f'chunk_{kx}_{kz}', mi, (ox, 0, oz)))
     size = g.write(out_path, roots)
-    log(f'  buildings kept {kept}, chunks {len(roots)}, tris {tri_total}, glb {size // 1024} kB')
+    log(f'  buildings kept {kept} ({seaward} cleared seaward of the road), chunks {len(roots)}, tris {tri_total}, glb {size // 1024} kB')
     return kept
 
 
@@ -1086,7 +1281,7 @@ def build_splat(osm, ref, hw, out_png, map_draw=None, map_tf=None, span=SPLAT_SP
     return img
 
 
-def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf, seafront_props=None):
+def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf, seafront_props=None, resort=None):
     lamps, trees = [], []
     radius = city.get("prop_radius", PROP_RADIUS)
     for nid, (x, z, tags) in osm.nodes.items():
@@ -1136,7 +1331,7 @@ def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf,
         side = 1 if (i // step) % 2 == 0 else -1
         p = ref.xz[i] + ref.nrm[i] * (hw + 1.2) * side
         track_lamps.append([round(float(p[0]), 1), round(float(ref.y[i]), 1), round(float(p[1]), 1), round(float(math.atan2(-ref.tan[i][0], -ref.tan[i][1])), 3)])
-    zones = landmark_clearance_zones(city, proj)
+    zones = landmark_clearance_zones(city, proj) + (vlore_resort.clear_zones(resort) if resort else [])
     lamps = [l for l in lamps if not overlaps_landmark_bounds([(l[0], l[2])], zones)]
     trees = [t for t in trees if not overlaps_landmark_bounds([(t[0], t[2])], zones)]
     # Preserve the landmark sightline without clearing the surrounding grove.
@@ -1176,6 +1371,8 @@ def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf,
         # The promenade has its palms; drop mapped trees that would crowd them.
         trees = [t for t in trees if min((t[0] - q[0]) ** 2 + (t[2] - q[2]) ** 2 for q in palms) > 36.0] if palms else trees
     data = {'lamps': lamps, 'track_lamps': track_lamps, 'trees': trees, 'landmarks': landmarks, 'cafes': cafes}
+    if resort:
+        data['resort'] = resort
     if palms:
         data['palms'] = palms
     if seafront_props:
@@ -1391,6 +1588,8 @@ def build(cid, route_only=False):
             dense = repair_road_bends(dense, hw + 1.5, sigma)
             dense, length = resample_closed(dense, SAMPLE)
     if 'out_and_back' in city:
+        dense = shape_roundabouts(dense, city, proj)
+        dense, length = resample_closed(dense, SAMPLE)
         check_carriageways_apart(dense, hw)
     log(f'  track length {length:.0f} m, {len(dense)} samples')
 
@@ -1455,6 +1654,14 @@ def build(cid, route_only=False):
         # races each direction on its own carriageway).
         **({'lanes': city['lanes']} if 'lanes' in city else {}),
         **({'one_way': True} if 'out_and_back' in city else {}),
+        # Roundabouts: the ring each pass drives ([x, z, ring radius, entry
+        # radius], roundabout_ring.gd) and the zone the field slows for
+        # ([x, z, radius m, km/h], race.gd).
+        **({'roundabouts': [[*(round(float(v), 1) for v in proj.to_xz(*ll)), ring, entry]
+                            for ll, ring, entry in city['out_and_back']['roundabouts']],
+            'slow': [[*(round(float(v), 1) for v in proj.to_xz(*ll)), round(ring + 30.0, 1), ROUNDABOUT_KMH]
+                     for ll, ring, _entry in city['out_and_back']['roundabouts']]}
+           if city.get('out_and_back', {}).get('roundabouts') else {}),
     })
     log(f'  track.json {len(pts)} control points, elevation {y.min():.1f}..{y.max():.1f} m')
 
@@ -1475,14 +1682,27 @@ def build(cid, route_only=False):
         seafront_props = {'idx': idx, 'side': side, 'water': (mask, wnm), 'surface': surface,
                           'palms': seafront.palms(ref, hw, idx, side, mask, wnm, terrain_sample, surface, rnd)}
         log(f'  seafront: {len(idx) * SAMPLE:.0f} m of road, sea on the {"+" if side > 0 else "-"} normal side')
-    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'))
+    resort, sea_clear = None, None
+    if city.get('resort') or city.get('sea_clear'):
+        mask, wnm = seafront.load_water(out)
+        if city.get('resort'):
+            resort = vlore_resort.plan(ref, hw, proj, city['resort'], mask, wnm, terrain_sample, rnd)
+            log(f'  resort: {len(resort["hotels"])} hotels, beach club {resort["club"]["depth"]:.0f} m deep')
+        if city.get('sea_clear'):
+            sea_clear = sea_side_clearance(ref, proj, city['sea_clear'], mask, wnm)
+    resort_zones = vlore_resort.clear_zones(resort) if resort else []
+    infill = None
+    if city.get('infill'):
+        water = seafront.load_water(out) if sea else (None, None)
+        infill = infill_planner(ref, proj, city['infill'], hw, landmark_clearance_zones(city, proj) + resort_zones, *water)
+    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj) + resort_zones, height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'), sea_clear, infill)
     if cid == 'tirane':
         bake_showcase_facades(Path(out))
     elif cid == "vlore":
         bake_vlore_facades(Path(out))
         coastal_macro.bake(Path(out))
     build_side_roads(osm, ref, hw, terrain_sample, os.path.join(out, 'roads.glb'), radius=city.get('osm_radius', 2600))
-    build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props)
+    build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props, resort)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.
     street_props.process_city(cid)
     if cid == "vlore":

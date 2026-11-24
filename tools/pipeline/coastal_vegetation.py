@@ -65,6 +65,9 @@ def bake(directory):
     for landmark, anchor in zip(cfg['landmarks'], props['landmarks'], strict=True):
         clear.append(((anchor['x'], anchor['z']), landmark.get('clear_half', (20, 20))))
     clear += [((x, z), (11, 11)) for x, _, z, *_ in props['cafes']]
+    # Vlorë's hotels and beach club before the tunnel (vlore_resort.py).
+    clear += [(((x0 + x1) / 2, (z0 + z1) / 2), ((x1 - x0) / 2, (z1 - z0) / 2))
+              for x0, z0, x1, z1 in props.get('resort', {}).get('clear', [])]
     for (x, z), (w, h) in clear:
         mask.polygon(np.array([[x-w,z-h], [x+w,z-h], [x+w,z+h], [x-w,z+h]]))
 

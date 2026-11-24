@@ -210,14 +210,22 @@ func _sign(message: String, at: Vector3, height: float, tint: Color) -> void:
 	add_child(label)
 
 
+## A flag on its pole at `at` (top of the hoist), rippling like the great
+## flag on the square (shaders/flag_cloth.gdshader).
 func _flag(at: Vector3, width := 1.85) -> void:
+	var size := Vector2(width, width * 5.0 / 7.0)
 	var flag := MeshInstance3D.new()
-	var cloth := QuadMesh.new()
-	cloth.size = Vector2(width, width * 0.70)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = LandmarkKit.albanian_flag()
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	flag.mesh = cloth
+	flag.name = "Flag"
+	flag.mesh = Landmarks.cloth_grid(size, 14, 8)
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://shaders/flag_cloth.gdshader")
+	mat.set_shader_parameter("flag_tex", LandmarkKit.albanian_flag())
+	mat.set_shader_parameter("width", size.x)
+	mat.set_shader_parameter("height", size.y)
+	mat.set_shader_parameter("wind", 0.6)
+	mat.set_shader_parameter("phase", fposmod(at.x * 0.37 + at.z * 0.21, 1.0))
 	flag.material_override = mat
-	flag.position = at + Vector3(width / 2.0, -width * 0.35, 0)
+	flag.position = at
+	flag.extra_cull_margin = 1.0
+	flag.visibility_range_end = 900.0
 	add_child(flag)

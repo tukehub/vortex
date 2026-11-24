@@ -23,6 +23,8 @@ var street: StreetProps
 var road_marks := {}
 
 var vegetation: TiranaTrees
+## Vlorë's hotels and beach club before the tunnel (props.json "resort").
+var resort: VloreResort
 
 
 func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, reverse := false) -> void:
@@ -37,6 +39,12 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 	var models := Landmarks.new()
 	add_child(models)
 	models.load_anchors(landmarks, terrain)
+	var strip: Dictionary = p.get("resort", {})
+	if not strip.is_empty():
+		resort = VloreResort.new()
+		resort.name = "UjiIFtohteResort"
+		add_child(resort)
+		resort.build(strip, terrain)
 	# Café terraces wherever the city's props list them (Blloku, Lungomare).
 	var cafes: Array = p.get("cafes", [])
 	if not cafes.is_empty():

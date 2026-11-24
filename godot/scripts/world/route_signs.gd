@@ -20,7 +20,9 @@ var posts: MultiMeshInstance3D
 var bands: Array[Dictionary] = []
 
 
-func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
+## `open_edges` (RoadMesh): no band on a roundabout's island side, where
+## the splitter islands and the paved ring are.
+func build(track: RaceTrack, guide: Guide, height_at := Callable(), open_edges: Array = []) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var post_transforms: Array[Transform3D] = []
@@ -28,6 +30,8 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 		var from := float(turn.start) - LEAD
 		var length := float(turn.span) + LEAD * 2.0
 		var d := -float(turn.side) * (track.half_w + OUTSIDE)
+		if not open_edges.is_empty() and RoundaboutRing.edge_open(open_edges, track, from + length * 0.5, signf(d)):
+			continue
 		var count := maxi(2, ceili(length / STEP) + 1)
 		var points: Array[Vector3] = []
 		for i in count:

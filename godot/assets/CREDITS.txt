@@ -75,3 +75,6 @@ Tirana broadleaf set (plane, linden and acacia silhouettes): original procedural
 branches, leaf sprays and impostor bakes by the Vortex project. Bark colour and
 normal are resized from Poly Haven Tree Small 02 (Rico Cilliers and Rob Tuytel,
 CC0 1.0, https://polyhaven.com/a/tree_small_02).
+
+Flamuri shqiptar (flamujt e shesheve, Vlorë): shqiponja nga vizatimi vektorial shtetëror në Wikimedia Commons, File:Flag_of_Albania.svg, në domen publik; e kthyer në imazh me tools/build_albanian_flag.py.
+commons.wikimedia.org/wiki/File:Flag_of_Albania.svg

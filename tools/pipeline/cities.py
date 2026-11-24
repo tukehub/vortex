@@ -98,14 +98,17 @@ CITIES = {
         # Bulevardi Ismail Qemali, round Sheshi Pavarsia and along Lungomare to
         # where the inland road from Dhimitër Konomi meets it; through the
         # tunnel, up Dhimitër Konomi and back to that merge; then the same
-        # roads home on the other carriageway, round the island at the square
-        # into the outbound leg. Each roundabout ring is (centre, radius m).
+        # roads home on the other carriageway. At the near end a one-way loop
+        # leaves the boulevard by the square, runs up through Muradie with
+        # the Bashkia on its right, across the top and straight back down
+        # Rruga Demokracia onto the square and the outbound carriageway.
+        # Each roundabout is (centre, ring radius of each carriageway's
+        # centreline, entry and exit radius), all m.
         'out_and_back': {
             'offset': 6.0,
-            'roundabouts': [((40.470724, 19.491154), 18.0),            # Sheshi i Flamurit turn
-                            ((40.454514, 19.486624), 26.0)],  # Sheshi Pavarsia (OSM ring)
+            'roundabouts': [((40.454514, 19.486624), 25.0, 22.0)],  # Sheshi Pavarsia (OSM ring 26 m)
             'shared': [
-                (40.470724, 19.491154),                   # the turning island at the square
+                (40.4704777, 19.4912006),  # Sheshi i Flamurit, on the boulevard
                 (40.4688450, 19.4912131),  # Muradie Mosque
                 (40.4628, 19.4894),        # Bulevardi Ismail Qemali
                 (40.4574, 19.4876),        # Flamurtari stadium
@@ -124,18 +127,54 @@ CITIES = {
                 (40.4238856, 19.4935304),  # back north on Dhimitër Konomi
                 (40.4289664, 19.4932962),  # its last stretch, into the shore road
             ],
+            # The near loop, from the return carriageway at the square round
+            # to the outbound one (control points of a smooth road, after the
+            # streets it follows).
+            'near_loop': [
+                (40.4707875, 19.4913553),  # off the boulevard, east of the square
+                (40.4712216, 19.4916159),  # Justin Godard, into Muradie
+                (40.4719451, 19.4920423),
+                (40.4726505, 19.4924450),  # the top of Justin Godard
+                (40.4732836, 19.4927766),  # across Rruga Perlat Rexhepi
+                (40.4738895, 19.4929306),  # north, the Bashkia on the right
+                (40.4744592, 19.4929306),
+                (40.4748572, 19.4927293),  # left above the Bashkia
+                (40.4750561, 19.4922436),
+                (40.4750833, 19.4912961),  # west across the top
+                (40.4750471, 19.4904315),
+                (40.4747939, 19.4900288),  # left onto Rruga Demokracia
+                (40.4743417, 19.4900288),
+                (40.4736634, 19.4902538),  # straight down Demokracia
+                (40.4727590, 19.4905262),
+                (40.4718094, 19.4908105),  # Bulevardi Ismail Qemali
+                (40.4710407, 19.4910474),  # onto the square
+            ],
         },
         'waypoints': [
-            (40.470724, 19.491154), (40.4688450, 19.4912131), (40.4628, 19.4894), (40.4574, 19.4876),
+            (40.4704777, 19.4912006), (40.4688450, 19.4912131), (40.4628, 19.4894), (40.4574, 19.4876),
             (40.454514, 19.486624), (40.4530, 19.4865), (40.4500, 19.4904), (40.4462743, 19.4943573),
             (40.4321612, 19.4944346), (40.4308271, 19.493864), (40.4212347, 19.4876934),
             (40.4205612, 19.4869312), (40.4169588, 19.4870453), (40.4238856, 19.4935304),
             (40.4289664, 19.4932962),
         ],
         'tunnel': ((40.4212347, 19.4876934), (40.4205612, 19.4869312)),
+        # The near loop's run up Justin Godard through old Muradie: stone
+        # setts and low plaster fronts (muradie_street.gd).
+        'stone_street': ((40.4712216, 19.4916159), (40.4726505, 19.4924450)),
+        # Nothing built between the road and the sea from the Independence
+        # Museum along Lungomare and the shore road to the tunnel.
+        'sea_clear': {'from': (40.45218, 19.48528), 'to': (40.4212347, 19.4876934), 'reach': 300},
+        # Hotels up the hillside on the land side, 60..380 m before the
+        # tunnel, and a beach club with a long pool on the sea side
+        # (vlore_resort.py).
+        'resort': {'portal': (40.4212347, 19.4876934), 'hotels': (60, 380), 'club': 170},
+        # The near loop runs through blocks the map leaves mostly empty:
+        # plain apartment frontage where nothing is mapped.
+        'infill': {'from': (40.4712216, 19.4916159), 'to': (40.4718094, 19.4908105), 'levels': (4, 7)},
         'turnaround': ((40.4191404, 19.4866541), (40.4197696, 19.4902821)),
         'scenery_clearances': [
             ((40.47210, 19.49228), (42, 66)),  # the modeled Muradie street fronts
+            ((40.47370, 19.49352), (32, 44)),  # the Bashkia in sight from Muradie
             ((40.42090, 19.48733), (63, 67)),  # rock and tunnel portals
         ],
         'landmarks': [
@@ -155,15 +194,19 @@ CITIES = {
             {'id': 'petro_marko', 'll': (40.46488, 19.49068), 'yaw': 72,
              'offset_x': -9, 'clear_half': (29, 26)},
             {'id': 'skela_roundabout', 'll': (40.454502, 19.486624), 'yaw': 0, 'island': 20.5},
-            {'id': 'flag_square_island', 'll': (40.470724, 19.491154), 'yaw': 0, 'island': 13.0, 'clear_half': (13, 13)},
             {'id': 'skela_corner', 'll': (40.45471, 19.48712), 'yaw': 76,
              'clear_half': (18, 27)},
             {'id': 'lungomare_gateway', 'll': (40.45228, 19.48812), 'yaw': 123,
              'clear_half': (29, 27)},
+            # Paragliders circling high over Lungomare and the shore road;
+            # local +X runs down the coast, +Z out over the bay.
+            {'id': 'lungomare_paragliders', 'll': (40.4477952, 19.4902893), 'yaw': -67},
             {'id': 'waterfront_courts', 'll': (40.42871, 19.49157), 'yaw': -33,
              'offset_x': 20, 'offset_y': 1.15, 'offset_z': 21, 'clear_half': (60, 77)},
-            {'id': 'vlore_municipality', 'll': (40.47458, 19.49335), 'yaw': -32,
-             'offset_z': 8, 'clear_half': (31, 27)},
+            # The Bashkia faces the near loop, on the right of it after
+            # Muradie, its entrance front turned toward the oncoming cars.
+            {'id': 'vlore_municipality', 'll': (40.47458, 19.49335), 'yaw': 105,
+             'offset_z': 8, 'clear_half': (27, 27)},
             {'id': 'flamurtari', 'll': (40.456086, 19.488786), 'yaw': -6.8, 'clear_half': (95, 85)},
             # Move the Independence Museum through its park toward the road
             # so the entrance and balcony read from the seafront approach.

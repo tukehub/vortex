@@ -48,8 +48,12 @@ func _ready() -> void:
 			var at := k * 2.0
 			check(at > 88.0 and at < 112.0, "the line is 100 m before the road passes Kuzum Baba (%.0f m)" % at)
 			# On the outbound carriageway, 6 m west of the boulevard's mapped centre.
+			# (Along it the line lands wherever the lap's samples fall, so only
+			# its offset across the boulevard is pinned.)
 			var line := track.pos(0.0, 0.0)
-			check(Vector2(line.x - 14.3, line.z + 2720.2).length() < 3.0, "the line is on Bulevardi Ismail Qemali")
+			var off := Vector2(line.x - 14.3, line.z + 2720.2)
+			var across := Vector2(track.normal(0.0).x, track.normal(0.0).z)
+			check(absf(off.dot(across)) < 1.0 and off.length() < 12.0, "the line is on Bulevardi Ismail Qemali")
 	# The landmarks on the hill.
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
 	var ids := {}

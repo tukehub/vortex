@@ -22,6 +22,9 @@ var _reverse := false
 var length := 0.0
 var barrier_mat: StandardMaterial3D
 var _terrain_height := Callable()
+## Stretches where one edge has no kerb or barrier (a roundabout's island
+## side, RoundaboutRing.open_edges): [[start s, length m, side], ...].
+var open_edges: Array = []
 
 
 func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable(), reverse := false) -> void:
@@ -263,6 +266,8 @@ func _build_kerbs(track: RaceTrack, hw: float) -> void:
 		for i in M:
 			var k0 := i
 			var k1 := (i + 1) % M
+			if not open_edges.is_empty() and RoundaboutRing.edge_open(open_edges, track, (i + 0.5) * track.ds, side):
+				continue
 			var seg_col := KERB_RED if (i / 3) % 2 == 0 else KERB_WHITE
 			if _showcase:
 				var at := Showcase.forward_s(track, (i + 0.5) * track.ds, _reverse)
@@ -313,6 +318,8 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 	for side: float in [-1.0, 1.0]:
 		for i in track.M:
 			var j := (i + 1) % track.M
+			if not open_edges.is_empty() and RoundaboutRing.edge_open(open_edges, track, (i + 0.5) * track.ds, side):
+				continue
 			var color := KERB_RED if int(i * track.ds / 8.0) % 2 == 0 else KERB_WHITE
 			if _showcase:
 				var at := Showcase.forward_s(track, (i + 0.5) * track.ds, _reverse)

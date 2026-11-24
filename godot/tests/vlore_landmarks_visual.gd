@@ -48,10 +48,12 @@ func _ready() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	var portal := scene.track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
 	var turn := scene.track.locate_xz(data.turnaround[0][0], data.turnaround[0][1]).x
-	# Out-and-back: the split round Sheshi Pavarsia on both passes, the
-	# Dhimitër Konomi merge, and the turn round the Flag Square island.
+	# Out-and-back: round the Sheshi Pavarsia roundabout on both passes, the
+	# Dhimitër Konomi merge, the near loop through Muradie past the Bashkia,
+	# and the run back onto Flag Square.
 	var skela := (landmarks.get_node("skela_roundabout") as Node3D).global_position
-	var flag := (landmarks.get_node("flag_square_island") as Node3D).global_position
+	var flag := (landmarks.get_node("independence") as Node3D).global_position
+	var bashkia := (landmarks.get_node("vlore_municipality") as Node3D).global_position
 	var skela_passes := []
 	var best := INF
 	for k in scene.track.M:
@@ -64,7 +66,8 @@ func _ready() -> void:
 	var merge := scene.track.locate_xz(240.0, -40.0).x
 	var route_views := {"tunnel_approach": portal - 37.0, "inside_tunnel": portal + 35.0, "turnaround": turn - 9.0,
 		"skela_out": float(skela_passes[0]) - 60.0, "skela_back": float(skela_passes[-1]) - 60.0,
-		"konomi_merge": merge - 80.0, "flag_square_turn": scene.track.locate_xz(flag.x, flag.z).x - 70.0}
+		"konomi_merge": merge - 80.0, "flag_square": scene.track.locate_xz(flag.x, flag.z).x - 70.0,
+		"bashkia": scene.track.locate_xz(bashkia.x, bashkia.z).x - 60.0, "resort": portal - 230.0}
 	for view_name in route_views:
 		var s: float = route_views[view_name]
 		var eye := scene.track.pos(s, 0.0) + Vector3.UP * 2.4

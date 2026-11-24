@@ -8,6 +8,8 @@ const FANS := {"eagle": 100, "bolt": 35, "barge": 50, "mine": 60, "shock": 70, "
 const BOT_ASSIST := 1.4
 const RACE_ACCEL_MULT := 1.08
 const BRAKE_DECEL := 11.5
+## What the field plans to brake at for a slow zone (a roundabout).
+const SLOW_ZONE_DECEL := 8.0
 const BRAKE_RESPONSE := 8.0
 const DRIFT_GRIP_BONUS := 0.35
 const RACE_RESTITUTION := 0.08
@@ -1161,6 +1163,9 @@ func ai_drive(c: CarState, dt: float) -> void:
 				if allow < v_t:
 					v_t = allow
 			x += 6.0
+		# Roundabouts: the field brakes to the zone's speed before the ring,
+		# planned gently (braking while steering bites at only ~4.5 m/s^2).
+		v_t = minf(v_t, T.slow_speed(c.s, SLOW_ZONE_DECEL, 240.0))
 		ai.v_t = v_t
 		var ka := 0.0
 		for xx in [15.0, 25.0, 35.0, 45.0, 55.0]:

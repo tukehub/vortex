@@ -427,10 +427,15 @@ def highway_lines(elements, proj):
     return lines, sorted(set(crossing_nodes))
 
 
-def keepouts_for(city, proj):
+def keepouts_for(city, proj, out_dir=None):
     # Lazy: build_city pulls in the whole pipeline.
     from build_city import landmark_clearance_zones
-    return landmark_clearance_zones(city, proj)
+    zones = landmark_clearance_zones(city, proj)
+    # Planned scenery (Vlorë's hotels and beach club) baked into props.json.
+    path = os.path.join(out_dir, 'props.json') if out_dir else None
+    if path and os.path.exists(path):
+        zones += [tuple(r) for r in json.load(open(path)).get('resort', {}).get('clear', [])]
+    return zones
 
 
 def water_test(out_dir):
@@ -463,7 +468,7 @@ def process_city(cid, force=False, api=False):
     items, segments, rings = from_osm(elements, proj)
     anchors = [(float(a['x']), float(a['z'])) for a in props.get('landmarks', [])]
     track, roads, buildings = Track(tj['pts'], tj['hw']), Roads(segments), Buildings(rings)
-    keepouts, water = keepouts_for(city, proj), water_test(out_dir)
+    keepouts, water = keepouts_for(city, proj, out_dir), water_test(out_dir)
     street = place(items, track, roads, buildings, keepouts, anchors, water)
     mapped = {k: len(street[k]) for k in KINDS}
     lines, crossing_nodes = highway_lines(elements, proj)

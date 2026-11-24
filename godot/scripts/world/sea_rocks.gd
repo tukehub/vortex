@@ -27,6 +27,8 @@ const SPRAY_NEAR := 18.0
 const SPRAY_FAR := 120.0
 ## Landmark id -> half-size (m) of the shore window armoured around it.
 const ANCHORS := {"waterfront_courts": 420.0}
+## Along the beach club's deck before the tunnel (VloreResort).
+const CLUB_REACH := 140.0
 
 var stones := 0
 ## Every stone placed (MultiMesh data is not kept by the headless renderer).

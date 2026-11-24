@@ -131,7 +131,7 @@ func _ready() -> void:
 				"vlora_house": "VloreHeritage/VloraHouseFacade", "muradie_mosque": "VloreHeritage/MuradieMasonry",
 				"petro_marko": "VloreCivic/PetroMarkoTheatre", "skela_roundabout": "VloreCivic/SkelaPlantedIsland",
 				"lungomare_gateway": "VloreCivic/LungomareTwinWings", "waterfront_courts": "WaterfrontCourts/CourtSurfacesAndFixtures",
-				"vlore_municipality": "VloreCivic/MunicipalityFacade"}
+				"vlore_municipality": "VloreCivic/MunicipalityFacade", "lungomare_paragliders": "Paragliders/Paraglider0"}
 			for id: String in expected:
 				var root := marks.get_node(id) as Node3D
 				assert(root.get_node_or_null(str(expected[id])) != null, "Vlorë landmark model missing: " + id)
@@ -142,11 +142,26 @@ func _ready() -> void:
 			for id in ["independence", "independence_museum", "flagpole_big"]:
 				var at := (marks.get_node(id) as Node3D).global_position
 				var d := scene.track.dist_to(at.x, at.z)
-				# The great flag stands on Flag Square, beside the turn round its island.
+				# The great flag stands on Flag Square, beside the run back onto it.
 				var off := 8.0 if id == "flagpole_big" else 20.0
 				assert(d > scene.track.half_w + off and d < 70.0, "landmark off the road and in sight of it: " + id)
+			# The great flag: the national flag's texture (5:7) on a rippling cloth.
 			var flag := marks.get_node("flagpole_big/GreatFlag") as MeshInstance3D
-			assert((flag.material_override as ShaderMaterial).get_shader_parameter("use_tex"), "the great flag shows the eagle")
+			var cloth := flag.material_override as ShaderMaterial
+			var eagle := cloth.get_shader_parameter("flag_tex") as Texture2D
+			assert(eagle != null and absf(float(eagle.get_width()) / eagle.get_height() - 1.4) < 0.01, "the great flag shows the eagle at 5:7")
+			assert(is_equal_approx(float(cloth.get_shader_parameter("width")) / float(cloth.get_shader_parameter("height")), 1.4))
+			# Paragliders circle high over the seafront and move.
+			var flock := marks.get_node("lungomare_paragliders/Paragliders") as Paragliders
+			assert(flock.gliders.size() >= 5, "paragliders over Lungomare")
+			var before := flock.gliders[0].global_position
+			flock._place(30.0)
+			assert(flock.gliders[0].global_position.distance_to(before) > 20.0, "the paragliders fly")
+			for glider in flock.gliders:
+				var g := glider.global_position
+				assert(g.y - scene.terrain.height_at(g.x, g.z) > 60.0, "paragliders fly high")
+				assert(scene.track.dist_to(g.x, g.z) < 700.0, "paragliders in sight of the road")
+			_test_vlore_resort(scene)
 			_test_vlore_circuit(scene, marks)
 			print("VLORE LANDMARKS: stadium facade ", snappedf(gap, 0.1), " m from the race line")
 		elif not FileAccess.file_exists("res://assets/cities/%s/water_near.bin" % city.id):
@@ -164,7 +179,7 @@ func _ready() -> void:
 func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var track := scene.track
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
-	assert(track.L > 8800.0 and track.L < 10400.0, "the Vlorë out-and-back stays near 9.5 km")
+	assert(track.L > 10000.0 and track.L < 11200.0, "the Vlorë out-and-back stays near 10.6 km")
 	# Out and back on the seafront road: two one-way carriageways of two
 	# lanes, a divider between them.
 	assert(bool(data.get("one_way", false)) and int(data.get("lanes", 0)) == 2, "Vlorë is raced on one-way carriageways")
@@ -198,13 +213,28 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 		var second: float = first[landmark][1]
 		assert(second > back, "Vlorë return passes the landmarks in reverse order: " + landmark)
 		back = second
-	# Up past the Muradie Mosque, round the island on Flag Square by the
-	# Independence Monument, and down past the mosque again to the line.
+	# Up past the Muradie Mosque, off the boulevard and up through Muradie
+	# with the Bashkia on the right, across the top and down Rruga Demokracia
+	# onto Flag Square by the Independence Monument, then down past the
+	# mosque again to the line.
 	var mosque := _passes(track, (marks.get_node("muradie_mosque") as Node3D).position)
+	var bashkia_at := (marks.get_node("vlore_municipality") as Node3D).position
+	var bashkia := _passes(track, bashkia_at)
 	var square := _passes(track, (marks.get_node("independence") as Node3D).position)
-	assert(mosque.size() == 2 and square.size() == 1, "the lap ends with a turn round Flag Square")
-	assert(back < mosque[0] and mosque[0] < square[0] and square[0] < mosque[1] and mosque[1] < track.L,
-		"the run to the line passes the Muradie Mosque and turns round Flag Square")
+	assert(mosque.size() == 2 and bashkia.size() == 1, "the near loop passes the Bashkia once")
+	assert(back < mosque[0] and mosque[0] < bashkia[0] and bashkia[0] < square[-1] and square[-1] < mosque[1] and mosque[1] < track.L,
+		"the run to the line: Muradie, the Bashkia, Flag Square, the mosque")
+	var by_bashkia := track.pos(bashkia[0], 0.0)
+	var to_bashkia := Vector2(bashkia_at.x - by_bashkia.x, bashkia_at.z - by_bashkia.z)
+	var right := Vector2(track.normal(bashkia[0]).x, track.normal(bashkia[0]).z)
+	assert(to_bashkia.dot(right) > 0.0, "the Bashkia is on the right coming from Muradie")
+	assert(to_bashkia.length() < 60.0, "the Bashkia stands by the road")
+	var corner := INF
+	for k in range(int((mosque[0] + 60.0) / track.ds), int((mosque[1] - 60.0) / track.ds)):
+		var kappa := absf(track.curv(k * track.ds))
+		if kappa > 1e-4:
+			corner = minf(corner, 1.0 / kappa)
+	assert(corner > 30.0, "the near loop has no tight turn (tightest %.0f m)" % corner)
 	# The two passes never share road: wherever the lap comes back past
 	# itself, the carriageways stay a divider apart.
 	var tight := INF
@@ -227,7 +257,26 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 					if mini(gap, track.M - gap) > apart:
 						tight = minf(tight, pts[k].distance_to(pts[other]))
 	assert(tight >= 2.0 * track.half_w + 0.4, "the carriageways never touch (closest %.1f m)" % tight)
-	# Both roundabouts are driven round their islands, one pass each side.
+	# Sheshi Pavarsia is a real roundabout: each pass circles the island on
+	# the ring, kerbed splitters between the entries and exits, and the
+	# field slows for it.
+	var rings: Array = data.get("roundabouts", [])
+	assert(rings.size() == 1, "Sheshi Pavarsia is a roundabout")
+	var ring: Array = rings[0]
+	var on_ring := 0
+	for k in track.M:
+		var p := track.pos(k * track.ds, 0.0)
+		if absf(Vector2(p.x - float(ring[0]), p.z - float(ring[1])).length() - float(ring[2])) < 1.0:
+			on_ring += 1
+	assert(on_ring * track.ds > 70.0, "both passes drive the ring (%.0f m on it)" % (on_ring * track.ds))
+	var dressing := scene.road.get_node("Roundabout") as RoundaboutRing
+	assert(dressing.get_node("CirculatingCarriageway") != null and dressing.get_node("SplitterIslands") != null)
+	assert(not scene.road.open_edges.is_empty(), "the island side of the ring stays open")
+	assert(track.slow_zones.size() == 2, "the field slows round Sheshi Pavarsia on both passes")
+	var slow := INF
+	for zone: Array in track.slow_zones:
+		slow = minf(slow, track.slow_speed(float(zone[0]) + 5.0, Race.SLOW_ZONE_DECEL, 240.0))
+	assert(slow * 3.6 < 60.0, "AI target speed in the roundabout (%.0f km/h)" % (slow * 3.6))
 	var baked: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
 	for anchor: Dictionary in baked.landmarks:
 		if not anchor.has("radius"):
@@ -260,6 +309,30 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var bore := tunnel.get_node("TunnelBore") as MeshInstance3D
 	assert(bore.mesh.get_aabb().size.length() < 145.0, "reverse race must build the same short bore")
 	tunnel.queue_free()
+
+
+## Hotels up the hillside and the beach club on the shore before the tunnel.
+func _test_vlore_resort(scene: RaceScene) -> void:
+	var resort := scene.props.resort
+	assert(resort != null, "Vlorë needs its hotels and beach club before the tunnel")
+	assert(resort.get_node("HotelWalls") != null and resort.get_node("HotelGlazing") != null)
+	assert(resort.get_node("BeachClub/PoolWater") != null and resort.get_node("BeachClub/ParasolsAndCanopies") != null)
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
+	var portal := scene.track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
+	var baked: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
+	var hotels: Array = baked.resort.hotels
+	assert(hotels.size() >= 8, "a row of hotels")
+	for h: Array in hotels:
+		var d := scene.track.dist_to(float(h[0]), float(h[2]))
+		assert(d > scene.track.half_w + 15.0, "hotels stand back from the road")
+		var before := scene.track.mod_s(portal - scene.track.locate_xz(float(h[0]), float(h[2])).x)
+		assert(before > 30.0 and before < 420.0, "hotels line the road before the tunnel (%.0f m)" % before)
+	var club: Dictionary = baked.resort.club
+	var club_at := Vector2(float(club.x), float(club.z))
+	assert(scene.track.dist_to(club_at.x, club_at.y) > scene.track.half_w + 8.0, "the deck starts past the barrier")
+	var into_sea := club_at + Vector2(sin(deg_to_rad(float(club.yaw))), cos(deg_to_rad(float(club.yaw)))) * (float(club.depth) * 0.5 + 12.0)
+	assert(scene.terrain.is_water(into_sea.x, into_sea.y), "the beach club looks over the sea")
+	print("VLORE RESORT: %d hotels, pool %.0f x %.0f m" % [hotels.size(), club.pool[0], club.pool[1]])
 
 
 ## Arc positions where the lap passes closest to `at`, one per pass (a pass

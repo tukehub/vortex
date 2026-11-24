@@ -3,9 +3,9 @@ extends RefCounted
 ## Small mesh-building helpers for the procedural landmarks: vertex-coloured
 ## boxes, quads, tapered cylinders and spheres appended to a SurfaceTool, so a
 ## whole building in one material is one draw call. Also the Albanian flag
-## texture (red field, black double-headed eagle), generated once.
+## texture (red field, black double-headed eagle).
 
-static var _flag: ImageTexture
+static var _flag: Texture2D
 
 
 static func begin() -> SurfaceTool:
@@ -105,37 +105,10 @@ static func material(rough := 0.85, metal := 0.0, cull := true) -> StandardMater
 	return m
 
 
-## The flag of Albania: a red field with the black double-headed eagle.
-## Drawn from a hand-traced half outline, mirrored; 7:10 proportions.
-static func albanian_flag() -> ImageTexture:
-	if _flag != null:
-		return _flag
-	var w := 200
-	var h := 140
-	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0.80, 0.07, 0.10))
-	# Right half of the eagle in a box 1 unit tall, x from the centre line.
-	var shapes: Array[PackedVector2Array] = [
-		# neck and head, beak to the right
-		PackedVector2Array([Vector2(0.0, 0.42), Vector2(0.05, 0.31), Vector2(0.08, 0.21), Vector2(0.11, 0.13), Vector2(0.16, 0.09), Vector2(0.21, 0.10), Vector2(0.27, 0.14), Vector2(0.21, 0.155), Vector2(0.17, 0.18), Vector2(0.14, 0.25), Vector2(0.10, 0.36), Vector2(0.05, 0.47)]),
-		# wing with feathered edge
-		PackedVector2Array([Vector2(0.03, 0.40), Vector2(0.18, 0.30), Vector2(0.32, 0.20), Vector2(0.47, 0.13), Vector2(0.43, 0.24), Vector2(0.50, 0.28), Vector2(0.43, 0.36), Vector2(0.49, 0.42), Vector2(0.41, 0.48), Vector2(0.45, 0.54), Vector2(0.37, 0.58), Vector2(0.39, 0.65), Vector2(0.29, 0.64), Vector2(0.18, 0.62), Vector2(0.06, 0.62)]),
-		# body
-		PackedVector2Array([Vector2(0.0, 0.36), Vector2(0.08, 0.42), Vector2(0.10, 0.55), Vector2(0.08, 0.70), Vector2(0.0, 0.76)]),
-		# tail fan
-		PackedVector2Array([Vector2(0.0, 0.70), Vector2(0.07, 0.72), Vector2(0.13, 0.93), Vector2(0.08, 0.89), Vector2(0.05, 0.97), Vector2(0.02, 0.91), Vector2(0.0, 0.98)]),
-		# legs and talons
-		PackedVector2Array([Vector2(0.06, 0.66), Vector2(0.16, 0.74), Vector2(0.22, 0.80), Vector2(0.17, 0.81), Vector2(0.13, 0.78), Vector2(0.05, 0.73)]),
-	]
-	var size := 0.84 * h
-	var top := 0.08 * h
-	for y in h:
-		for x in w:
-			var p := Vector2(absf(x + 0.5 - w * 0.5) / size, (y + 0.5 - top) / size)
-			for shape in shapes:
-				if Geometry2D.is_point_in_polygon(p, shape):
-					img.set_pixel(x, y, Color(0.03, 0.03, 0.03))
-					break
-	img.generate_mipmaps()
-	_flag = ImageTexture.create_from_image(img)
+## The flag of Albania: a red field with the black double-headed eagle, at
+## the official 5:7 proportion. The eagle is the state's vector drawing
+## (public domain), rasterised by tools/build_albanian_flag.py.
+static func albanian_flag() -> Texture2D:
+	if _flag == null:
+		_flag = load("res://assets/textures/albanian_flag.png")
 	return _flag
