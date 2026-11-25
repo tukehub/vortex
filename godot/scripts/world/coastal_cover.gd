@@ -11,12 +11,16 @@ var _pines := PineForestMultiMesh.new()
 var _pine_count := -1
 
 
-func build() -> void:
+func build(terrain: Terrain = null) -> void:
 	var sites := FileAccess.get_file_as_bytes("res://assets/cities/vlore/ground_cover.bin").to_float32_array()
 	var groups := {}
 	for i in range(0, sites.size(), 4):
 		var at := Vector3(sites[i], sites[i+1], sites[i+2])
 		var kind := int(sites[i+3])
+		if terrain != null and kind != 2: # Promenade lawns sit on their own mesh.
+			var ground := terrain.detail.height_at(at.x, at.z)
+			if not is_nan(ground):
+				at.y = ground
 		var phase := fposmod(i * .1545085, 1.)
 		var scale := .76 + .5 * fposmod(i * .1035534, 1.)
 		var basis := Basis(Vector3.UP, phase * TAU)

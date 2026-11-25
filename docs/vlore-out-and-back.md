@@ -221,3 +221,40 @@ Not verified on a phone: frame time at the seafront on the target devices.
 - `tools/pipeline/test_out_and_back.py`: merge join (shallow merge kept
   whole, converging road cut back, impossible merge refused), carriageway
   gate, first-pass seafront.
+
+## Local hillside terrain
+
+Vlorë uses 35 independently culled 120 m tiles at 1.875 m spacing on the
+western flank of Kuzum Baba, above lower Lungomare and along the Dhimitër
+Konomi climb behind Uji i Ftohtë. These cover 0.504 km², about 0.62% of the
+existing near grid. The bake uses downhill drainage to shape gullies and
+warped geological bedding to form ledges and fractured limestone. The
+shipped elevation grid sets the broad contours. The finer relief is procedural.
+
+Banks fade into the surrounding grid over 21 m. The full, 7.5 m and 15 m tile
+meshes share perimeter vertices, including the edges where tiles meet the
+surrounding terrain. Godot selects the index buffer by projected size and
+frustum-culls each tile. The quality preset and thermal pressure bring coarser
+geometry closer. The terrain shader uses the baked rock and drainage weights
+to place limestone and weathered soil. It samples the existing 1K limestone
+map only on nearby outcrops.
+
+The bake masks the race and side roads, foundations, shoreline, and modeled
+tunnel cliff. Road meshes and route signs use the original height sampler.
+Trees and natural ground cover sample the detailed triangles where available,
+and promenade lawns follow the promenade mesh. The simulation uses the
+original track data.
+
+Rebuild the terrain detail from the shipped city files without rerouting or
+rebaking the city. A full Vlorë pipeline build runs the same step after the
+road and building meshes are available.
+
+```sh
+python3 tools/pipeline/vlore_terrain_detail.py
+godot --headless --path godot res://tests/vlore_terrain_detail.tscn
+```
+
+The compressed height and material data occupy about 286 KiB. The Godot
+regression checks the stitched boundaries, LOD rims, expected relief and prop
+heights. It also checks both race directions for zero displacement at the
+road center and outside the shoulders.

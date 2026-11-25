@@ -7,6 +7,10 @@ extends Node3D
 
 const CHUNK := 40                 # near-grid cells per chunk edge (600 m)
 const SHADER := preload("res://shaders/terrain.gdshader")
+const DETAIL := preload("res://scripts/world/terrain_detail.gd")
+
+var detail := DETAIL.new()
+var detail_chunks: Array[MeshInstance3D] = []
 
 var near := {}
 var far := {}
@@ -58,6 +62,9 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 	if city_id == "vlore":
 		mat.set_shader_parameter("coastal_ground", true)
 		mat.set_shader_parameter("ground_macro", load(dir + "ground_macro.png"))
+		detail.load_bake(dir, near, near_h)
+		if not detail.tiles.is_empty():
+			mat.set_shader_parameter("tex_limestone", load("res://assets/textures/limestone_diff.jpg"))
 	mat.set_shader_parameter("splat", splat)
 	mat.set_shader_parameter("two_scale", Quality.preset != "low" and Quality.pressure_stage < 2)
 	Quality.budget_changed.connect(_apply_budget)
@@ -86,6 +93,7 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 		mat.set_shader_parameter("shore_size", float(near.cell) * (int(near.n) - 1))
 		mat.set_shader_parameter("beach_span", beach_span)
 	_build_near()
+	_build_detail()
 	_build_far()
 	if lana_enabled:
 		var river := LanaRiver.new()
@@ -130,11 +138,23 @@ func _terrain_lod_bias() -> float:
 func _apply_budget() -> void:
 	for chunk in chunks:
 		chunk.lod_bias = _terrain_lod_bias()
+	for chunk in detail_chunks:
+		chunk.lod_bias = _detail_lod_bias()
 	mat.set_shader_parameter("two_scale", Quality.preset != "low" and Quality.pressure_stage < 2)
 
 
-## Bilinear height lookup on the near grid, falling back to far grid.
+func _detail_lod_bias() -> float:
+	return _terrain_lod_bias() / (1.0 + .32 * Quality.pressure_stage)
+
+
+## Props on a detailed hill sample the exact full-resolution mesh triangles.
 func height_at(x: float, z: float) -> float:
+	var refined := detail.height_at(x, z)
+	return base_height_at(x, z) if is_nan(refined) else refined
+
+
+## Keep the original bilinear sample for road shoulders and track-side geometry.
+func base_height_at(x: float, z: float) -> float:
 	var h := _sample(near, near_h, x, z)
 	if is_nan(h):
 		h = _sample(far, far_h, x, z)
@@ -159,7 +179,7 @@ func _sample(g: Dictionary, h: PackedFloat32Array, x: float, z: float) -> float:
 	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
 
 
-func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells: int, step: int, hole := Rect2(), origin := Vector3.ZERO, chunk_lods := {}) -> ArrayMesh:
+func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells: int, step: int, hole := Rect2(), origin := Vector3.ZERO, chunk_lods := {}, cuts := {}) -> ArrayMesh:
 	var n := int(g.n)
 	var cell := float(g.cell)
 	var x0 := float(g.x0)
@@ -195,6 +215,8 @@ func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells:
 	for j in m - 1:
 		for i in m - 1:
 			var a := j * m + i
+			if not cuts.is_empty() and _cut_cell(cuts, i, j):
+				continue
 			if hole.has_area():
 				# skip quads fully inside `hole` (xz); straddling quads stay as overlap
 				var lo := verts[a]
@@ -217,31 +239,42 @@ func _grid_mesh(g: Dictionary, h: PackedFloat32Array, cx0: int, cz0: int, cells:
 	return mesh
 
 
-## Keep every edge vertex in the coarse index buffer so neighbouring chunks
-## can choose different detail levels without opening the ridgeline to the sky.
-func _coarse_indices() -> PackedInt32Array:
+## A cut occupies whole groups of eight base cells within a 600 m chunk.
+static func _cut_cell(cuts: Dictionary, x: int, z: int) -> bool:
+	return cuts.has(Vector2i(x / DETAIL.BASE_CELLS, z / DETAIL.BASE_CELLS)) and x >= 0 and z >= 0
+
+
+## Preserve the fine perimeter at each LOD. For a hole in the base terrain,
+## also keep every 15 m edge vertex along the adjacent coarse block.
+static func _lod_indices(cells: int, step: int, cuts := {}) -> PackedInt32Array:
 	var indices := PackedInt32Array()
-	var stride := CHUNK + 1
-	for z in range(0, CHUNK, 4):
-		for x in range(0, CHUNK, 4):
+	var stride := cells + 1
+	for z in range(0, cells, step):
+		for x in range(0, cells, step):
+			if not cuts.is_empty() and _cut_cell(cuts, x, z):
+				continue
 			var a := z * stride + x
-			var b := a + 4
-			var c := b + 4 * stride
-			var d := a + 4 * stride
-			if x > 0 and z > 0 and x + 4 < CHUNK and z + 4 < CHUNK:
+			var b := a + step
+			var c := b + step * stride
+			var d := a + step * stride
+			var top := z == 0 or _cut_cell(cuts, x, z-step)
+			var right := x + step == cells or _cut_cell(cuts, x+step, z)
+			var bottom := z + step == cells or _cut_cell(cuts, x, z+step)
+			var left := x == 0 or _cut_cell(cuts, x-step, z)
+			if step == 1 or not (top or right or bottom or left):
 				indices.append_array(PackedInt32Array([a, b, d, b, c, d]))
 				continue
 			var rim := PackedInt32Array()
-			for i in range(0, 4, 1 if z == 0 else 4):
+			for i in range(0, step, 1 if top else step):
 				rim.append(a + i)
-			for i in range(0, 4, 1 if x + 4 == CHUNK else 4):
+			for i in range(0, step, 1 if right else step):
 				rim.append(b + i * stride)
-			for i in range(0, 4, 1 if z + 4 == CHUNK else 4):
+			for i in range(0, step, 1 if bottom else step):
 				rim.append(c - i)
-			for i in range(0, 4, 1 if x == 0 else 4):
+			for i in range(0, step, 1 if left else step):
 				rim.append(d - i * stride)
 			for i in rim.size():
-				indices.append_array(PackedInt32Array([a + 2 * stride + 2, rim[i], rim[(i + 1) % rim.size()]]))
+				indices.append_array(PackedInt32Array([a + (step / 2) * (stride + 1), rim[i], rim[(i + 1) % rim.size()]]))
 	return indices
 
 
@@ -249,19 +282,51 @@ func _build_near() -> void:
 	var n := int(near.n)
 	var cell := float(near.cell)
 	var nc := (n - 1) / CHUNK
-	var lods := {1.5: _coarse_indices()}
+	var lods := {1.5: _lod_indices(CHUNK, 4)}
+	var chunk_cuts := {}
+	var per_chunk := CHUNK / DETAIL.BASE_CELLS
+	for tile: Vector2i in detail.tiles:
+		var block := tile / Vector2i(per_chunk, per_chunk)
+		if not chunk_cuts.has(block):
+			chunk_cuts[block] = {}
+		chunk_cuts[block][tile % Vector2i(per_chunk, per_chunk)] = true
 	for cz in nc:
 		for cx in nc:
 			var center := Vector3(float(near.x0) + (cx + 0.5) * CHUNK * cell, 0, float(near.z0) + (cz + 0.5) * CHUNK * cell)
 			var mi := MeshInstance3D.new()
 			mi.position = center
-			mi.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 1, Rect2(), center, lods)
+			var cuts: Dictionary = chunk_cuts.get(Vector2i(cx, cz), {})
+			var chunk_lods := lods if cuts.is_empty() else {1.5: _lod_indices(CHUNK, 4, cuts)}
+			mi.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 1, Rect2(), center, chunk_lods, cuts)
 			mi.material_override = mat
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mi.lod_bias = _terrain_lod_bias()
 			add_child(mi)
 			chunks.append(mi)
 			chunk_pos.append(Vector2(float(near.x0) + (cx + 0.5) * CHUNK * cell, float(near.z0) + (cz + 0.5) * CHUNK * cell))
+
+
+func _build_detail() -> void:
+	if detail.tiles.is_empty():
+		return
+	var indices := _lod_indices(DETAIL.CELLS, 1)
+	# Godot selects these index buffers by projected size. Keeping the
+	# coarse patch visible preserves the surface when the fine LOD drops out.
+	var lods := {0.70: _lod_indices(DETAIL.CELLS, 4), 2.0: _lod_indices(DETAIL.CELLS, 8)}
+	for key: Vector2i in detail.tiles:
+		var c := detail.tile_origin(key) + Vector2.ONE * float(near.cell) * DETAIL.BASE_CELLS * .5
+		var mi := MeshInstance3D.new()
+		mi.name = "TerrainPatch_%d_%d" % [key.x, key.y]
+		mi.position = Vector3(c.x, 0.0, c.y)
+		mi.mesh = detail.make_mesh(key, indices, lods)
+		mi.material_override = mat
+		mi.set_instance_shader_parameter("detailed_hillside", true)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.lod_bias = _detail_lod_bias()
+		# Each 120 m patch has its own bounds for renderer frustum culling.
+		add_child(mi)
+		detail_chunks.append(mi)
+	detail.release_mesh_data()
 
 
 func _build_far() -> void:

@@ -13,6 +13,8 @@ uniform sampler2D tex_urban_n : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D tex_road : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool coastal_ground = false;
 uniform sampler2D ground_macro : filter_linear_mipmap, repeat_enable;
+instance uniform bool detailed_hillside = false;
+uniform sampler2D tex_limestone : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool skanderbeg_square = false;
 // Second, coarser texture scale that hides tiling in the distance.
 uniform bool two_scale = true;
@@ -47,11 +49,13 @@ uniform vec3 urban_tint : source_color = vec3(0.72, 0.70, 0.66);
 varying vec3 wpos;
 varying vec3 wnrm;
 varying float cam_dist;
+varying vec2 relief;
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	cam_dist = length((VIEW_MATRIX * vec4(wpos, 1.0)).xyz);
+	relief = detailed_hillside ? COLOR.rg : vec2(0.0);
 }
 
 // hash based detail noise to break tiling
@@ -126,6 +130,25 @@ void fragment() {
 		base = mix(mix(soil, meadow, smoothstep(.19,.48,land.r)), brush, scrub);
 		rock_w = max(rock_w, exposed * (.72 + .28 * slope));
 		base = mix(base, limestone, rock_w);
+		// Dry ledges and eroded draws follow the baked geometry. The material
+		// weights taper to zero at the same boundaries as the displacement.
+		if (detailed_hillside) {
+			float strata = smoothstep(.06, .68, relief.x);
+			float gully = smoothstep(.08, .82, relief.y);
+			vec3 face = vec3(.49, .45, .36) * (.72 + .36 * mineral * 6.0);
+			float close_stone = strata * (1.0 - smoothstep(180.0, 440.0, cam_dist));
+			if (close_stone > .01) {
+				vec3 axis = pow(abs(normalize(wnrm)), vec3(4.0));
+				axis /= dot(axis, vec3(1.0));
+				vec3 stone = texture(tex_limestone, wpos.zy / 6.0).rgb * axis.x;
+				stone += texture(tex_limestone, wpos.xz / 6.0).rgb * axis.y;
+				stone += texture(tex_limestone, wpos.xy / 6.0).rgb * axis.z;
+				face *= mix(vec3(1.0), clamp(stone / vec3(.236, .146, .082), .38, 1.65), close_stone * .65);
+			}
+			base = mix(base, face, strata * (.92 - gully * .24));
+			base *= mix(vec3(1.0), vec3(.72, .67, .54), gully * .44);
+			rock_w = max(rock_w, strata);
+		}
 	}
 	vec3 nrm = mix(n_grass, n_rock, rock_w);
 	float rough = mix(0.92, 0.85, rock_w);

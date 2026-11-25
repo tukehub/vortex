@@ -29,6 +29,7 @@ from glb import GLB, earcut  # noqa: E402
 from water import process_city as build_water_mask  # noqa: E402
 import coastal_macro
 import coastal_vegetation
+import vlore_terrain_detail
 import seafront  # noqa: E402
 import street_props  # noqa: E402
 import rozafa  # noqa: E402
@@ -1599,6 +1600,7 @@ def build(cid, route_only=False):
         rozafa.process_city()
     if cid == "vlore":
         coastal_vegetation.bake(Path(out))
+        vlore_terrain_detail.bake(Path(out))
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_map.png'), span=map_span)
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_zoom.png'), span=1800, size=1800)
     log(f'  done -> {out}')

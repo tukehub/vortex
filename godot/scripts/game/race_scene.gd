@@ -175,7 +175,7 @@ func _build_world() -> void:
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
-	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
+	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.base_height_at, reverse)
 	road.set_layout(int(tj.get("lanes", 4)), bool(tj.get("one_way", false)))
 	road.add_island_aprons(track)
 	if tj.has("tunnel"):
@@ -196,7 +196,7 @@ func _build_world() -> void:
 	var route_signs := RouteSigns.new()
 	route_signs.name = "RouteSigns"
 	road.add_child(route_signs)
-	route_signs.build(track, route_guide, terrain.height_at)
+	route_signs.build(track, route_guide, terrain.base_height_at)
 	RaceReflections.hide_detail(route_signs.posts)
 	buildings = Buildings.new()
 	var side_path := "res://assets/cities/%s/roads.glb" % city_id

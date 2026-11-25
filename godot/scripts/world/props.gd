@@ -83,7 +83,7 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 		var cover := preload("res://scripts/world/coastal_cover.gd").new()
 		cover.name = "CoastalVegetation"
 		add_child(cover)
-		cover.build()
+		cover.build(terrain)
 	if _tirana and track != null and terrain != null:
 		var showcase_street := preload("res://scripts/world/showcase_street_props.gd").new()
 		showcase_street.name = "TiranaStreetProps"
