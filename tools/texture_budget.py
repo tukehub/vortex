@@ -31,6 +31,8 @@ UNSHIPPED = re.compile(r'^assets/props/(street_bin|promenade_lamp|utility_box|be
 # Detail maps (normal, ARM) of the CC0 surface sets: grain and relief at a
 # few metres, never filling the screen. 512 px keeps them sharp at 720p.
 DETAIL_512 = re.compile(r'^assets/textures/((sand|promenade_paving|palm_bark|castle_wall|pole_metal)_(nor|arm)|marble_rock_rough)\.jpg$')
+# Coastal 1K atlases are sliced into mipmapped texture arrays.
+COAST_ARRAYS = re.compile(r'^assets/cities/vlore/(ground_layers\.jpg|ground_layers_pbr\.webp)$')
 # Tall bark strip: 1024 x 2048 at source, a palm trunk never needs it.
 DIFFUSE_1024 = re.compile(r'^assets/textures/palm_bark_diff\.jpg$')
 
@@ -45,7 +47,10 @@ def wanted(rel: str) -> dict:
         # ASTC HDR on Android (BPTC on desktop): a quarter of raw RGBE.
         return {'compress/mode': '2'}
     out = {'compress/mode': '2', 'mipmaps/generate': 'true'}
-    if re.fullmatch(r"assets/textures/limestone_(diff|nor|arm)\.jpg", rel):
+    if COAST_ARRAYS.fullmatch(rel):
+        out.update({'compress/high_quality': 'true', 'compress/channel_pack': '0',
+                    'slices/horizontal': '2', 'slices/vertical': '2'})
+    elif re.fullmatch(r"assets/textures/limestone_(diff|nor|arm)\.jpg", rel):
         out.update({'process/size_limit': '1024', 'compress/high_quality': 'true'})
     elif DETAIL_512.search(rel):
         out['process/size_limit'] = '512'
@@ -57,9 +62,10 @@ def wanted(rel: str) -> dict:
 def textures():
     for path in sorted((GODOT / 'assets').rglob('*.import')):
         text = path.read_text()
-        if 'importer="texture"' not in text:
+        rel = path.relative_to(GODOT).as_posix()[:-len('.import')]
+        if 'importer="texture"' not in text and not COAST_ARRAYS.fullmatch(rel):
             continue
-        yield path, path.relative_to(GODOT).as_posix()[:-len('.import')], text
+        yield path, rel, text
 
 
 def main():

@@ -82,3 +82,5 @@ normal are resized from Poly Haven Tree Small 02 (Rico Cilliers and Rob Tuytel,
 CC0 1.0, https://polyhaven.com/a/tree_small_02).
 - Marble Rock 03 (Poly Haven, CC0): Uji i Ftohtë cliff.
 - Vlorë breakwater and talus (Poly Haven, CC0 1.0): Rock 07 and Rock 09 by Jenelle van Heerden, Boulder 01 by Rico Cilliers, Stone 01 by Dario Barresi and Rico Cilliers, Namaqualand Boulder 02 by Greg Zaal and Rico Cilliers, Namaqualand Boulders 03 and 05 by Dario Barresi and Jenelle van Heerden, and Coast Rocks 05 by Rob Tuytel. Retextured with Rock Face 03 (Dario Barresi and Rico Cilliers).
+
+- Vlorë terrain layers (Poly Haven, CC0 1.0): Withered Grass by Charlotte Baglioni, Red Laterite Soil Stones and Dry River Pebbles by Amal Kumar, and Sandy Gravel 02 by Dario Barresi. Source links and hashes are in tools/pipeline/coastal_materials.json.

@@ -249,9 +249,8 @@ Banks fade into the surrounding grid over 21 m. The full, 7.5 m and 15 m tile
 meshes share perimeter vertices, including the edges where tiles meet the
 surrounding terrain. Godot selects the index buffer by projected size and
 frustum-culls each tile. The quality preset and thermal pressure bring coarser
-geometry closer. The terrain shader uses the baked rock and drainage weights
-to place limestone and weathered soil. It samples the existing 1K limestone
-map only on nearby outcrops.
+geometry closer. The terrain shader uses the baked rock and drainage weights to place
+limestone and weathered soil.
 
 The bake masks the race and side roads, foundations, shoreline, and modeled
 tunnel cliff. Road meshes and route signs use the original height sampler.
@@ -272,3 +271,38 @@ The compressed height and material data occupy about 286 KiB. The Godot
 regression checks the stitched boundaries, LOD rims, expected relief and prop
 heights. It also checks both race directions for zero displacement at the
 road center and outside the shoulders.
+
+
+## Mediterranean ground materials
+
+![Chase-camera approach, eroded slope and aerial view of Vlorë](images/vlore-ground-materials.webp)
+
+The Vlorë terrain shader combines exposure, elevation, shore distance and the
+baked erosion masks to select limestone, dry grass, terra rossa, gravel and
+rounded shore pebbles. Washed stone gathers around the waterline, gravel
+collects in gullies and along road shoulders, and fine soil fills the gaps.
+Nearby displacement samples influence which material shows through at each
+blend. Steep limestone faces use triplanar projection. The tunnel cut uses the
+same macro limestone and soil palette.
+
+Two rotated macro fields keep the colour patches consistent across the near
+tiles and the horizon. Near the camera the material adds fine world-space
+normals and roughness variation from the PBR maps. Micro normals fade between
+22 m and 79 m. Surface photos and sampled height blend into the macro palette
+between 72 m and 242 m. Low quality and thermal pressure bring this handoff
+closer and skip the micro normals. The coastal path skips the surface
+photographs beyond the cutoff. Height samples affect blend weights only.
+
+Four CC0 surface scans use two 1K atlases. Godot imports each atlas as four
+512px repeating slices with independent mipmaps. The packed atlas stores
+OpenGL normal XY in RG, roughness in B, and displacement in A. The maps share
+two samplers. In an Android test export, both mipmapped ASTC arrays together occupied 2.67 MiB before archive compression. The terrain reuses the existing 1K
+Rock Face 03 limestone maps and Coast Sand 04 beach maps. The city splat,
+water mask and race geometry retain their original coordinates. [Pinned source manifest](../tools/pipeline/coastal_materials.json) · [Poly Haven license](https://polyhaven.com/license)
+
+Rebuild the atlases with the pipeline's Python dependencies.
+
+```sh
+python3 tools/pipeline/bake_coastal_materials.py
+godot --headless --path godot --editor --import
+```

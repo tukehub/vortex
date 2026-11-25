@@ -65,18 +65,24 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 		mat.set_shader_parameter("coastal_ground", true)
 		mat.set_shader_parameter("ground_macro", load(dir + "ground_macro.png"))
 		detail.load_bake(dir, near, near_h)
-		if not detail.tiles.is_empty():
-			mat.set_shader_parameter("tex_limestone", load("res://assets/textures/limestone_diff.jpg"))
+		mat.set_shader_parameter("ground_layers", load(dir + "ground_layers.jpg"))
+		mat.set_shader_parameter("ground_layers_pbr", load(dir + "ground_layers_pbr.webp"))
+		mat.set_shader_parameter("tex_limestone_arm", load("res://assets/textures/limestone_arm.jpg"))
 	mat.set_shader_parameter("splat", splat)
 	mat.set_shader_parameter("two_scale", Quality.preset != "low" and Quality.pressure_stage < 2)
 	Quality.budget_changed.connect(_apply_budget)
 	mat.set_shader_parameter("splat_span", float(meta.splat.span))
-	mat.set_shader_parameter("tex_grass", load("res://assets/textures/grass_diff.jpg"))
-	mat.set_shader_parameter("tex_grass_n", load("res://assets/textures/grass_nor.jpg"))
-	mat.set_shader_parameter("tex_rock", load("res://assets/textures/rock_diff.jpg"))
-	mat.set_shader_parameter("tex_rock_n", load("res://assets/textures/rock_nor.jpg"))
+	if city_id == "vlore":
+		mat.set_shader_parameter("tex_rock", load("res://assets/textures/limestone_diff.jpg"))
+		mat.set_shader_parameter("tex_rock_n", load("res://assets/textures/limestone_nor.jpg"))
+	else:
+		mat.set_shader_parameter("tex_grass", load("res://assets/textures/grass_diff.jpg"))
+		mat.set_shader_parameter("tex_grass_n", load("res://assets/textures/grass_nor.jpg"))
+		mat.set_shader_parameter("tex_rock", load("res://assets/textures/rock_diff.jpg"))
+		mat.set_shader_parameter("tex_rock_n", load("res://assets/textures/rock_nor.jpg"))
 	mat.set_shader_parameter("tex_urban", load("res://assets/textures/concrete_diff.jpg"))
-	mat.set_shader_parameter("tex_urban_n", load("res://assets/textures/concrete_nor.jpg"))
+	if city_id != "vlore":
+		mat.set_shader_parameter("tex_urban_n", load("res://assets/textures/concrete_nor.jpg"))
 	mat.set_shader_parameter("tex_road", load("res://assets/textures/asphalt_diff.jpg"))
 	if has_water:
 		mat.set_shader_parameter("tex_sand", load("res://assets/textures/sand_diff.jpg"))

@@ -1,0 +1,111 @@
+{
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "source_tier": "1k",
+  "layers": [
+    {
+      "role": "dry_grass",
+      "id": "withered_grass",
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "source": "https://polyhaven.com/a/withered_grass",
+      "maps": {
+        "albedo": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_diff_1k.jpg",
+          "md5": "a6e00946839a9ab1975457ae4a39823b"
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_nor_gl_1k.jpg",
+          "md5": "1d86c19a4dd4826eeb6db9653f8736bb"
+        },
+        "roughness": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_rough_1k.jpg",
+          "md5": "bd4219a20ed41f88098166497cdbc05d"
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/withered_grass/withered_grass_disp_1k.jpg",
+          "md5": "b4c6322d6b25054cdca2083f386c5d11"
+        }
+      }
+    },
+    {
+      "role": "terra_rossa",
+      "id": "red_laterite_soil_stones",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "source": "https://polyhaven.com/a/red_laterite_soil_stones",
+      "maps": {
+        "albedo": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_laterite_soil_stones/red_laterite_soil_stones_diff_1k.jpg",
+          "md5": "f5d483e42da0c704f320b8c159ebca5e"
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_laterite_soil_stones/red_laterite_soil_stones_nor_gl_1k.jpg",
+          "md5": "08737e3b461efa2583c648fbb3472e84"
+        },
+        "roughness": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_laterite_soil_stones/red_laterite_soil_stones_rough_1k.jpg",
+          "md5": "564a0faa8182a6cdb0fcff8e357dc064"
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_laterite_soil_stones/red_laterite_soil_stones_disp_1k.jpg",
+          "md5": "55fef21f42937458813f8d7e5d2362b5"
+        }
+      }
+    },
+    {
+      "role": "gravel",
+      "id": "sandy_gravel_02",
+      "authors": [
+        "Dario Barresi"
+      ],
+      "source": "https://polyhaven.com/a/sandy_gravel_02",
+      "maps": {
+        "albedo": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandy_gravel_02/sandy_gravel_02_diff_1k.jpg",
+          "md5": "e8f0496f1e0e923514470171de033bf9"
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandy_gravel_02/sandy_gravel_02_nor_gl_1k.jpg",
+          "md5": "a0174cc069d02b825b546d8547b4a49a"
+        },
+        "roughness": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandy_gravel_02/sandy_gravel_02_rough_1k.jpg",
+          "md5": "bbd5bd1358d0a3f7dbdee52707c126c1"
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandy_gravel_02/sandy_gravel_02_disp_1k.jpg",
+          "md5": "fd62d54065e010038a9c47864c314cca"
+        }
+      }
+    },
+    {
+      "role": "pebbles",
+      "id": "dry_river_pebbles",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "source": "https://polyhaven.com/a/dry_river_pebbles",
+      "maps": {
+        "albedo": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_diff_1k.jpg",
+          "md5": "970ed34655bdf437d6016b130742668f"
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_nor_gl_1k.jpg",
+          "md5": "309cc625d2f3834f281720bdd1d8cdbe"
+        },
+        "roughness": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_rough_1k.jpg",
+          "md5": "8e07eb86e5850fc7568344009b2065ef"
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_disp_1k.jpg",
+          "md5": "e866f543f22b2380919222a4a04eecea"
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,8 @@ uniform sampler2D rock_arm : hint_default_white, filter_linear_mipmap, repeat_en
 uniform sampler2D scrub_map : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D landscape : filter_linear_mipmap, repeat_enable;
 uniform float water_y = -1.2;
+#include "res://shaders/coastal_palette.gdshaderinc"
+
 varying vec3 world;
 varying vec3 normal_world;
 
@@ -31,12 +33,12 @@ void fragment() {
 	beds += .34 * sin(world.z * .19 + .27 * sin(world.x * .18));
 	float lamina = smoothstep(.025, .20, abs(fract(beds + .5) - .5));
 	float seams = (1.0 - lamina) * (.27 + COLOR.b * .25);
-	vec3 limestone = vec3(.40,.379,.334) * mix(vec3(1.0), clamp(stone * vec3(3.4,4.2,5.1), .28, 1.65), .66);
+	vec3 limestone = COAST_LIMESTONE * mix(vec3(1.0), clamp(stone * vec3(3.4,4.2,5.1), .28, 1.65), .66);
 	limestone *= mix(vec3(1.0), vec3(.61,.54,.45), seams);
 	vec3 land = texture(landscape, world.xz / 1580.0).rgb;
 	float grain = dot(texture(scrub_map, world.xz / 4.7).rgb, vec3(.22,.65,.13));
-	vec3 soil = mix(vec3(.19,.126,.072), vec3(.087,.14,.058), smoothstep(.20,.66,land.r));
-	soil *= .48 + grain * 4.1;
+	vec3 soil = mix(coastal_soil(land.r), COAST_MAQUIS, smoothstep(.25,.72,land.r) * .66);
+	soil *= .66 + grain * 2.6;
 	float exposed = clamp(COLOR.g * mix(.81, 1.12, 1.0 - direction.y), 0., 1.);
 	float splash = (1. - smoothstep(water_y + .12, water_y + 1.7, world.y)) * exposed;
 	ALBEDO = mix(soil, limestone, exposed) * mix(.58, 1., COLOR.r) * mix(1., .64, splash);

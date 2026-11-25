@@ -14,7 +14,10 @@ uniform sampler2D tex_road : source_color, filter_linear_mipmap_anisotropic, rep
 uniform bool coastal_ground = false;
 uniform sampler2D ground_macro : filter_linear_mipmap, repeat_enable;
 instance uniform bool detailed_hillside = false;
-uniform sampler2D tex_limestone : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+// Vlorë binds tex_rock and tex_rock_n to the shared 1K limestone.
+uniform sampler2D tex_limestone_arm : hint_default_white, filter_linear_mipmap, repeat_enable;
+uniform sampler2DArray ground_layers : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2DArray ground_layers_pbr : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool skanderbeg_square = false;
 // Second, coarser texture scale that hides tiling in the distance.
 uniform bool two_scale = true;
@@ -45,6 +48,7 @@ uniform vec3 grass_tint : source_color = vec3(0.78, 0.86, 0.62);
 uniform vec3 urban_tint : source_color = vec3(0.72, 0.70, 0.66);
 
 #include "res://shaders/square_paving.gdshaderinc"
+#include "res://shaders/terrain_coastal.gdshaderinc"
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -75,102 +79,99 @@ void fragment() {
 	float in_splat = step(0.0, suv.x) * step(suv.x, 1.0) * step(0.0, suv.y) * step(suv.y, 1.0);
 	sp *= in_splat;
 
-	// two-scale texturing: near (4 m tiles) blended with far (40 m tiles)
+	// Shared road and water masks remain registered to the baked map.
 	vec2 uv_n = wpos.xz / 4.0;
 	vec2 uv_f = wpos.xz / 41.0;
 	float far_w = clamp((cam_dist - 120.0) / 500.0, 0.0, 1.0);
-	float slope = 1.0 - clamp(wnrm.y, 0.0, 1.0);
-
-	// Each scale is fetched only where it has weight: inside 120 m the far
-	// tiles, beyond 620 m the near tiles and their normals. The weights are 0
-	// where the branches switch, so a quad straddling the seam cannot show
-	// a wrong mip level. Phones skip three to six of the ~16 fetches a pixel.
-	vec3 grass = vec3(0.0);
-	vec3 rock = vec3(0.0);
-	vec3 urban = vec3(0.0);
-	vec3 n_grass = vec3(0.5, 0.5, 1.0);
-	vec3 n_rock = n_grass;
-	vec3 n_urban = n_grass;
-	float near_w = two_scale ? 1.0 - far_w : 1.0;
-	if (near_w > 0.0) {
-		grass = texture(tex_grass, uv_n).rgb * near_w;
-		rock = texture(tex_rock, uv_n).rgb * near_w;
-		urban = texture(tex_urban, uv_n).rgb * near_w;
-		n_grass = mix(texture(tex_grass_n, uv_n).rgb, n_grass, far_w);
-		n_rock = mix(texture(tex_rock_n, uv_n).rgb, n_rock, far_w);
-		n_urban = mix(texture(tex_urban_n, uv_n).rgb, n_urban, far_w);
+	vec3 up = normalize(wnrm);
+	float slope = 1.0 - clamp(up.y, 0.0, 1.0);
+	float above = wpos.y - water_surface;
+	vec2 shore = vec2(beach_span, 0.0);
+	if (sea_surface) {
+		vec2 shore_uv = (wpos.xz - shore_origin) / shore_size;
+		shore.y = step(0.0, shore_uv.x) * step(shore_uv.x, 1.0) * step(0.0, shore_uv.y) * step(shore_uv.y, 1.0);
+		float code = texture(shore_tex, clamp(shore_uv, 0.0, 1.0)).r * 255.0;
+		shore.x = clamp((127.0 - code) / 127.0, 0.0, 1.0) * beach_span;
 	}
-	if (near_w < 1.0) {
-		grass += texture(tex_grass, uv_f).rgb * far_w;
-		rock += texture(tex_rock, uv_f).rgb * far_w;
-		urban += texture(tex_urban, uv_f).rgb * far_w;
-	}
-	grass *= grass_tint;
-	urban *= urban_tint;
-	vec3 road = texture(tex_road, uv_n * 0.5).rgb * 0.85;
 
-	float rock_w = smoothstep(0.35, 0.65, slope + (vnoise(wpos.xz * 0.02) - 0.5) * 0.3);
-	// high altitude -> rock & snow
 	float alt = clamp((wpos.y - 900.0) / 600.0, 0.0, 1.0);
-	rock_w = max(rock_w, alt * 0.8);
-
-	vec3 base = mix(grass, rock, rock_w);
+	float rock_w = 0.0;
+	vec3 base;
+	vec3 urban = vec3(.25,.23,.20);
+	vec3 nrm = vec3(.5,.5,1.0);
+	vec3 n_urban = nrm;
+	vec3 world_detail = vec3(0.);
+	float rough;
+	float ground_ao = 1.0;
 	if (coastal_ground) {
-		// Broad olive maquis in sheltered pockets, warm terra rossa on open
-		// ground, pale limestone on dry ridges and steep east-facing slopes.
-		vec3 land = texture(ground_macro, wpos.xz / 1580.0).rgb;
-		float exposed = smoothstep(.47, .76, land.g + (land.b-.5)*.37 + slope * 1.25 + wnrm.x * .105);
-		float scrub = smoothstep(.27, .62, land.r + (land.b-.5)*.55 + sp.g * .20 - exposed * .22);
-		float grain = dot(grass, vec3(.22,.65,.13));
-		float mineral = dot(rock, vec3(.22,.65,.13));
-		vec3 meadow = vec3(.16,.215,.078) * (.24 + 6.6 * grain);
-		vec3 brush = vec3(.039,.088,.036) * (.28 + 6.5 * grain);
-		vec3 soil = vec3(.25,.161,.087) * (.19 + 8.3 * mineral);
-		vec3 limestone = vec3(.44,.425,.339) * (.20 + 9.1 * mineral);
-		base = mix(mix(soil, meadow, smoothstep(.19,.48,land.r)), brush, scrub);
-		rock_w = max(rock_w, exposed * (.72 + .28 * slope));
-		base = mix(base, limestone, rock_w);
-		// Dry ledges and eroded draws follow the baked geometry. The material
-		// weights taper to zero at the same boundaries as the displacement.
-		if (detailed_hillside) {
-			float strata = smoothstep(.06, .68, relief.x);
-			float gully = smoothstep(.08, .82, relief.y);
-			vec3 face = vec3(.49, .45, .36) * (.72 + .36 * mineral * 6.0);
-			float close_stone = strata * (1.0 - smoothstep(180.0, 440.0, cam_dist));
-			if (close_stone > .01) {
-				vec3 axis = pow(abs(normalize(wnrm)), vec3(4.0));
-				axis /= dot(axis, vec3(1.0));
-				vec3 stone = texture(tex_limestone, wpos.zy / 6.0).rgb * axis.x;
-				stone += texture(tex_limestone, wpos.xz / 6.0).rgb * axis.y;
-				stone += texture(tex_limestone, wpos.xy / 6.0).rgb * axis.z;
-				face *= mix(vec3(1.0), clamp(stone / vec3(.236, .146, .082), .38, 1.65), close_stone * .65);
-			}
-			base = mix(base, face, strata * (.92 - gully * .24));
-			base *= mix(vec3(1.0), vec3(.72, .67, .54), gully * .44);
-			rock_w = max(rock_w, strata);
+		CoastGround ground = coastal_surface(wpos, up, cam_dist, sp, relief, shore, above, rock_w);
+		base = ground.albedo;
+		rough = ground.roughness;
+		world_detail = ground.detail_normal;
+		ground_ao = ground.ao;
+	} else {
+		// Each scale is fetched only where it has weight: inside 120 m the far
+		// tiles, beyond 620 m the near tiles and their normals. The weights are 0
+		// where the branches switch, so a quad straddling the seam cannot show
+		// a wrong mip level. Phones skip three to six of the ~16 fetches a pixel.
+		vec3 grass = vec3(0.0);
+		vec3 rock = vec3(0.0);
+		urban = vec3(0.0);
+		vec3 n_grass = vec3(0.5, 0.5, 1.0);
+		vec3 n_rock = n_grass;
+		n_urban = n_grass;
+		float near_w = two_scale ? 1.0 - far_w : 1.0;
+		if (near_w > 0.0) {
+			grass = texture(tex_grass, uv_n).rgb * near_w;
+			rock = texture(tex_rock, uv_n).rgb * near_w;
+			urban = texture(tex_urban, uv_n).rgb * near_w;
+			n_grass = mix(texture(tex_grass_n, uv_n).rgb, n_grass, far_w);
+			n_rock = mix(texture(tex_rock_n, uv_n).rgb, n_rock, far_w);
+			n_urban = mix(texture(tex_urban_n, uv_n).rgb, n_urban, far_w);
 		}
+		if (near_w < 1.0) {
+			grass += texture(tex_grass, uv_f).rgb * far_w;
+			rock += texture(tex_rock, uv_f).rgb * far_w;
+			urban += texture(tex_urban, uv_f).rgb * far_w;
+		}
+		grass *= grass_tint;
+		urban *= urban_tint;
+		rock_w = smoothstep(0.35, 0.65, slope + (vnoise(wpos.xz * 0.02) - 0.5) * 0.3);
+		rock_w = max(rock_w, alt * 0.8);
+		base = mix(grass, rock, rock_w);
+		nrm = mix(n_grass, n_rock, rock_w);
+		rough = mix(0.92, 0.85, rock_w);
 	}
-	vec3 nrm = mix(n_grass, n_rock, rock_w);
-	float rough = mix(0.92, 0.85, rock_w);
 
 	float urban_w = sp.a * (1.0 - rock_w * 0.5);
 	if (coastal_ground) {
 		// The OSM residential polygon spans whole hillsides. Streets and
 		// footprints are drawn separately, and open slopes show through it.
 		float hillside = smoothstep(12., 38., wpos.y) * (.84 + .16 * smoothstep(.005, .07, slope));
-		urban_w *= 1.0 - max(hillside * .90, sp.g * .85);
+		float streets = smoothstep(.035, .33, sp.r);
+		urban_w *= (1.0 - max(hillside * .93, sp.g * .85)) * mix(.24, .83, streets);
+		float grit = .58 * (1.0 - smoothstep(28.,130.,cam_dist));
+		if (urban_w > .015 && grit > .005) {
+			urban = mix(urban, texture(tex_urban, uv_n).rgb * urban_tint, grit);
+		}
 	}
 	base = mix(base, urban, urban_w);
 	nrm = mix(nrm, n_urban, urban_w);
 	rough = mix(rough, 0.8, urban_w);
 
 	float road_w = smoothstep(0.25, 0.7, sp.r);
-	base = mix(base, road, road_w);
+	if (road_w > .001) {
+		vec3 road = texture(tex_road, uv_n * 0.5).rgb * 0.85;
+		base = mix(base, road, road_w);
+	}
 	nrm = mix(nrm, vec3(0.5, 0.5, 1.0), road_w);
 	rough = mix(rough, 0.75, road_w);
-
-	// vegetation darkens / greens a little
-	base = mix(base, base * vec3(0.72, 0.9, 0.6), sp.g * 0.6 * (1.0 - road_w));
+	float hardscape = 1.0 - (1.0 - urban_w) * (1.0 - road_w);
+	world_detail *= 1.0 - hardscape;
+	ground_ao = mix(ground_ao, 1.0, hardscape);
+	if (!coastal_ground) {
+		base = mix(base, base * vec3(0.72, 0.9, 0.6), sp.g * 0.6 * (1.0 - road_w));
+	}
 
 	// A geographically placed, softly edged paving area around the monument.
 	// The road is separate geometry above the terrain, so this cannot cover it.
@@ -192,17 +193,12 @@ void fragment() {
 	if (sea_surface) {
 		// Seabed under the surface; a sand beach along the shore, wet at the
 		// waterline, never over roads or up a cliff.
-		float above = wpos.y - water_surface;
-		vec2 shore_uv = (wpos.xz - shore_origin) / shore_size;
-		float on_grid = step(0.0, shore_uv.x) * step(shore_uv.x, 1.0) * step(0.0, shore_uv.y) * step(shore_uv.y, 1.0);
-		float code = texture(shore_tex, clamp(shore_uv, 0.0, 1.0)).r * 255.0;
-		float to_water = clamp((127.0 - code) / 127.0, 0.0, 1.0) * beach_span;
-		float beach = (1.0 - smoothstep(16.0, 34.0, to_water)) * on_grid;
+		float beach = (1.0 - smoothstep(16.0, 34.0, shore.x)) * shore.y;
 		float sand_w = beach * (1.0 - road_w) * (1.0 - smoothstep(3.0, 6.0, above)) * smoothstep(0.75, 0.9, wnrm.y);
 		float wet_sand = 1.0 - smoothstep(0.0, 0.6, above);
 		// The beach is a thin band: fetch its three maps only on it (sand_w
 		// eases in from 0, so the branch edge never shows).
-		if (sand_w > 0.0) {
+		if (!coastal_ground && sand_w > 0.0) {
 			vec2 sand_uv = wpos.xz / SAND_TILE;
 			vec3 grain = texture(tex_sand, sand_uv).rgb / SAND_MEAN;
 			// The grain fades with distance like the other near textures.
@@ -220,6 +216,7 @@ void fragment() {
 	base = mix(base, water_color, water_w);
 	rough = mix(rough, 0.05, water_w);
 	nrm = mix(nrm, vec3(0.5, 0.5, 1.0), water_w);
+	world_detail *= (1.0-water_w)*smoothstep(-.5,.25,above);
 	float metal = 0.0;
 
 	// snow cover
@@ -233,16 +230,19 @@ void fragment() {
 	base *= 1.0 - 0.45 * wet_w;
 	rough = mix(rough, 0.18, wet_w * (0.6 + 0.4 * road_w));
 
-	// detail variation
-	float v = vnoise(wpos.xz * 0.12) * 0.16 + 0.92;
-	base *= v;
+	if (!coastal_ground) {
+		base *= vnoise(wpos.xz * 0.12) * 0.16 + 0.92;
+	} else {
+		NORMAL = normalize((VIEW_MATRIX * vec4(normalize(up + world_detail * (1.0 - snow_w) * (1.0 - wet_w*.38)), 0.0)).xyz);
+	}
+	AO = mix(ground_ao, 1.0, max(water_w, snow_w));
 
 	ALBEDO = base;
 	ROUGHNESS = rough;
 	METALLIC = metal;
 	SPECULAR = mix(0.5, 0.7, water_w);
 	NORMAL_MAP = nrm;
-	NORMAL_MAP_DEPTH = 0.6;
+	NORMAL_MAP_DEPTH = coastal_ground ? 0.0 : 0.6;
 	// faint urban glow at night for distant city blocks
 	EMISSION = vec3(1.0, 0.72, 0.4) * urban_w * night * 0.012 * far_w;
 }

@@ -10,6 +10,12 @@ func _ready() -> void:
 	var terrain := Terrain.new()
 	add_child(terrain)
 	terrain.load_city("vlore", null)
+	check(terrain.mat.get_shader_parameter("coastal_ground"), "Vlorë selects the coastal ground material")
+	for uniform in ["ground_layers", "ground_layers_pbr"]:
+		var map := terrain.mat.get_shader_parameter(uniform) as TextureLayered
+		check(map != null and map.get_width() == 512 and map.get_height() == 512
+			and map.get_layers() == 4 and map.has_mipmaps(), uniform + " has four mipmapped 512px slices")
+
 	check(terrain.detail.tiles.size() == 35 and terrain.detail_chunks.size() == 35, "localized bake loaded in all three hillside areas")
 	check(terrain.chunks.size() == 225 and terrain.detail.tiles.size() * TILE_SPAN * TILE_SPAN < .01 * 9000.0 * 9000.0, "existing grid remains and detail covers less than 1%")
 	var maximum_cut := 0.0
@@ -92,6 +98,7 @@ func _ready() -> void:
 	check(max_road_delta < .002, "race and shoulder corridor relief is zero")
 	var before := terrain.detail_chunks[0].lod_bias
 	Quality.set_pressure_stage(3)
+	check(not terrain.mat.get_shader_parameter("two_scale"), "thermal pressure shortens material detail range")
 	check(terrain.detail_chunks[0].lod_bias < before, "thermal pressure brings coarse LOD closer")
 	print("VLORE DETAIL: %d chunks, %+0.2f/%+0.2f m relief, seam %.5f m, road %.5f m, prop %.5f m"
 		% [checked, maximum_raise, -maximum_cut, maximum_seam, max_road_delta, maximum_prop_error])
