@@ -164,7 +164,9 @@ func _column(parent: Node3D, pos: Vector3, radius: float, height: float, color: 
 	mesh.radial_segments = 16
 	return _part(parent, mesh, pos, color)
 
-func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
+## `track` and `terrain` let a landmark lay its ground round the road
+## (Sheshi i Flamurit's paving).
+func load_anchors(anchors: Array, terrain: Terrain = null, track: RaceTrack = null) -> void:
 	for anchor in anchors:
 		var root := Node3D.new()
 		root.name = str(anchor.id)
@@ -192,6 +194,8 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			var monument := IndependenceMonument.new()
 			monument.name = "IndependenceMonument"
 			root.add_child(monument)
+			if track != null and terrain != null:
+				monument.build_square(track, terrain, root.transform)
 		elif str(anchor.id) == "independence_museum":
 			var house := IndependenceHouse.new()
 			house.name = "IndependenceHouse"

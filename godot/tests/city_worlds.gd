@@ -306,6 +306,7 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	for s in range(int(entry) - 5, int(exit) + 5, 2):
 		var at := track.pos(s, 0.0)
 		assert(at.y > scene.terrain.height_at(at.x, at.z), "tunnel road must clear the cut terrain")
+	_test_vlore_boulevard(scene, marks)
 	var reverse := RaceTrack.load_city("vlore", true)
 	var tunnel := preload("res://scripts/world/vlore_tunnel.gd").new()
 	add_child(tunnel)
@@ -383,6 +384,35 @@ func _passes(track: RaceTrack, at: Vector3) -> Array:
 
 ## Korçë: the lap down Bulevardi Republika past the Resurrection Cathedral and
 ## Mësonjëtorja, both built in detail, textured, in view and off the road.
+## The boulevard past the Muradie Mosque as a street, and Sheshi i Flamurit.
+func _test_vlore_boulevard(scene: RaceScene, marks: Node) -> void:
+	var track := scene.track
+	var b := scene.boulevard
+	assert(b != null, "Vlorë's boulevard is built from boulevard.json")
+	var on := 0
+	for k in track.M:
+		on += scene.road.street[k]
+	assert(on * track.ds > 1000.0 and on * track.ds < 1600.0, "the street runs both passes from the flag square to Petro Marko (%d m)" % int(on * track.ds))
+	var mosque := (marks.get_node("muradie_mosque") as Node3D).position
+	var k := track.nearest(mosque.x, mosque.z, 120.0)
+	assert(k >= 0 and scene.road.street[k] == 1, "the street passes the Muradie Mosque")
+	assert(scene.road.street[track.nearest(-370.0, -1502.0, 120.0)] == 0, "race kerbs elsewhere")
+	assert(b.kerb_m > 900.0 and b.sidewalk_m > 900.0, "granite kerbs and sidewalks down both sides (%d m)" % int(b.kerb_m))
+	assert(b.verge_m > 250.0 and b.palms > 25 and b.benches > 10, "verge, palms and benches")
+	assert(b.mouths > 0, "kerbs drop at the side roads' mouths")
+	var monument := marks.get_node("independence/IndependenceMonument") as IndependenceMonument
+	assert(monument.square_area > 900.0, "Sheshi i Flamurit is paved round the monument (%d m2)" % int(monument.square_area))
+	assert(monument.spheres >= 10 and monument.flags >= 5, "spheres round the steps, flags behind")
+	var root := marks.get_node("independence") as Node3D
+	for part: String in ["FlagSquarePaving", "FlagSquareBorder"]:
+		var mesh := (monument.get_node(part) as MeshInstance3D).mesh
+		for v: Vector3 in mesh.get_faces():
+			var w := root.transform * v
+			assert(track.dist_to(w.x, w.z) > track.half_w + 0.3, "the square stays off the road")
+	print("VLORE BOULEVARD: %d samples, kerbs %d m, verge %d m, %d palms, %d benches, %d mouths; square %d m2, %d spheres, %d flags" % [
+		on, int(b.kerb_m), int(b.verge_m), b.palms, b.benches, b.mouths, int(monument.square_area), monument.spheres, monument.flags])
+
+
 func _test_korce(scene: RaceScene) -> void:
 	var trees := scene.props.vegetation
 	assert(trees != null and trees.name == "StreetTrees" and trees.entries.size() > 0, "Korçë plants the shared street trees")

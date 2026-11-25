@@ -36,6 +36,7 @@ import rozafa  # noqa: E402
 from river import River  # noqa: E402
 import old_quarters  # noqa: E402
 import berat_castle  # noqa: E402
+import vlore_boulevard  # noqa: E402
 import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
 from showcase_facades import bake as bake_showcase_facades
@@ -1688,6 +1689,8 @@ def build(cid, route_only=False):
     if cid == "vlore":
         coastal_vegetation.bake(Path(out))
         vlore_terrain_detail.bake(Path(out))
+    if 'boulevard' in city:
+        vlore_boulevard.bake(out, city)
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_map.png'), span=map_span)
     debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_zoom.png'), span=1800, size=1800)
     log(f'  done -> {out}')

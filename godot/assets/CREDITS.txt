@@ -27,6 +27,7 @@ Koshi i mbeturinave (Metal Trash Can), feneri i shëtitores (Street Lamp 01), ku
 Metali i shtyllave: Metal032 nga ambientCG (ambientcg.com) — CC0 1.0.
 Korçë — guri i Katedrales Ngjallja e Krishtit: Sandstone Blocks 05, Rob Tuytel (polyhaven.com/a/sandstone_blocks_05); muret e Mësonjëtores: Stone Wall, Charlotte Baglioni dhe Dario Barresi (polyhaven.com/a/stone_wall); tjegullat e kupolave dhe të çatisë: Clay Roof Tiles 02, Amal Kumar (polyhaven.com/a/clay_roof_tiles_02); të gjitha CC0 1.0. Modelet e Katedrales, Mësonjëtores dhe Luftëtarit Kombëtar janë interpretime origjinale sipas fotografive dhe gjurmëve në OpenStreetMap.
 Berat — zhavorri i Osumit: Dry River Pebbles; trarët, kornizat e dritareve dhe strehët: Dark Wooden Planks; tjegullat e vjetra të Mangalemit dhe Goricës: Roof 09. Dry River Pebbles dhe Dark Wooden Planks nga Amal Kumar, Roof 09 nga Rob Tuytel — Poly Haven, CC0 1.0. Dritaret e Beratit (assets/textures/berat_windows.png) janë pjekur nga Dark Wooden Planks me tools/build_berat_windows.py. Shtëpitë e Mangalemit, Goricës dhe Kalasë, kalaja, Ura e Goricës dhe lumi janë ndërtuar nga gjurmët në OpenStreetMap (© kontribuesit e OpenStreetMap, ODbL) dhe lartësitë Copernicus.
+Vlorë — Sheshi i Flamurit dhe bordurat e bulevardit të Muradies: Granite Tile 03; shkallët e rrumbullakëta dhe veshja e piramidës së Monumentit të Pavarësisë: Granite Tile. Të dyja nga Charlotte Baglioni — Poly Haven, CC0 1.0. Trotuaret, lëndina dhe hyrjet e rrugëve anësore të bulevardit janë vendosur sipas rrugëve dhe ndërtesave të qytetit (tools/pipeline/vlore_boulevard.py).
 Semaforët: “Traffic Light - Complex” nga Urban Mini Props Pack - Free; i kthyer dhe i thjeshtuar në rreth 5 600 trekëndësha për pajisje celulare.
 
 [b]Fotografia e pemës[/b]
@@ -85,4 +86,5 @@ CC0 1.0, https://polyhaven.com/a/tree_small_02).
 - Marble Rock 03 (Poly Haven, CC0): Uji i Ftohtë cliff.
 - Vlorë breakwater and talus (Poly Haven, CC0 1.0): Rock 07 and Rock 09 by Jenelle van Heerden, Boulder 01 by Rico Cilliers, Stone 01 by Dario Barresi and Rico Cilliers, Namaqualand Boulder 02 by Greg Zaal and Rico Cilliers, Namaqualand Boulders 03 and 05 by Dario Barresi and Jenelle van Heerden, and Coast Rocks 05 by Rob Tuytel. Retextured with Rock Face 03 (Dario Barresi and Rico Cilliers).
 
+- Vlorë Sheshi i Flamurit and the Muradie boulevard (Poly Haven, CC0 1.0): Granite Tile 03 (square paving, kerbs) and Granite Tile (the Independence Monument's steps and pylon), both by Charlotte Baglioni.
 - Vlorë terrain layers (Poly Haven, CC0 1.0): Withered Grass by Charlotte Baglioni, Red Laterite Soil Stones and Dry River Pebbles by Amal Kumar, and Sandy Gravel 02 by Dario Barresi. Source links and hashes are in tools/pipeline/coastal_materials.json.

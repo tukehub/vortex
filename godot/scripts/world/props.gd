@@ -40,7 +40,7 @@ func load_city(city_id: String, terrain: Terrain, track: RaceTrack = null, rever
 	road_marks = p.get("road_marks", {})
 	var models := Landmarks.new()
 	add_child(models)
-	models.load_anchors(landmarks, terrain)
+	models.load_anchors(landmarks, terrain, track)
 	# Café terraces wherever the city's props list them (Blloku, Lungomare).
 	var cafes: Array = p.get("cafes", [])
 	if not cafes.is_empty():

@@ -154,6 +154,10 @@ CITIES = {
         # Both carriageways are one road; along Lungomare a rounded 10 cm
         # median runs down its middle (the seafront stretch below).
         'median': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943)},
+        # The boulevard from Sheshi i Flamurit past the Muradie Mosque to
+        # Teatri Petro Marko as a city street: granite kerbs, paved
+        # sidewalks, palms and benches (vlore_boulevard.py).
+        'boulevard': {'from': (40.47045, 19.49112), 'to': (40.46455, 19.49030)},
         'scenery_clearances': [
             ((40.47210, 19.49228), (42, 66)),  # the modeled Muradie street fronts
             ((40.42090, 19.48733), (63, 67)),  # rock and tunnel portals

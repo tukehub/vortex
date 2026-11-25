@@ -35,6 +35,8 @@ var buildings: Buildings
 ## A city's river (river.json) and its traditional quarters (houses.json).
 var river: CityRiver
 var quarters: OldQuarter
+## Vlorë's boulevard past the Muradie Mosque as a city street (boulevard.json).
+var boulevard: VloreBoulevard
 var props: Props
 var reflections: RaceReflections
 var pine_forest: Node3D
@@ -178,6 +180,9 @@ func _build_world() -> void:
 	sky.apply(env_id)
 	road = RoadMesh.new()
 	add_child(road)
+	var boulevard_data := VloreBoulevard.load_data(city_id)
+	if not boulevard_data.is_empty():
+		road.street = VloreBoulevard.street_samples(track, boulevard_data)
 	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.base_height_at, reverse)
 	road.set_layout(int(tj.get("lanes", 4)), bool(tj.get("one_way", false)))
 	road.add_island_aprons(track)
@@ -226,6 +231,10 @@ func _build_world() -> void:
 		add_child(quarters)
 		quarters.build(city_id, terrain)
 		quarters.set_night(sky.night)
+	if not boulevard_data.is_empty():
+		boulevard = VloreBoulevard.new()
+		add_child(boulevard)
+		boulevard.build(track, boulevard_data, road.street, terrain)
 	props = Props.new()
 	add_child(props)
 	props.load_city(city_id, terrain, track, reverse)

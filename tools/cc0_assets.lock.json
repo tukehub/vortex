@@ -533,5 +533,65 @@
         "bytes": 278085
       }
     ]
+  },
+  "square_granite": {
+    "source": "polyhaven",
+    "id": "granite_tile_03",
+    "name": "Granite Tile 03",
+    "authors": [
+      "Charlotte Baglioni"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/granite_tile_03",
+    "files": [
+      {
+        "path": "godot/assets/textures/square_granite_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile_03/granite_tile_03_diff_1k.jpg",
+        "md5": "00d37a8ed649c60d5d9f3f6d740e3bfb",
+        "bytes": 1056664
+      },
+      {
+        "path": "godot/assets/textures/square_granite_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile_03/granite_tile_03_nor_gl_1k.jpg",
+        "md5": "446391b39eec599447a4ab8b9ca35eaf",
+        "bytes": 778769
+      },
+      {
+        "path": "godot/assets/textures/square_granite_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile_03/granite_tile_03_arm_1k.jpg",
+        "md5": "d89e9410243f41dfd4a31bb2c15585fd",
+        "bytes": 490346
+      }
+    ]
+  },
+  "dark_granite": {
+    "source": "polyhaven",
+    "id": "granite_tile",
+    "name": "Granite Tile",
+    "authors": [
+      "Charlotte Baglioni"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/granite_tile",
+    "files": [
+      {
+        "path": "godot/assets/textures/dark_granite_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile/granite_tile_diff_1k.jpg",
+        "md5": "5dfd6dbdb5c0b22ca04505c6209cea9f",
+        "bytes": 676597
+      },
+      {
+        "path": "godot/assets/textures/dark_granite_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile/granite_tile_nor_gl_1k.jpg",
+        "md5": "e9053333e3db348d10466a781456ec58",
+        "bytes": 592362
+      },
+      {
+        "path": "godot/assets/textures/dark_granite_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/granite_tile/granite_tile_arm_1k.jpg",
+        "md5": "7c526438b1f83d77415227b81f24c964",
+        "bytes": 718960
+      }
+    ]
   }
 }

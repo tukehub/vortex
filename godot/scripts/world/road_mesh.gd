@@ -22,6 +22,10 @@ var _reverse := false
 var length := 0.0
 var barrier_mat: StandardMaterial3D
 var _terrain_height := Callable()
+## Samples on a city street (VloreBoulevard.street_samples; set before
+## build): 1 where the street's own granite kerbs and sidewalks replace the
+## race kerbs, barriers and shoulder.
+var street := PackedByteArray()
 
 
 func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable(), reverse := false) -> void:
@@ -317,6 +321,11 @@ static func isle_side(track: RaceTrack, k: int) -> float:
 	return track.ISLE[k] if track.ISLE.size() == track.M else 0.0
 
 
+## True when the segment from sample i to the next runs along a city street.
+func on_street(track: RaceTrack, i: int) -> bool:
+	return street.size() == track.M and street[i] == 1 and street[(i + 1) % track.M] == 1
+
+
 ## True when the segment from sample i to the next is open on `side`: the
 ## other pass joins there, or it faces a roundabout island.
 static func open_side(track: RaceTrack, i: int, side: float) -> bool:
@@ -405,7 +414,7 @@ func _build_kerbs(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
-			if open_side(track, i, side):
+			if open_side(track, i, side) or on_street(track, i):
 				continue
 			var k0 := i
 			var k1 := (i + 1) % M
@@ -458,7 +467,7 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in track.M:
-			if open_side(track, i, side):
+			if open_side(track, i, side) or on_street(track, i):
 				continue
 			var j := (i + 1) % track.M
 			var color := KERB_RED if int(i * track.ds / 8.0) % 2 == 0 else KERB_WHITE
@@ -503,7 +512,7 @@ func _build_skirt(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
-			if open_side(track, i, side):
+			if open_side(track, i, side) or on_street(track, i):
 				continue
 			var k0 := i
 			var k1 := (i + 1) % M
