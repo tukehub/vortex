@@ -243,8 +243,8 @@ def _safe_rel(rel: str) -> str:
     return p.as_posix()
 
 
-def pack_glb(gltf: dict, read_rel) -> bytes:
-    """Pack a glTF with external buffers/images into a single GLB (one BIN chunk)."""
+def pack_glb(gltf: dict, read_rel, *, embed_images: bool = True) -> bytes:
+    """Pack glTF buffers into a GLB, optionally leaving image URIs external."""
     blob = bytearray()
 
     def append(data: bytes) -> int:
@@ -264,7 +264,7 @@ def pack_glb(gltf: dict, read_rel) -> bytes:
         view["byteOffset"] = view.get("byteOffset", 0) + base[view.get("buffer", 0)]
         view["buffer"] = 0
     views = gltf.setdefault("bufferViews", [])
-    for image in gltf.get("images", []):
+    for image in gltf.get("images", []) if embed_images else []:
         uri = image.pop("uri", None)
         if uri is None:
             continue

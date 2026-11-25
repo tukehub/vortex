@@ -33,6 +33,8 @@ godot --path godot --rendering-method mobile res://tests/vlore_landmarks_visual.
 
 Keep simulation code in `godot/scripts/sim/` deterministic and node-free. Drive visuals from simulation events, use `Quality.p` for render budgets, and add player-facing strings to `strings_sq.gd`. Include regression coverage in `godot/tests/` and migrations for saved-data changes.
 
+Build new CC0 environment models with the [mobile environment asset pipeline](docs/mobile-environment-assets.md).
+
 ## Android APK
 
 Install JDK 17, Android SDK platform 34, platform-tools, build-tools 34.0.0 and the matching Godot export templates, including `android_source.zip`. Set `JAVA_HOME` and `ANDROID_HOME`. Choose a version code higher than the installed build.
