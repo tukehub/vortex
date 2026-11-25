@@ -20,6 +20,25 @@ All of it is visual only: the cars keep the road's own boundary.
 
 ![The stretch from above, Sheshi i Flamurit at the top](images/vlore-muradie-aerial.webp)
 
+## The blocks behind the boulevard
+
+OpenStreetMap has few footprints west of the boulevard, behind the mosque and
+the theatre. `tools/pipeline/vlore_infill.py` lines the side streets there
+with 176 apartment blocks of 4–8 floors (`infill.json`).
+
+Each block fronts its street with a 3.5 m pavement and keeps clear of:
+
+- the side roads and the mapped buildings,
+- the landmark plots,
+- the sea, and ground that falls more than 4.5 m across it.
+
+Only the west side is filled, since the Kuzum Baba sightlines run east.
+
+`VloreInfill` builds the blocks with the city facade shader: a window grid
+and shopfronts in plaster of the town's colours (cream, ochre, salmon,
+white, yellow, grey-blue). Each has a flat roof behind a parapet with a
+stair housing, and windows that light at night.
+
 ## Sheshi i Flamurit
 
 The Independence Monument stands on four round steps and a polished drum of dark granite (CC0 Granite Tile), and its pylon is clad in the same stone. The bronze group, the flag-bearer and the cast flag take a weathered bronze finish with a dark brown patina, metallic enough to catch the sky.

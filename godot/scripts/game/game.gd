@@ -283,7 +283,7 @@ func _loading_info(name: String) -> String:
 	match name:
 		"race":
 			var weather := Data.t("env.rainy") if str(race_setting("env")) == "rainy" else Data.t("env.day")
-			return Data.t("loading.race_info", [Data.city_name(str(race_opts.city)), int(race_setting("laps")) if int(race_setting("laps")) > 0 else city_laps(str(race_opts.city)), weather])
+			return Data.t("loading.race_info", [Data.city_name(str(race_opts.city)), city_laps(str(race_opts.city)), weather])
 		"arena":
 			return Data.t("loading.arena_info", [Data.square_name(str(race_opts.city)), int(race_opts.points_minutes)])
 	return ""
@@ -428,6 +428,9 @@ func city_env(city_id: String) -> String:
 
 
 func city_laps(city_id: String) -> int:
+	# A sprint (Vlorë) is one run from the start to the finish beside it.
+	if bool(Data.city(city_id).get("sprint", false)):
+		return 1
 	if int(race_setting("laps")) > 0:
 		return int(race_setting("laps"))
 	return int(Data.city(city_id).laps)

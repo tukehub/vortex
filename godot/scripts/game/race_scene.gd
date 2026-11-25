@@ -37,6 +37,8 @@ var river: CityRiver
 var quarters: OldQuarter
 ## Vlorë's boulevard past the Muradie Mosque as a city street (boulevard.json).
 var boulevard: VloreBoulevard
+## Vlorë's apartment blocks behind the boulevard (infill.json).
+var infill: VloreInfill
 var props: Props
 var reflections: RaceReflections
 var pine_forest: Node3D
@@ -231,6 +233,11 @@ func _build_world() -> void:
 		add_child(quarters)
 		quarters.build(city_id, terrain)
 		quarters.set_night(sky.night)
+	if FileAccess.file_exists(VloreInfill.path_for(city_id)):
+		infill = VloreInfill.new()
+		add_child(infill)
+		infill.build(city_id, terrain)
+		infill.set_env(sky.night, sky.wet)
 	if not boulevard_data.is_empty():
 		boulevard = VloreBoulevard.new()
 		add_child(boulevard)
@@ -1066,6 +1073,8 @@ func _update_weather(dt: float) -> void:
 			river.set_env(sky.wet, sky.night)
 		if quarters != null:
 			quarters.set_night(sky.night)
+		if infill != null:
+			infill.set_env(sky.night, sky.wet)
 		for car in cars:
 			car.set_night(sky.night)
 		CarVisual.set_wet(sky.wet)

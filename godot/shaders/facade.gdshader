@@ -17,6 +17,8 @@ uniform vec3 window_warm : source_color = vec3(1.0, 0.78, 0.45);
 uniform vec3 window_cool : source_color = vec3(0.75, 0.85, 1.0);
 uniform float window_glow = 2.4;
 uniform float seed = 0.0;
+// How much of the vertex tint shows in the masonry (Vlorë's painted blocks: more).
+uniform float tint_amount = 0.24;
 varying vec3 wpos;
 varying vec4 vcol;
 varying vec2 fuv;
@@ -85,7 +87,7 @@ void fragment() {
 	// to gray. The mask comes from the existing sample, so it costs no texture
 	// reads and leaves the architectural frames in the neutral wall material.
 	float pane_mask = smoothstep(0.02, 0.12, tile.b - tile.r);
-	vec3 tint = mix(vec3(0.88, 0.86, 0.82), vcol.rgb, 0.24);
+	vec3 tint = mix(vec3(0.88, 0.86, 0.82), vcol.rgb, tint_amount);
 	vec3 masonry = vec3(luminance) * tint * 1.38;
 	float grazing = 1.0 - clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0);
 	float fresnel = grazing * grazing * grazing;

@@ -6,13 +6,14 @@
 
 ## The circuit
 
-Vlorë is now raced out and back on the seafront road, like the real
+Vlorë is raced out and back on the seafront road, like the real
 boulevard: **two one-way carriageways of two lanes, 9 m each, side by side as
 one 21 m road** (centrelines 6 m either side of the mapped road; see
-[One road](#one-road) below). Lap ≈ 9.5 km:
+[One road](#one-road) below). It is a **sprint**: one 9.3 km run that starts
+and finishes at Sheshi i Flamurit, with no turn there (see [The sprint](#the-sprint)):
 
-1. **Out** (right-hand carriageway, the sea side): from the line on
-   Bulevardi Ismail Qemali, 100 m before Kuzum Baba, south past Petro Marko
+1. **Out** (right-hand carriageway, the sea side): from the start line by
+   Sheshi i Flamurit, south past the Muradie Mosque, Kuzum Baba, Petro Marko
    and Flamurtari stadium, **round the west side of the Sheshi Pavarsia
    island**, past the Independence Museum and down Lungomare and Rruga Murat
    Tërbaçi.
@@ -21,14 +22,67 @@ one 21 m road** (centrelines 6 m either side of the mapped road; see
    back north up **Dhimitër Konomi**.
 3. **Merge**: Dhimitër Konomi joins the shore road's return carriageway on a
    40 m-radius bend (no hairpin; the outbound carriageway is ≥ 13 m away all
-   through it).
+   through it). At **Rrapi**, where the two part, an island with a lion
+   fountain keeps them apart (see [Rrapi](#rrapi-the-konomi-split)).
 4. **Back** (the land-side carriageway): north the same way, **round the
    east side of Sheshi Pavarsia**, past the stadium and Kuzum Baba, the
-   Muradie Mosque, and **round the turning island on Sheshi i Flamurit** into
-   the outbound carriageway and the line.
+   Muradie Mosque again, to the **finish line beside the start line**,
+   across the whole road.
 
 The old-town return (town hall, stone street, Muradie street, Lungomare
 median) is gone from the lap: the road focus is the boulevard and seafront.
+
+## The sprint
+
+`cities.py` `'sprint'` names the line, and `finish_line.place_sprint`
+rotates the lap to start on the southbound carriageway there. It records
+`track.json` `"sprint": {"start", "finish"}`: the finish is on the
+northbound carriageway beside the start, so the chequer on both
+carriageways makes one line across the whole road.
+
+The sim's road is still a loop, closed by the turn at the square past the
+line. In the race:
+
+- **Distance.** `RaceTrack.finish_s` is where the race ends. `Race.distance`
+  replaces `laps * L`, and laps is 1 whatever the settings.
+- **The hidden turn.** `RaceTrack.HIDE` marks the turn's samples, from 42 m
+  past the finish to 42 m behind the start (the grid). Neither the road,
+  kerbs, barriers, shoulder, chevron boards nor crossings are drawn there.
+- **After the finish.** Finished cars pull up.
+- **The square.** The turn's ground, and the island it went round, are paved
+  as part of Sheshi i Flamurit, in the square's granite (`VloreBoulevard`
+  `FlagSquarePlaza`).
+
+Reversed, the run starts where it used to finish.
+
+## Pickups on both carriageways
+
+Where the two passes are one road, each station's three pickups are spread
+over the whole width, from this carriageway's outer lane to the other's
+(`Race.pickup_lanes`; the adaptive rows too). A car of the other pass that
+drives through one in the world collects it. Bots aim for pickups across the
+whole road (their target is clamped to `edge_left`/`edge_right`, not to
+their own carriageway).
+
+## Rrapi: the Konomi split
+
+Where Dhimitër Konomi comes down to the shore road, the carriageways used to
+stay joined right up to the fork. A car heading for the tunnel could drift
+onto the Konomi side. `cities.py` `'splits'` (track.json `"splits"`) parts
+them within 50 m of the fork, so each has its own edge (`RaceTrack.splits`).
+The joined road's taper closes over the 80 m before it.
+
+Between them stands an island (`RrapiFountain`) from where they part to where
+they are 36 m apart. RoadMesh leaves out the race kerbs on its side
+(`split_side`), and the island has its own granite kerb round a lawn. On it:
+
+- **The fountain.** A round ashlar basin and a stele with a cornice carry a
+  lion's head (CC0 "Lion Head" by Tina, Poly Haven, reduced from 47 000 to
+  4 100 triangles by `tools/build_lion_head.gd`). Water arcs from its mouth
+  into the basin, with rings spreading on the pool
+  (`shaders/fountain_water.gdshader`).
+- **The plane tree.** Rrapi itself, the city's CC0 broadleaf grown to
+  plane-tree size, with leaf clumps cut from the photographic tree.
 
 ## How it is built (`tools/pipeline/build_city.py`, `cities.py` `out_and_back`)
 

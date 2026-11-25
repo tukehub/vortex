@@ -236,7 +236,8 @@ func _plaza(track: RaceTrack, kerb_mat: Material) -> void:
 	for i in hull.size() - 1:
 		var a: Vector3 = level.call(hull[i])
 		var b: Vector3 = level.call(hull[i + 1])
-		ArchKit.wall_quad(st, centre, a, b, centre, Color.WHITE, Vector3.UP)
+		var plan := func(v: Vector3) -> Vector2: return Vector2(v.x, v.z)
+		ArchKit.quad_uv(st, centre, a, b, centre, plan.call(centre), plan.call(a), plan.call(b), plan.call(centre), Color.WHITE, Vector3.UP)
 		plaza_area += absf((hull[i] - c).cross(hull[i + 1] - c)) * 0.5
 		# The edge, a granite step down to the ground.
 		ArchKit.wall_quad(st, a + Vector3.DOWN * 0.6, b + Vector3.DOWN * 0.6, b, a, Color(0.85, 0.85, 0.85), Vector3(a.x + b.x - 2.0 * c.x, 0, a.z + b.z - 2.0 * c.y))

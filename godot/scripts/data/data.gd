@@ -52,7 +52,7 @@ const ENV_ORDER := ["night", "dusk", "sunset", "day", "golden", "rainy", "rain",
 const POINTS_CITIES := ["tirane", "vlore"]
 const CITIES := [
 	{"id": "tirane", "env": "day", "laps": 2, "neon": "#ff2d6f", "horizon": "flat", "hdri": "day", "stars": 0},
-	{"id": "vlore", "env": "sunset", "laps": 2, "neon": "#ffd23a", "horizon": "sea", "hdri": "sunset", "stars": 4},
+	{"id": "vlore", "env": "sunset", "laps": 1, "sprint": true, "neon": "#ffd23a", "horizon": "sea", "hdri": "sunset", "stars": 4},
 	{"id": "shkoder", "env": "golden", "laps": 2, "neon": "#4ee0ff", "horizon": "mountains", "hdri": "golden", "stars": 7},
 	{"id": "korce", "env": "day", "laps": 2, "neon": "#e8423f", "horizon": "mountains", "hdri": "day", "stars": 10},
 	{"id": "berat", "env": "golden", "laps": 2, "neon": "#ffb347", "horizon": "mountains", "hdri": "golden", "stars": 12},

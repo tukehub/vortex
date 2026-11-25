@@ -233,13 +233,53 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 		var second: float = first[landmark][1]
 		assert(second > back, "Vlorë return passes the landmarks in reverse order: " + landmark)
 		back = second
-	# Up past the Muradie Mosque, round the island on Flag Square by the
-	# Independence Monument, and down past the mosque again to the line.
+	# A sprint: from the line by Sheshi i Flamurit down past the Muradie
+	# Mosque, and back up past it to the finish beside the start; the turn
+	# at the square past the line only closes the loop and is not drawn.
 	var mosque := _passes(track, (marks.get_node("muradie_mosque") as Node3D).position)
-	var square := _passes(track, (marks.get_node("independence") as Node3D).position)
-	assert(mosque.size() == 2 and square.size() == 1, "the lap ends with a turn round Flag Square")
-	assert(back < mosque[0] and mosque[0] < square[0] and square[0] < mosque[1] and mosque[1] < track.L,
-		"the run to the line passes the Muradie Mosque and turns round Flag Square")
+	assert(track.sprint and data.has("sprint"), "Vlorë is a sprint (track.json sprint)")
+	assert(mosque.size() == 2 and mosque[0] < first["petro_marko"][0] and back < mosque[1] and mosque[1] < track.finish_s,
+		"the run starts past the mosque and finishes past it again")
+	assert(track.finish_s > track.L - 260.0 and track.finish_s < track.L - 80.0, "the finish is beside the start, short of the turn (%.0f of %.0f m)" % [track.finish_s, track.L])
+	var line_gap := track.pos(0.0, 0.0).distance_to(track.pos(track.finish_s, 0.0))
+	assert(line_gap < 15.0, "start and finish lines side by side across the road (%.1f m)" % line_gap)
+	assert(track.hidden(track.finish_s + RaceTrack.SPRINT_RUNOUT + 10.0) and not track.hidden(5.0) and not track.hidden(track.finish_s - 5.0),
+		"the turn past the line is hidden, the grid and the finish are not")
+	assert(scene.road.surface_mat.get_shader_parameter("finish_s") == track.finish_s, "a chequer at the finish too")
+	var race := Race.new(track, {"laps": 3, "seed": 7})
+	assert(race.laps == 1 and is_equal_approx(race.distance, track.finish_s), "a sprint is one run to the finish, whatever the laps")
+	# Pickups spread over both carriageways where they are one road.
+	var across := 0
+	for p: Dictionary in race.pickups:
+		if absf(float(p.d)) > track.half_w:
+			across += 1
+	assert(across >= 5, "pickups on the other carriageway too (%d)" % across)
+	# A car of the other pass drives through one in the world: it collects it.
+	for p: Dictionary in race.pickups:
+		if absf(float(p.d)) > track.half_w + 2.0 and bool(p.alive):
+			var w := track.pos(float(p.s), float(p.d))
+			var other := track.locate_xz(w.x, w.z)
+			assert(absf(track.wrap_s(other.x - float(p.s))) > 200.0, "that pickup lies on the other pass's carriageway")
+			var c: CarState = race.cars[1]
+			c.slots.clear()
+			c.s = other.x
+			c.d = other.y
+			race.update_pickups(0.016)
+			assert(not bool(p.alive), "a car on the other carriageway collects it")
+			break
+	# Rrapi: the carriageways part at the Konomi split, with the island and
+	# the lion fountain between them.
+	assert(not track.splits.is_empty(), "the Konomi split is in track.json")
+	var fountain := marks.get_node("rrapi_lion/RrapiFountain") as RrapiFountain
+	assert(fountain.island_area > 300.0 and fountain.built_lion, "the island and the lion (%d m2)" % int(fountain.island_area))
+	var lion_at := (marks.get_node("rrapi_lion") as Node3D).position
+	var near_lion := _passes(track, lion_at)
+	for s_at: float in near_lion:
+		assert(not track.joined(s_at), "the carriageways are apart at the fountain")
+	assert(track.dist_to(lion_at.x, lion_at.z) > track.half_w + 4.0, "the fountain stands clear of both roads")
+	assert(marks.get_node_or_null("rrapi_tree/RrapiTree") != null, "the plane tree")
+	assert(scene.infill != null and scene.infill.blocks > 120, "apartment blocks behind the boulevard (%d)" % (scene.infill.blocks if scene.infill else 0))
+	print("VLORE SPRINT: %.0f m to the line, %d pickups across, island %d m2, %d infill blocks" % [track.finish_s, across, int(fountain.island_area), scene.infill.blocks])
 	# The two passes never overlap: wherever the lap comes back past itself,
 	# each keeps its own carriageway (side by side, as one road).
 	var tight := INF
