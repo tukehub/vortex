@@ -312,13 +312,21 @@ static func _ring(c: Vector3, along: Vector3, rx: float, ry: float, n: int, e: f
 
 static func _loft(st: SurfaceTool, rings: Array, col: Color) -> void:
 	var n: int = (rings[0] as PackedVector3Array).size()
+	var mids: Array[Vector3] = []
+	for r: PackedVector3Array in rings:
+		var m := Vector3.ZERO
+		for v in r:
+			m += v
+		mids.append(m / r.size())
 	for i in rings.size() - 1:
 		var a: PackedVector3Array = rings[i]
 		var b: PackedVector3Array = rings[i + 1]
 		for k in n:
 			var k1 := (k + 1) % n
-			for v: Vector3 in [a[k], b[k], b[k1], a[k], b[k1], a[k1]]:
+			for e: Array in [[a[k], i], [b[k], i + 1], [b[k1], i + 1], [a[k], i], [b[k1], i + 1], [a[k1], i]]:
+				var v: Vector3 = e[0]
 				st.set_color(col)
+				st.set_normal((v - mids[int(e[1])]).normalized())
 				st.add_vertex(v)
 	# Close both ends.
 	for end: int in [0, rings.size() - 1]:
@@ -330,8 +338,10 @@ static func _loft(st: SurfaceTool, rings: Array, col: Color) -> void:
 		for k in n:
 			var k1 := (k + 1) % n
 			var tri := [mid, r[k1], r[k]] if end == 0 else [mid, r[k], r[k1]]
+			var cap := (mids[0] - mids[1]).normalized() if end == 0 else (mids[end] - mids[end - 1]).normalized()
 			for v: Vector3 in tri:
 				st.set_color(col)
+				st.set_normal(cap)
 				st.add_vertex(v)
 
 
@@ -364,6 +374,7 @@ static func _lumpy(st: SurfaceTool, c: Vector3, r: Vector3, col: Color, shag: in
 			var d: Vector3 = pt.call(i, j + 1)
 			for v: Vector3 in [a, d, cc, a, cc, b]:
 				st.set_color(col)
+				st.set_normal(((v - c) / (r * r)).normalized())
 				st.add_vertex(v)
 
 
