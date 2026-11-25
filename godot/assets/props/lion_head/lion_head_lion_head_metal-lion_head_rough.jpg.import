@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ch7k1j5tyj3nw"
-path="res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.ctex"
+path.s3tc="res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.s3tc.ctex"
+path.etc2="res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "319fbac50e237583011b2e814c6f695d"
@@ -14,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/props/lion_head/lion_head_lion_head_metal-lion_head_rough.jpg"
-dest_files=["res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.ctex"]
+dest_files=["res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.s3tc.ctex", "res://.godot/imported/lion_head_lion_head_metal-lion_head_rough.jpg-f80d53828538b9ba3a94347b9038582e.etc2.ctex"]
 
 [params]
 

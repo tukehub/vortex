@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dxke1lab1u2xd"
-path="res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.ctex"
+path.s3tc="res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.s3tc.ctex"
+path.etc2="res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "3647fa5b4d4f8d4df0edcfb02fa77ecd"
@@ -14,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/props/lion_head/lion_head_lion_head_diff.jpg"
-dest_files=["res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.ctex"]
+dest_files=["res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.s3tc.ctex", "res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984ea423c6c9c08f631.etc2.ctex"]
 
 [params]
 

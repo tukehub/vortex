@@ -27,7 +27,9 @@ var hw := 10.0
 ## Metres from the start to the chequered flag: laps * L, or on a sprint
 ## (RaceTrack.sprint: Vlorë, out and back with no turn at the line) one run
 ## from the start line to the finish line beside it.
-var distance := 0.0
+var distance: float:
+	get:
+		return track.finish_s if track.sprint else laps * L
 var opt := {}
 var laps := 2
 var diff: Dictionary
@@ -90,7 +92,6 @@ func _init(p_track: RaceTrack, p_opt: Dictionary) -> void:
 	laps = int(opt.get("laps", 2))
 	if track.sprint:
 		laps = 1
-	distance = track.finish_s if track.sprint else laps * L
 	diff = Data.DIFFS[clampi(int(opt.get("diff", 1)), 0, 2)]
 	rng.seed = int(opt.get("seed", 1234))
 	wet = bool(opt.get("wet", false))
