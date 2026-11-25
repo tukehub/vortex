@@ -1,6 +1,6 @@
 extends Node3D
-## Vlorë: Kuzum Baba on its hill, and the start/finish on the straight
-## Bulevardi Ismail Qemali 100 m before the circuit passes the Kuzum Baba park.
+## Vlorë: Kuzum Baba on its hill, passed out and back on the sprint from
+## Sheshi i Flamurit, whose start and finish lines sit side by side.
 
 var failures := 0
 ## OSM: the Kuzum Baba park (leisure=park, way 1222923148) in local metres.
@@ -18,38 +18,38 @@ func check(ok: bool, message: String) -> void:
 
 func _ready() -> void:
 	Quality.set_preset("medium")
+	var tj: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	for reverse in [false, true]:
 		var track := RaceTrack.load_city("vlore", reverse)
-		# Straight street at the line: over the grid behind it and the run past.
+		# A sprint from Sheshi i Flamurit: the grid and the run past the
+		# start, and the run in to the finish, on the boulevard's straight
+		# (the turn at the square lies past both lines and is not raced).
 		var tightest := INF
-		var s := -40.0
-		while s <= 40.0:
-			var k := absf(track.curv(s))
-			tightest = minf(tightest, 1.0 / k if k > 1e-6 else INF)
-			s += 2.0
-		check(tightest >= 150.0, "the start/finish sits on a straight (tightest radius %.0f m, reverse=%s)" % [tightest, reverse])
-		if not reverse:
-			# Where the road passes the park (its centre is ~180 m off the road).
-			# The lap passes it twice, out and back a carriageway apart: the
-			# line belongs to the first pass.
-			var dists := PackedFloat32Array()
-			var best := INF
-			var probe := 0.0
-			while probe < track.L:
-				var p := track.pos(probe, 0.0)
-				dists.append(Vector2(p.x - PARK.x, p.z - PARK.y).length())
-				best = minf(best, dists[-1])
-				probe += 2.0
-			var k := 0
-			while dists[k] > best + 20.0:
-				k += 1
-			while k + 1 < dists.size() and dists[k + 1] < dists[k]:
-				k += 1
-			var at := k * 2.0
-			check(at > 88.0 and at < 112.0, "the line is 100 m before the road passes Kuzum Baba (%.0f m)" % at)
-			# On the outbound carriageway, 6 m west of the boulevard's mapped centre.
-			var line := track.pos(0.0, 0.0)
-			check(Vector2(line.x - 14.3, line.z + 2720.2).length() < 3.0, "the line is on Bulevardi Ismail Qemali")
+		for span: Vector2 in [Vector2(-32.0, 40.0), Vector2(track.finish_s - 40.0, track.finish_s + 10.0)]:
+			var s := span.x
+			while s <= span.y:
+				var k := absf(track.curv(s))
+				tightest = minf(tightest, 1.0 / k if k > 1e-6 else INF)
+				s += 2.0
+		check(tightest >= 80.0, "the start and finish sit on the boulevard's straight (tightest radius %.0f m, reverse=%s)" % [tightest, reverse])
+		# The start on its carriageway at the square; reversed, where the
+		# forward run finishes.
+		var start: Array = tj.sprint.finish if reverse else tj.sprint.start
+		var line := track.pos(0.0, 0.0)
+		check(Vector2(line.x - float(start[0]), line.z - float(start[1])).length() < 3.0, "the line is by Sheshi i Flamurit (reverse=%s)" % reverse)
+		check(line.distance_to(track.pos(track.finish_s, 0.0)) < 15.0, "the finish is beside the start, across the road")
+		# Both ways, the run passes Kuzum Baba's park twice, out and back.
+		var passes := 0
+		var was_near := false
+		var probe := 0.0
+		while probe < track.finish_s:
+			var p := track.pos(probe, 0.0)
+			var near := Vector2(p.x - PARK.x, p.z - PARK.y).length() < 200.0
+			if near and not was_near:
+				passes += 1
+			was_near = near
+			probe += 2.0
+		check(passes == 2, "the run passes Kuzum Baba out and back (%d)" % passes)
 	# The landmarks on the hill.
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/props.json"))
 	var ids := {}

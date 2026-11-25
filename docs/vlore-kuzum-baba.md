@@ -28,20 +28,21 @@ the boulevard below, shows its towers above the rooftops.
 
 ## Start/finish
 
-Before: Sheshi i Flamurit, inside the square's turn (tightest radius ≈ 28 m
-within 40 m of the line). Now: on the straight Bulevardi Ismail Qemali,
-**102 m before** the road passes the Kuzum Baba park, with no bend tighter
-than 211 m over the grid behind the line and the run past it. On the
-out-and-back circuit ([the road and the sea](vlore-out-and-back.md)) the
-road passes the park twice; the line is on the first, outbound pass, on the
-sea-side carriageway.
+The line was first inside the square's turn (tightest radius ≈ 28 m within
+40 m of it), then on Bulevardi Ismail Qemali 102 m before the park. Vlorë is
+now a **sprint** ([the road and the sea](vlore-out-and-back.md#the-sprint)):
 
-`tools/pipeline/finish_line.py` rotates the closed lap so it starts the asked
-distance before the point of the circuit nearest a landmark, and refuses a
-spot where any 12 m of the grid or run-out bends tighter than 150 m:
+- **Start.** On the southbound carriageway by Sheshi i Flamurit.
+- **Finish.** Beside the start on the northbound one, so the two chequers
+  make one line across the road.
+- **The run.** It passes the park out and back and does not turn at the
+  square. The turn there lies past both lines and is never raced.
+
+`tools/pipeline/finish_line.py` (`place_sprint`) rotates the closed lap to
+start there and records both lines in `track.json` `"sprint"`:
 
 ```sh
-python3 tools/pipeline/finish_line.py vlore       # cities.py: 'finish_before'
+python3 -c "import sys; sys.path.insert(0, 'tools/pipeline'); import finish_line; finish_line.process_sprint('vlore')"
 python3 tools/pipeline/landmark_anchors.py vlore  # add new landmarks + keepouts
 python3 tools/pipeline/glb_cut.py vlore 1222923149
 ```
@@ -52,7 +53,13 @@ idempotent; `build_city.py` applies the same placement on a full rebuild.
 Everything else in the city (tunnel, turnaround, crossings, furniture) is
 located by world position, so it is unaffected.
 
-Tests: `tests/vlore_kuzum_baba` (line on a straight in both directions,
-100 ± 12 m before the park, landmarks built and facing west, no building
-inside the temple, no trees in the keepouts), `tools/pipeline/test_finish_line.py`,
-and `tests/city_worlds` with the new lap order.
+Tests: `tests/vlore_kuzum_baba` checks:
+
+- the start and the finish on the straight in both directions,
+- that they sit side by side at the square,
+- that the park is passed out and back,
+- that the landmarks are built and face west, with no building
+  inside the temple and no trees in the keepouts.
+
+`tools/pipeline/test_finish_line.py` and `tests/city_worlds` cover the
+sprint's order.
