@@ -6,6 +6,7 @@ shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, specular_schlick_ggx;
 
 uniform bool pool = true;
+uniform vec2 fall = vec2(0.0, -0.6); // where the jet meets the pool (local xz)
 uniform vec3 deep : source_color = vec3(0.08, 0.24, 0.24);
 uniform vec3 foam : source_color = vec3(0.86, 0.92, 0.93);
 
@@ -21,7 +22,6 @@ float hash(vec2 p) {
 
 void fragment() {
 	if (pool) {
-		vec2 fall = vec2(0.0, -0.6);
 		float r = length(lpos.xz - fall);
 		float ring = sin(r * 9.0 - TIME * 6.0) * exp(-r * 0.7);
 		vec2 dir = normalize(lpos.xz - fall + vec2(1e-4));

@@ -100,6 +100,9 @@ func _v(p: Vector2, y: float) -> Vector3:
 func _water() -> void:
 	water_mat = ShaderMaterial.new()
 	water_mat.shader = SHADER
+	# CC0 wave ripples (tools/build_wave_normals.py).
+	water_mat.set_shader_parameter("wave_nor", preload("res://assets/textures/water_waves_nor.png"))
+	water_mat.set_shader_parameter("use_waves", true)
 	var lanes := [-1.0, -0.6, -0.25, 0.0, 0.25, 0.6, 1.0]
 	var start := 0
 	while start < pts.size() - 1:

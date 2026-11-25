@@ -12,6 +12,10 @@ uniform vec3 foam_color : source_color = vec3(0.82, 0.86, 0.84);
 uniform float flow_speed = 0.9;      // metres per second
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 uniform float night : hint_range(0.0, 1.0) = 0.0;
+// Ripples from CC0 wave heightmaps (tools/build_wave_normals.py), carried
+// downstream in the frame of the current.
+uniform sampler2D wave_nor : filter_linear_mipmap, repeat_enable;
+uniform bool use_waves = false;
 
 varying vec3 wpos;
 varying vec2 flow;
@@ -52,6 +56,11 @@ void fragment() {
 	g += grad(vec2(q.x * 0.22, (q.y - t) * 0.09)) * 0.10 * mid_w;
 	g += grad(vec2(q.x * 0.55 + 3.1, (q.y - t * 1.3) * 0.30)) * 0.05 * near_w;
 	g += grad(vec2(q.x * 1.6 - 7.0, (q.y - t * 1.6) * 0.9)) * 0.012 * near_w;
+	if (use_waves) {
+		vec2 r = texture(wave_nor, vec2(q.x, q.y - t) / 13.0).rg * 2.0 - 1.0;
+		vec2 r2 = texture(wave_nor, vec2(q.x * 1.7 + 0.37, q.y * 0.8 - t * 1.4) / 5.5).rg * 2.0 - 1.0;
+		g += (r * 0.09 * mid_w + r2 * 0.05 * near_w);
+	}
 	// Slack water near the banks is calmer; riffles where the bed shallows.
 	float edge = 1.0 - mid;
 	g *= mix(1.0, 0.55, edge) * (1.0 + wetness * 0.8);

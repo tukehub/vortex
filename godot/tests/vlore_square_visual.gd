@@ -50,8 +50,15 @@ func _ready() -> void:
 	var lion: Vector3 = marks.rrapi_lion
 	var sh := Vector3(split.x, scene.terrain.height_at(split.x, split.z), split.z)
 	views.append(["split_aerial", sh + Vector3(-90, 110, -40), lion + Vector3(10, 0, -20)])
-	views.append(["split_fountain", lion + Vector3(9, 3.2, -11), lion + Vector3(0, 2.2, 0)])
-	views.append(["split_lion", lion + Vector3(2.5, 2.6, -5.5), lion + Vector3(0, 2.4, 1.0)])
+	var fountain := scene.props.get_node("Landmarks/rrapi_lion/RrapiFountain") as Node3D if scene.props.has_node("Landmarks/rrapi_lion/RrapiFountain") else null
+	if fountain == null:
+		for n in scene.props.find_children("RrapiFountain", "", true, false):
+			fountain = n
+	var fx := fountain.global_transform
+	var mouth_w: Vector3 = fx * (fountain as RrapiFountain).mouth
+	views.append(["split_fountain", fx * ((fountain as RrapiFountain).mouth + Vector3(7, 1.6, -9)), mouth_w + Vector3.DOWN * 0.4])
+	views.append(["split_lion", fx * ((fountain as RrapiFountain).mouth + Vector3(1.6, 0.4, -2.6)), fx * ((fountain as RrapiFountain).mouth + Vector3(0, -0.3, 0.8))])
+	views.append(["split_lion_side", fx * ((fountain as RrapiFountain).mouth + Vector3(-3.4, 0.2, 0.9)), fx * ((fountain as RrapiFountain).mouth + Vector3(0, -0.35, 0.9))])
 	# The line at Sheshi i Flamurit, and the boulevard's back blocks.
 	views.append(["finish_grid", track.pos(-60.0, 0.0) + Vector3.UP * 4.0, track.pos(40.0, 0.0) + Vector3.UP * 1.0])
 	if track.sprint:

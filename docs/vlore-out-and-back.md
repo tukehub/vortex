@@ -55,6 +55,16 @@ line. In the race:
 
 Reversed, the run starts where it used to finish.
 
+## Water
+
+The sea and the rivers carry fine ripples from CC0 wave heightmaps
+("Seamless looping waves heightmaps" by zookeeper, OpenGameArt).
+`tools/build_wave_normals.py` blends two frames into one tiling normal map,
+`water_waves_nor.png`, and the shaders add it on top of their own swells:
+
+- **The sea** (`sea.gdshader`): two scales drifting apart, out to 700 m.
+- **The river** (`river.gdshader`): carried downstream with the current.
+
 ## Pickups on both carriageways
 
 Where the two passes are one road, each station's three pickups are spread
@@ -76,11 +86,15 @@ Between them stands an island (`RrapiFountain`) from where they part to where
 they are 36 m apart. RoadMesh leaves out the race kerbs on its side
 (`split_side`), and the island has its own granite kerb round a lawn. On it:
 
-- **The fountain.** A round ashlar basin and a stele with a cornice carry a
-  lion's head (CC0 "Lion Head" by Tina, Poly Haven, reduced from 47 000 to
-  4 100 triangles by `tools/build_lion_head.gd`). Water arcs from its mouth
-  into the basin, with rings spreading on the pool
-  (`shaders/fountain_water.gdshader`).
+- **The fountain: Luani**, after the city's famous one. A gilded lion
+  stands on a worn slab on a rock, in a low round basin of mossy concrete,
+  and a thin stream runs from its mouth into the water
+  (`shaders/fountain_water.gdshader`). Two plane trees stand behind it.
+  There is no free full-body lion model, so the body is built in
+  `rrapi_fountain.gd`: a lofted torso, a shaggy mane, four legs with the
+  near forefoot stepping out, and a tail curling up behind. The face is the
+  CC0 "Lion Head" by Tina (Poly Haven), reduced from 47 000 to 4 100
+  triangles by `tools/build_lion_head.gd` and gilded to match.
 - **The plane tree.** Rrapi itself, the city's CC0 broadleaf grown to
   plane-tree size, with leaf clumps cut from the photographic tree.
 

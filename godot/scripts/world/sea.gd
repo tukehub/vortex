@@ -29,6 +29,9 @@ func build(terrain: Terrain, bay := false) -> bool:
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mat = ShaderMaterial.new()
 	mat.shader = SHADER
+	# CC0 wave ripples (tools/build_wave_normals.py).
+	mat.set_shader_parameter("wave_nor", preload("res://assets/textures/water_waves_nor.png"))
+	mat.set_shader_parameter("use_waves", true)
 	mat.set_shader_parameter("shore", terrain.shore_tex)
 	mat.set_shader_parameter("shore_origin", Vector2(float(terrain.near.x0), float(terrain.near.z0)))
 	mat.set_shader_parameter("shore_size", float(terrain.near.cell) * (int(terrain.near.n) - 1))

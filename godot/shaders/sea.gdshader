@@ -19,6 +19,10 @@ uniform float wetness : hint_range(0.0, 1.0) = 0.0;   // rain roughens the surfa
 uniform float night : hint_range(0.0, 1.0) = 0.0;
 
 uniform int tier = 1;
+// Ripples from CC0 wave heightmaps (zookeeper, OpenGameArt; baked by
+// tools/build_wave_normals.py), two scales drifting apart over the swells.
+uniform sampler2D wave_nor : filter_linear_mipmap, repeat_enable;
+uniform bool use_waves = false;
 varying vec3 wpos;
 
 void vertex() {
@@ -67,6 +71,12 @@ void fragment() {
 			slope += swell(warped, vec2(-.7,-.7), 2.7, .032, .7) * near_w;
 			if (tier == 2) slope += swell(warped, vec2(.2,-.98), .87, .012, .45) * (1. - smoothstep(20.,100.,dist));
 		}
+	}
+	if (use_waves && dist < 700.0) {
+		float w = 1.0 - smoothstep(60.0, 700.0, dist);
+		vec2 a = texture(wave_nor, p / 23.0 + vec2(TIME * 0.011, TIME * 0.006)).rg * 2.0 - 1.0;
+		vec2 b = texture(wave_nor, p.yx / 8.5 + vec2(-TIME * 0.017, TIME * 0.013)).rg * 2.0 - 1.0;
+		slope -= (a * 0.2 + b * (tier > 0 ? 0.11 : 0.0)) * w;
 	}
 	slope *= wave_strength * (1.0 + wetness * 0.6);
 
