@@ -81,3 +81,4 @@ branches, leaf sprays and impostor bakes by the Vortex project. Bark colour and
 normal are resized from Poly Haven Tree Small 02 (Rico Cilliers and Rob Tuytel,
 CC0 1.0, https://polyhaven.com/a/tree_small_02).
 - Marble Rock 03 (Poly Haven, CC0): Uji i Ftohtë cliff and breakwater rock (marble_rock_diff/nor/rough, 1K; normal derived from its displacement).
+- Rock 07, Jenelle van Heerden (Poly Haven, CC0 1.0): Uji i Ftohtë talus geometry reduced to 480 triangles and retextured with Marble Rock 03. https://polyhaven.com/a/rock_07

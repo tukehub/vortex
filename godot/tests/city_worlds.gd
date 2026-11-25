@@ -278,7 +278,7 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	var tunnel_node := scene.road.get_node("UjiIFtohteTunnel")
 	var slots := {}
 	var tunnel_tris := 0
-	for name: String in ["Cliff", "Portals", "TunnelBore"]:
+	for name: String in ["Cliff", "Portals", "WingWalls", "TunnelBore"]:
 		var mesh := (tunnel_node.get_node(name) as MeshInstance3D).mesh
 		tunnel_tris += mesh.get_faces().size() / 3
 		for i in mesh.get_surface_count():
@@ -287,7 +287,7 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 		assert(slots.has(slot), "tunnel material slot " + slot)
 	assert(tunnel_tris < 12000, "tunnel stays under 12k triangles (%d)" % tunnel_tris)
 	assert(tunnel_node.find_children("*", "OmniLight3D", true, false).is_empty(), "tunnel lighting is emissive, not real-time lights")
-	assert((tunnel_node.get_node("Cliff") as MeshInstance3D).get_surface_override_material(0).uv1_world_triplanar, "cliff rock projects in world space")
+	_check_tunnel_cut(tunnel_node, track, entry, exit)
 	var boulders := 0
 	for i in 4:
 		boulders += (tunnel_node.get_node("Breakwater%d" % i) as MultiMeshInstance3D).multimesh.instance_count
@@ -310,7 +310,53 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	tunnel.build(reverse, data.tunnel, true, scene.terrain)
 	var bore := tunnel.get_node("TunnelBore") as MeshInstance3D
 	assert(bore.mesh.get_aabb().size.length() < 145.0, "reverse race must build the same short bore")
+	assert(tunnel.get_node("Portals").global_transform.is_equal_approx(tunnel_node.get_node("Portals").global_transform),
+		"both directions share the same baked portal alignment")
+	var reverse_talus := tunnel.get_node("SeamRocks") as MultiMeshInstance3D
+	var talus := tunnel_node.get_node("SeamRocks") as MultiMeshInstance3D
+	assert(reverse_talus.multimesh.get_instance_transform(0).is_equal_approx(talus.multimesh.get_instance_transform(0)),
+		"talus placement is stable across race directions")
 	tunnel.queue_free()
+
+
+## Check the actual triangle clearance outside the original bore geometry.
+func _check_tunnel_cut(tunnel: Node3D, track: RaceTrack, entry: float, exit: float) -> void:
+	assert(tunnel.find_children("*", "CollisionObject3D", true, false).is_empty())
+	var cliff := tunnel.get_node("Cliff") as MeshInstance3D
+	var portal := tunnel.get_node("Portals") as MeshInstance3D
+	var wings := tunnel.get_node("WingWalls") as MeshInstance3D
+	assert((cliff.get_surface_override_material(0) as ShaderMaterial).shader.resource_path.ends_with("vlore_limestone.gdshader"))
+	assert((portal.get_surface_override_material(0) as ShaderMaterial).shader.resource_path.ends_with("vlore_portal_concrete.gdshader"))
+	var stone: PackedColorArray = cliff.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var concrete: PackedColorArray = portal.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	assert(Array(stone).any(func(color: Color) -> bool: return color.r < .75 and color.b > .1), "baked limestone recesses and joints")
+	assert(Array(concrete).any(func(color: Color) -> bool: return color.r < .58), "baked collar soffit occlusion")
+	var talus := tunnel.get_node("SeamRocks") as MultiMeshInstance3D
+	assert(talus.multimesh.mesh.get_faces().size() / 3 <= 500 and talus.multimesh.instance_count >= 20)
+	assert(cliff.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	var previous := Quality.preset
+	Quality.set_preset("high")
+	assert(portal.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON and wings.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	Quality.set_pressure_stage(2)
+	assert(portal.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and wings.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	Quality.set_preset(previous)
+	var checked := 0
+	for surface: MeshInstance3D in [cliff, portal, wings]:
+		var faces := surface.mesh.get_faces()
+		for s in range(floori(entry) - 14, ceili(exit) + 14, 2):
+			for d: float in [-track.half_w, -2.0, 0.0, 2.0, track.half_w]:
+				var ray := surface.to_local(track.pos(s, d) + Vector3.UP * .15)
+				for i in range(0, faces.size(), 3):
+					var a := faces[i]
+					var b := faces[i+1]
+					var c := faces[i+2]
+					if ray.x < minf(a.x, minf(b.x,c.x)) or ray.x > maxf(a.x, maxf(b.x,c.x)) or (
+							ray.z < minf(a.z, minf(b.z,c.z)) or ray.z > maxf(a.z, maxf(b.z,c.z))):
+						continue
+					var hit: Variant = Geometry3D.ray_intersects_triangle(ray, Vector3.UP, a, b, c)
+					assert(hit == null or hit.y - ray.y >= 4.0, "cut overlaps the driveable envelope at s=%d d=%.1f" % [s,d])
+				checked += 1
+	print("VLORE TUNNEL: cleared %d exterior rays with the bore and vehicle geometry intact" % checked)
 
 
 ## Arc positions where the lap passes closest to `at`, one per pass (a pass

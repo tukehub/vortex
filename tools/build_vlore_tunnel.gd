@@ -1,22 +1,8 @@
 extends SceneTree
-## Bakes the Uji i Ftohtë coastal tunnel into one mobile glTF:
+## Bake the race spline's original bore and a terrain-backed limestone cut.
 ##   godot --headless --path godot --script ../tools/build_vlore_tunnel.gd
-## Reads  the race spline (RaceTrack, track.json "tunnel" portals) and the
-##        baked Vlorë terrain, so the bore, portals and cliff sit exactly on
-##        the road the cars drive.
-## Writes res://assets/cities/vlore/tunnel.glb, world coordinates under one
-##        root placed at the southern-approach portal:
-##   Cliff        cliff_rock       smooth limestone mass over the bore, its
-##                                 inland foot buried in the hillside, its
-##                                 portal faces round both collars
-##   Portals      portal_masonry   arched cast-concrete collars, 1.8 m deep
-##   TunnelBore   tunnel_interior  arched concrete lining
-##                ceiling_lights   warm emissive strips along the crown
-##   Boulder0..3  cliff_rock       angular shoreline boulders (MultiMesh use)
-##   Scrub0..1    scrub            low Mediterranean bushes (MultiMesh use)
-## No Blender: subdivided cross-sections, FastNoiseLite displacement (clouds
-## plus Voronoi cells and bedding) and smoothed normals stand in for the
-## Subdivision / Displace / Auto Smooth stack. Budget: under 12k triangles.
+## The tool is visual only. No scene node carries a physics body or collider.
+## See docs/vlore-out-and-back.md for the source scan and vertex bake.
 
 const OUT := "res://assets/cities/vlore/tunnel.glb"
 const SPRING := 3.5          # wall height before the arch (matches the old bore)
@@ -24,12 +10,15 @@ const RISE := 3.4            # arch rise: 6.9 m crown above the road
 const ARCH := 16             # arch segments
 const COLLAR := 1.4          # collar ring thickness
 const COLLAR_DEPTH := 1.8    # how far each collar stands out of the cliff face
-const SEA_FOOT := 13.0       # metres from the centreline, sea side
-const LAND_FOOT := 34.0      # inland, where the cliff has sunk into the hill
-const SHELL_COLS := 30
-const SHELL_STEP := 2.0      # metres between cliff cross-sections
+const DETAIL := preload("res://scripts/world/terrain_detail.gd")
+const OFFSETS := [20., 18., 16., 14.8, 13.9, 13.1, 12.1, 11.3, 10.3, 9.45, 8.5, 7.3,
+	5.6, 3.1, 0., -3., -6., -9.5, -13., -17., -22., -28., -34., -41., -49., -58., -68., -78.]
+const BEDS := [0., 0., .028, .115, .155, .32, .36, .535, .60, .77, .82, 1.]
+const FIRST_INLAND := 18
+const SHELL_STEP := 1.8
 const BORE_STEP := 3.0
 const MAX_TRIS := 12000
+const SCAN := "pipeline/assets/vlore_rock_07.glb"
 
 var track: RaceTrack
 ## The game's near terrain grid, water carved as Terrain does it (no Terrain
@@ -42,6 +31,9 @@ var half := 0.0
 var clouds := FastNoiseLite.new()
 var cells := FastNoiseLite.new()
 var tris := 0
+var entrance := 0.0
+var run := 0.0
+var detail := DETAIL.new()
 
 
 func _initialize() -> void:
@@ -50,6 +42,8 @@ func _initialize() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://assets/cities/vlore/track.json"))
 	var start := track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
 	var length := track.mod_s(track.locate_xz(data.tunnel[1][0], data.tunnel[1][1]).x - start)
+	entrance = start
+	run = length
 	half = track.half_w + 1.18
 	origin = track.pos(start, 0.0)
 	clouds.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -77,12 +71,18 @@ func _initialize() -> void:
 	var cliff := ArrayMesh.new()
 	_add(cliff, _shell(start, length), rock)
 	for end in 2:
-		_add(cliff, _portal_face(start if end == 0 else start + length, end == 0), rock)
+		var s := start if end == 0 else start + length
+		_add(cliff, _portal_face(s, end == 0), rock)
+		_add(cliff, _approach(s, end == 0), rock)
 	_child(root, "Cliff", cliff)
 	var portals := ArrayMesh.new()
 	for end in 2:
 		_add(portals, _collar(start if end == 0 else start + length, end == 0), masonry)
 	_child(root, "Portals", portals)
+	var wing_walls := ArrayMesh.new()
+	for end in 2:
+		_add(wing_walls, _wing_wall(start if end == 0 else start + length, end == 0), masonry)
+	_child(root, "WingWalls", wing_walls)
 	var bore := ArrayMesh.new()
 	_add(bore, _bore(start, length), interior)
 	_add(bore, _light_strips(start, length), lights)
@@ -95,6 +95,14 @@ func _initialize() -> void:
 		var bush := ArrayMesh.new()
 		_add(bush, _bush(i), scrub)
 		_child(root, "Scrub%d" % i, bush)
+
+	var talus := _scan_mesh(rock)
+	if talus == null:
+		root.free()
+		quit(1)
+		return
+	_child(root, "TalusScan", talus)
+	_scatter(root, cliff, start, length)
 
 	print("TUNNEL: %.1f m bore, %d triangles" % [length, tris])
 	if tris > MAX_TRIS:
@@ -123,7 +131,7 @@ func _child(root: Node3D, node_name: String, mesh: ArrayMesh) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
 	mi.mesh = mesh
-	if not (node_name.begins_with("Boulder") or node_name.begins_with("Scrub")):
+	if not (node_name.begins_with("Boulder") or node_name.begins_with("Scrub") or node_name == "TalusScan"):
 		mi.position = origin
 	root.add_child(mi)
 	mi.owner = root
@@ -158,36 +166,31 @@ func _load_ground() -> void:
 	var floor_h := water_surface + 0.25  # Terrain.LAND_CLEARANCE
 	for i in heights.size():
 		heights[i] = minf(heights[i], bed) if mask[i] >= 128 else maxf(heights[i], floor_h)
+	detail.load_bake(dir, grid, heights)
+	detail.release_mesh_data()
 
 
-## Terrain height (world) at world x, z: bilinear, as Terrain.height_at.
+## Height of the actual visual triangles, including localized hillside tiles.
 func _height(x: float, z: float) -> float:
-	var n := int(grid.n)
-	var fx := (x - float(grid.x0)) / float(grid.cell)
-	var fz := (z - float(grid.z0)) / float(grid.cell)
-	var ix := clampi(int(fx), 0, n - 2)
-	var iz := clampi(int(fz), 0, n - 2)
-	var tx := clampf(fx - ix, 0.0, 1.0)
-	var tz := clampf(fz - iz, 0.0, 1.0)
-	return lerpf(lerpf(heights[iz * n + ix], heights[iz * n + ix + 1], tx),
-		lerpf(heights[(iz + 1) * n + ix], heights[(iz + 1) * n + ix + 1], tx), tz)
-
-
-## Terrain height under a root-relative point, relative to the road there.
-func _ground(p: Vector3) -> float:
-	var w := p + origin
-	return _height(w.x, w.z) - track.pos(track.locate_xz(w.x, w.z).x, 0.0).y
+	var visual := detail.height_at(x, z)
+	if not is_nan(visual):
+		return visual
+	return DETAIL._height(heights, int(grid.n), (x - float(grid.x0)) / float(grid.cell),
+		(z - float(grid.z0)) / float(grid.cell))
 
 
 ## Indexed grid of rows x cols, every cell's triangles wound to face `toward`
 ## (a callable: cell centre -> direction). Shared vertices: smooth normals.
-func _grid(rows: Array, toward: Callable) -> SurfaceTool:
+func _grid(rows: Array, toward: Callable, paint := Callable()) -> SurfaceTool:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var cols: int = (rows[0] as PackedVector3Array).size()
-	for row: PackedVector3Array in rows:
-		for p in row:
+	for r in rows.size():
+		for c in cols:
+			var p: Vector3 = rows[r][c]
 			st.set_uv(Vector2(p.x + p.y * 0.3, p.z + p.y * 0.3) * 0.12)
+			if paint.is_valid():
+				st.set_color(paint.call(r, c, p))
 			st.add_vertex(p)
 	for r in rows.size() - 1:
 		for c in cols - 1:
@@ -207,56 +210,123 @@ func _grid(rows: Array, toward: Callable) -> SurfaceTool:
 	return st
 
 
-## Rock offset (metres, along the surface normal) at a world point: rolling
-## clouds, Voronoi blocks breaking along their edges, and bedding bands.
-func _rock(p: Vector3) -> float:
-	var w := p + origin
-	var cloud := clouds.get_noise_3dv(w)
-	var block := cells.get_noise_3dv(w)
-	var bedding := 0.35 * sin(w.y * 1.7 + cloud * 3.0)
-	return cloud * 1.3 + block * 0.9 + bedding
+## Terraced seaward face, irregular roof and a long inland tie-in. Dips and
+## fault offsets deform the beds together instead of embossing each section.
+func _cliff_row(s: float) -> PackedVector3Array:
+	var row := PackedVector3Array()
+	var q := s - entrance
+	var road_y := track.height(s)
+	var fault := smoothstep(-1.2, 1.2, q - 33.0) - smoothstep(-1.8, 1.8, q - 67.0)
+	var crest := 15.2 + 3.8 * clouds.get_noise_2d(q, 19.0) + 2.6 * fault + 1.6 * sin(q * .075 + .6)
+	var face_setback := 1.3 * sin(q * .092) + 2.3 * clouds.get_noise_2d(q, 80.0) + 1.45 * fault
+	for c in OFFSETS.size():
+		var d: float = OFFSETS[c]
+		var shifting := smoothstep(3.0, 8.0, d) * (1.0 - smoothstep(14.0, 20.0, d))
+		d += shifting * face_setback
+		var p := _terrain_point(s, d)
+		var ground := _height(p.x + origin.x, p.z + origin.z)
+		var crest_notch := -3.6 * smoothstep(.25, .68, clouds.get_noise_2d(q * 1.6, d * 2.1 + 166.0))
+		var rock := crest + crest_notch + _relief(p, crest + road_y) * 1.55
+		var y := rock + road_y
+		if c < BEDS.size():
+			# The low bench widens at bedding planes and drops under the sea
+			# floor at the toe; the upper bench can flare out under the crown.
+			var bed: float = BEDS[c]
+			var toe := minf(ground, water_surface) - .9
+			y = lerpf(toe, y, bed)
+			y += sin(bed * PI) * _relief(p, y) * 1.55
+		else:
+			var back := maxf(0., -d)
+			var uplift := 2.7 * smoothstep(2., 17., back) + 1.1 * sin(d * .31 + q * .045)
+			var saddle := road_y + rock + .16 * back + uplift + _relief(p, y)
+			var edge := smoothstep(25., 78., back)
+			y = lerpf(saddle, ground - .65, edge)
+		p.y = y - origin.y
+		row.append(p)
+	return row
 
 
-## Cliff cross-section at s: column 0 at the sea-side foot, last column buried
-## in the hillside, smooth over the bore.
-func _profile(s: float) -> PackedVector3Array:
-	var out := PackedVector3Array()
-	var foot_sea := minf(_ground(_at(s, SEA_FOOT, 0.0)), water_surface - track.height(s)) - 1.5
-	for c in SHELL_COLS:
-		var u := float(c) / (SHELL_COLS - 1)
-		# Denser over the bore: u -> d with an ease.
-		var d := lerpf(SEA_FOOT, -LAND_FOOT, pow(u, 1.35))
-		var dome := 10.5 + 2.6 * cos(clampf(d / 9.0, -1.0, 1.0) * PI * 0.5)
-		var y := dome
-		if d > 9.0:
-			y = lerpf(dome, foot_sea, smoothstep(9.0, SEA_FOOT, d))
-		elif d < -9.0:
-			var hill := _ground(_at(s, d, 0.0)) - 1.2
-			y = lerpf(dome, hill, smoothstep(-8.0, -LAND_FOOT, d))
-		out.append(_at(s, d, y))
-	return out
+func _terrain_point(s: float, d: float) -> Vector3:
+	var p := _at(s, d, 0.0)
+	# On the deep inland skirt, gradually stop following the tightly
+	# curving road normal. This prevents offset cross-sections folding.
+	var weight := smoothstep(22.0, 72.0, -d)
+	var shore_axis := track.normal(entrance + run * .52)
+	return p.lerp(track.pos(s, 0.0) - origin + d * shore_axis, weight)
+
+
+func _relief(p: Vector3, y: float) -> float:
+	var w := Vector3(p.x + origin.x, y, p.z + origin.z)
+	var warp := clouds.get_noise_3dv(w)
+	var joint := 1.0 + cells.get_noise_3dv(Vector3(w.x, w.y * .52, w.z))
+	return 1.15 * warp - .66 * (1.0 - smoothstep(.015, .21, joint)) + .22 * sin(y * 1.65 + .075 * w.x - .12 * w.z + warp * 3.6)
 
 
 func _shell(start: float, length: float) -> SurfaceTool:
 	var rings := ceili(length / SHELL_STEP)
 	var rows := []
 	for i in rings + 1:
-		var s := start + length * i / rings
-		var row := _profile(s)
-		var n := track.normal(s)
-		for c in row.size():
-			var prev: Vector3 = row[maxi(0, c - 1)]
-			var next: Vector3 = row[mini(row.size() - 1, c + 1)]
-			var along := (next - prev).normalized()
-			# Outward: perpendicular to the section, away from the bore.
-			var out := along.cross(track.tangent(s)).normalized()
-			if out.y < 0.0:
-				out = -out
-			var u := float(c) / (SHELL_COLS - 1)
-			var fade := smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.78, 1.0, u))
-			row[c] += out * _rock(row[c]) * 1.4 * fade
+		rows.append(_cliff_row(start + length * i / rings))
+	return _grid(rows, func(_p: Vector3) -> Vector3: return Vector3.UP, _coat.bind(rows, 0))
+
+
+## A graded inland cut with talus at its toe and offset limestone shelves.
+## The outer and far edges are buried in the sampled hillside.
+func _approach(s: float, entry: bool) -> SurfaceTool:
+	var rows := []
+	var direction := -1.0 if entry else 1.0
+	var reach := 46.0 if entry else 52.0
+	for i in 23:
+		var t := float(i) / 22.0
+		var at := s + direction * reach * t
+		var depth := _cliff_row(at)
+		var row := PackedVector3Array()
+		var toe_d := -9.15 - 5.4 * t - 1.6 * sin(t*PI) * clouds.get_noise_2d(at, 28.0)
+		var toe := _terrain_point(at, toe_d)
+		toe.y = _height(toe.x + origin.x, toe.z + origin.z) - origin.y - .55
+		var setback := smoothstep(0., .48, t) * (5.1 + 2.2 * sin(at*.13))
+		var crown: Vector3 = depth[FIRST_INLAND]
+		var retain := 1.0 - smoothstep(.015, 1.0, t)
+		for j in 5:
+			var width: float = [0., .21, .39, .73, .91][j]
+			var height: float = [0., .17, .29, .57, .74][j]
+			var p := _terrain_point(at, lerpf(toe_d, -13.0-setback, width))
+			var ground := _height(p.x + origin.x, p.z + origin.z) - origin.y
+			p.y = lerpf(ground - .55, lerpf(toe.y, crown.y, height) + width * _relief(p, crown.y + origin.y), retain)
+			row.append(p)
+		for c in range(FIRST_INLAND, depth.size()):
+			var p: Vector3 = depth[c]
+			var u := smoothstep(0., 6., c - FIRST_INLAND)
+			var bent := _terrain_point(at, OFFSETS[c] - setback * (1.0-u))
+			p.x = bent.x
+			p.z = bent.z
+			var ground := _height(p.x + origin.x, p.z + origin.z) - origin.y
+			p.y = lerpf(ground - .7, p.y, retain)
+			row.append(p)
 		rows.append(row)
-	return _grid(rows, func(p: Vector3) -> Vector3: return (p - _at(start + length * 0.5, 0.0, 2.0)).normalized())
+	return _grid(rows, func(_p: Vector3) -> Vector3: return Vector3.UP, _coat.bind(rows, FIRST_INLAND - 5))
+
+
+## Bake a local horizon on the triangulated height surface into vertex R.
+## G controls exposed rock versus scrub/soil and B carries fracture depth.
+func _coat(r: int, c: int, p: Vector3, rows: Array, first: int) -> Color:
+	var horizon := 0.0
+	for offset in [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1),
+			Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1)]:
+		var angle := 0.0
+		for step in [1, 3, 6]:
+			var nr := clampi(r + offset.y * step, 0, rows.size() - 1)
+			var nc := clampi(c + offset.x * step, 0, rows[nr].size() - 1)
+			var delta: Vector3 = rows[nr][nc] - p
+			angle = maxf(angle, maxf(0., delta.y) / maxf(delta.length(), .01))
+		horizon += angle
+	var d: float = OFFSETS[c + first]
+	var exposed := (1.0 - smoothstep(33.0, 69.0, -d)) * (1.0 - smoothstep(15.0, 20.0, d))
+	if first > 0:
+		exposed *= smoothstep(0., 2., c) * (1.0 - smoothstep(.50, 1., float(r) / (rows.size() - 1)))
+	var gap := 1.0 + cells.get_noise_3dv((p + origin) * Vector3(1.0, .48, 1.0))
+	var fracture := 1.0 - smoothstep(.018, .26, gap)
+	return Color(clampf(1.0 - horizon * .092, .58, 1.0), exposed, fracture)
 
 
 ## The bore's cross-section: walls, the arch, and back down.
@@ -331,39 +401,84 @@ func _collar(s: float, entry: bool) -> SurfaceTool:
 				toward = ((a + b) * 0.5 - axis).normalized()
 			var n := (b - a).cross(d - a)
 			var order := [a, c, b, a, d, c] if n.dot(toward) >= 0.0 else [a, b, c, a, c, d]
+			var recess := 1.0 if band[2] == "in" else (.33 if band[2] == "out" else 0.0)
 			for p: Vector3 in order:
-				st.set_uv(Vector2(p.x + p.z, p.y) * 0.25)
-				st.add_vertex(p)
+				_concrete_vertex(st, p, s, recess)
 	st.index()
 	return st
 
 
-## The rock face round a portal: from the collar's outer band out to the
-## cliff's cross-section, bulging gently, its sharp edge against the shell.
+## Jagged quarry-like face around each unchanged collar opening.
 func _portal_face(s: float, entry: bool) -> SurfaceTool:
 	var out_dir := -1.0 if entry else 1.0
-	var shell := _profile(s)
-	var rim := _resample(_bore_profile(s - out_dir * 0.6, COLLAR + 0.05), shell.size())
+	var shell := _cliff_row(s)
+	var rim := _resample(_bore_profile(s, COLLAR + .06), shell.size())
 	var rows := []
-	var layers := 4
+	var layers := 8
 	var tangent := track.tangent(s) * out_dir
 	for l in layers + 1:
 		var t := float(l) / layers
 		var row := PackedVector3Array()
 		for c in shell.size():
 			var p := rim[c].lerp(shell[c], t)
-			var bulge := sin(t * PI) * (0.6 + 0.5 * _rock(p))
-			p += tangent * bulge
-			# Inland of the collar the face settles onto the hillside just
-			# outside the portal: no fin of rock standing over the approach.
-			var d := (p + origin - track.pos(s, 0.0)).dot(track.normal(s))
-			if d < -half - COLLAR - 1.0:
-				var outside := p + tangent * 5.0
-				var settle := smoothstep(half + COLLAR + 1.0, half + COLLAR + 7.0, -d)
-				p.y = minf(p.y, lerpf(p.y, _ground(outside) + track.height(s) - origin.y + 0.4, settle))
+			var world := p + origin
+			var wave := _relief(p, world.y)
+			var bedding := sin(world.y * 1.38 + world.x*.11 - world.z*.15 + wave*.70)
+			var gash := smoothstep(.08,.56,clouds.get_noise_3dv(world*1.24))
+			var ledge := -.8 + wave * 2.45 + bedding * 1.0 - gash * 3.4
+			p += tangent * sin(t * PI) * ledge
+			if c >= FIRST_INLAND and c < FIRST_INLAND + 3:
+				# Dipping foot beds close the corner behind the retaining wing.
+				p.y -= sin(t * PI) * (1.8 + absf(wave)) * (1.0 - (c-FIRST_INLAND)/3.0)
 			row.append(p)
 		rows.append(row)
-	return _grid(rows, func(_p: Vector3) -> Vector3: return tangent)
+	var paint := func(r: int, c: int, p: Vector3) -> Color:
+		var ao := _coat(r, c, p, rows, 0)
+		ao.r *= lerpf(.66, 1.0, smoothstep(0.0, 4.0, r))
+		ao.g = 1.0 if c < FIRST_INLAND else ao.g
+		return ao
+	return _grid(rows, func(_p: Vector3) -> Vector3: return tangent, paint)
+
+
+## Poured-concrete abutment on the inland approach. The battered face
+## and cap stay behind the shoulder and butt into the rock above it.
+func _wing_wall(s: float, entry: bool) -> SurfaceTool:
+	var direction := -1.0 if entry else 1.0
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in 8:
+		var edge := PackedVector3Array()
+		for j in [i, i + 1]:
+			var t := float(j) / 8.0
+			var at := s + direction * (1.0 + 13.0 * t)
+			var d := lerpf(-half - .94, -half - 4.2, t)
+			var top := maxf(.32, 4.55 * pow(1.0 - t, .69))
+			edge.append_array(PackedVector3Array([_at(at, d + .14, -.62), _at(at, d, top), _at(at, d - .78, top)]))
+		_concrete_quad(st, edge[0], edge[3], edge[4], edge[1], track.normal(s), s, .0)
+		_concrete_quad(st, edge[1], edge[4], edge[5], edge[2], Vector3.UP, s, .5)
+		if i == 7:
+			_concrete_quad(st, edge[3], _at(s + direction * 14.0, -half - 4.98, -.62),
+				edge[5], edge[4], track.tangent(s) * direction, s, .15)
+	st.index()
+	return st
+
+
+func _concrete_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3,
+		facing: Vector3, s: float, recess: float) -> void:
+	var n := (b - a).cross(d - a)
+	var order := [a, c, b, a, d, c] if n.dot(facing) >= 0.0 else [a, b, c, a, c, d]
+	for p: Vector3 in order:
+		_concrete_vertex(st, p, s, recess)
+
+
+func _concrete_vertex(st: SurfaceTool, p: Vector3, s: float, recess: float) -> void:
+	var relative := p - _at(s, 0.0, 0.0)
+	var d := relative.dot(track.normal(s))
+	var along := relative.dot(track.tangent(s))
+	var ao := clampf(.70 + .26 * smoothstep(-.15, 2.8, relative.y) - recess * .24, .42, .98)
+	st.set_uv(Vector2(d + along * .58, relative.y))
+	st.set_color(Color(ao, recess, 0.0))
+	st.add_vertex(p)
 
 
 ## n points along a polyline, evenly by arc length, from the sea-side end to
@@ -408,20 +523,107 @@ func _boulder(variant: int) -> SurfaceTool:
 	return st
 
 
-## A low rounded shrub of three overlapping lobes, 1-1.6 m tall.
+## Crossed, inclinable sprays of lentisk/maquis foliage from the shared atlas.
 func _bush(variant: int) -> SurfaceTool:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 900 + variant
-	for lobe in 3:
-		var sphere := SphereMesh.new()
-		sphere.radial_segments = 6
-		sphere.rings = 3
-		sphere.radius = rng.randf_range(0.5, 0.8)
-		sphere.height = sphere.radius * rng.randf_range(1.2, 1.7)
-		var at := Vector3(rng.randf_range(-0.5, 0.5), sphere.height * 0.42, rng.randf_range(-0.5, 0.5))
-		for p in sphere.get_faces():
-			st.set_uv(Vector2(p.x, p.z))
-			st.add_vertex(p + at)
+	for leaf in range(11 + variant * 2):
+		var theta := float(leaf) * 2.399 + rng.randf_range(-.22, .22)
+		var branch := Vector3(cos(theta), 0.0, sin(theta))
+		var axis := branch.cross(Vector3.UP) * rng.randf_range(.16, .31)
+		var root := branch * rng.randf_range(.04,.30)
+		var tip := branch * rng.randf_range(.31,.83) + Vector3.UP * rng.randf_range(.34,.76)
+		var uv_x := .50 if leaf % 3 else 0.0
+		var points := [root-axis, root+axis, tip+axis, tip-axis]
+		var uvs := [Vector2(uv_x+.002,.99), Vector2(uv_x+.248,.99), Vector2(uv_x+.248,.01), Vector2(uv_x+.002,.01)]
+		var tint := Color(.49, .57, .34).lerp(Color(.78, .75, .49), rng.randf() * .62)
+		for i in [0, 2, 1, 0, 3, 2]:
+			st.set_color(tint)
+			st.set_uv(uvs[i])
+			st.add_vertex(points[i])
 	return st
+
+
+## A compact photogrammetry silhouette, normalized around its ground contact.
+func _scan_mesh(material: Material) -> ArrayMesh:
+	var path: String = get_script().resource_path.get_base_dir().path_join(SCAN)
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	var error := doc.append_from_file(path, state)
+	if error != OK:
+		printerr("Unable to open the optimized Rock 07 scan: ", error_string(error))
+		return null
+	var scene := doc.generate_scene(state)
+	var result := ArrayMesh.new()
+	for obj in scene.find_children("*", "MeshInstance3D", true, false):
+		var model := obj as MeshInstance3D
+		for i in model.mesh.get_surface_count():
+			var st := SurfaceTool.new()
+			st.create_from(model.mesh, i)
+			var arrays := st.commit_to_arrays()
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var bounds := model.mesh.get_aabb()
+			var foot := Vector3(bounds.get_center().x, bounds.position.y, bounds.get_center().z)
+			var span := maxf(bounds.size.x, bounds.size.z)
+			var uvs := PackedVector2Array()
+			for j in verts.size():
+				verts[j] = (verts[j] - foot) / span
+				uvs.append(Vector2(verts[j].x, verts[j].z))
+			arrays[Mesh.ARRAY_VERTEX] = verts
+			arrays[Mesh.ARRAY_TEX_UV] = uvs
+			result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			result.surface_set_material(result.get_surface_count() - 1, material)
+			tris += (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+	scene.free()
+	return result if result.get_surface_count() > 0 else null
+
+
+## Project decorative anchors onto the baked cut once, during the bake.
+## The shipped scene just instances the prototypes at these fixed sites.
+func _scatter(root: Node3D, cliff: ArrayMesh, start: float, length: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7341
+	var faces := cliff.get_faces()
+	var counts := {"TalusSite": 0, "MaquisSite": 0}
+	for end in 2:
+		var s := start if end == 0 else start + length
+		var sign_out := -1.0 if end == 0 else 1.0
+		for i in 26:
+			var reach := rng.randf_range(3.5, 40.0)
+			var inland := rng.randf_range(10.5, 23.5)
+			var p := _at(s + reach*sign_out, -inland, 0.0)
+			var heights_at := _scatter_height(p, faces)
+			var plant := i >= 13
+			if plant and heights_at.y < .66:
+				continue
+			var prefix := "MaquisSite" if plant else "TalusSite"
+			p.y = heights_at.x - (.08 if plant else .04)
+			var radius := rng.randf_range(.54, 1.32) if plant else rng.randf_range(.25, 1.12)
+			if reach < 15.0 and inland < 14.0:
+				radius *= .66
+			var marker := Node3D.new()
+			marker.name = "%s%02d" % [prefix, counts[prefix]]
+			counts[prefix] += 1
+			marker.transform = Transform3D(Basis(Vector3.UP, rng.randf()*TAU).scaled(
+				Vector3(radius, radius*rng.randf_range(.76, 1.16), radius)), p + origin)
+			root.add_child(marker)
+			marker.owner = root
+
+
+func _scatter_height(p: Vector3, faces: PackedVector3Array) -> Vector2:
+	var best := _height(p.x + origin.x, p.z + origin.z) - origin.y
+	var slope := 1.0
+	for i in range(0, faces.size(), 3):
+		var a := faces[i]
+		var b := faces[i+1]
+		var c := faces[i+2]
+		if p.x < minf(a.x, minf(b.x, c.x)) or p.x > maxf(a.x, maxf(b.x, c.x)) or (
+				p.z < minf(a.z, minf(b.z, c.z)) or p.z > maxf(a.z, maxf(b.z, c.z))):
+			continue
+		var hit: Variant = Geometry3D.ray_intersects_triangle(Vector3(p.x, 65.0, p.z), Vector3.DOWN, a, b, c)
+		if hit != null and hit.y > best:
+			best = hit.y
+			slope = absf((b-a).cross(c-a).normalized().y)
+	return Vector2(best, slope)

@@ -142,21 +142,31 @@ car heave and roll, reverse joins on the right, two-way cities untouched).
   Baba's temple and tomb are in view ahead on the return up the boulevard and
   after the Flag Square turn; Teatri Petro Marko's facade from both legs
   between the Muradie Mosque and the stadium. 12 buildings cleared.
-- **Uji i Ftohtë** is baked by `tools/build_vlore_tunnel.gd` (Godot
-  headless, on the race spline and the game's terrain grid) into
-  `assets/cities/vlore/tunnel.glb`, 5.5k triangles: a smooth limestone
-  cliff (subdivided sections, FastNoiseLite clouds + Voronoi + bedding
-  displacement, smoothed normals) whose inland foot sinks into the hillside
-  and whose portal faces settle onto it; 1.8 m cast-concrete collars on both
-  portals; an arched concrete lining with warm emissive crown strips (no
-  OmniLights). Slots `cliff_rock`, `portal_masonry`, `tunnel_interior`,
-  `ceiling_lights` (+ `scrub`); `vlore_tunnel.gd` gives `cliff_rock` world
-  triplanar Marble Rock 03 (1K albedo, normal, roughness), lays a MultiMesh
-  breakwater of four boulder shapes outside the coastal wall on both
-  approaches (`shoreline_rock.gdshader`: x0.45 albedo, 0.2 roughness below
-  the water line plus splash), and scatters scrub and rocks on the seam.
-  Rebuild after a route change:
-  `godot --headless --path godot --script ../tools/build_vlore_tunnel.gd`.
+- **Uji i Ftohtë** is a bedded limestone road cut baked by
+  `tools/build_vlore_tunnel.gd`. The cut follows the existing spline and
+  meets the active terrain triangles. A stepped seaward face, recessed joints,
+  and staggered beds continue through graded inland slopes. The original
+  97.9 m bore, lining, collar openings and emissive strips keep their
+  geometry. Inland concrete wings retain the crumbling slopes alongside both
+  collars. The portal material layers formwork seams, seepage, carbonate
+  deposits and road-spray dirt over the existing concrete texture.
+  Rock and concrete carry baked vertex occlusion. The collars cast shadows
+  on medium and high before thermal pressure stage 2. The small wings cast
+  on high with no thermal pressure. The cliff and decorative batches keep
+  their baked shading at every preset.
+- The bake projects talus and low maquis onto stable sites at the cut.
+  Talus uses a 480-triangle reduction of **Rock 07** by Jenelle van Heerden
+  (Poly Haven, CC0 1.0), retextured with the game's Marble Rock 03. The
+  geometry-only source is `tools/pipeline/assets/vlore_rock_07.glb`.
+  It uses the 1K glTF geometry stream (source MD5
+  `817b2cfd1626cb06f18a825f87f58ec3`) and meshoptimizer simplification.
+  The cliffs reuse the 1K Marble Rock 03 albedo and Rock Face 03 ARM. The
+  shape and surface maps add no new texture downloads. The existing wet
+  breakwater keeps its four inexpensive shared shapes. [Rock 07](https://polyhaven.com/a/rock_07) · [License](https://polyhaven.com/license)
+- Rebuild after changing the route or the local terrain bake.
+  `godot --headless --path godot --script ../tools/build_vlore_tunnel.gd`
+  produces a GLB with 7,562 triangles including shared rock and plant
+  prototypes. The bake rejects a result over 12,000 triangles.
 - **Asphalt** is continuous: the photo's cracks (its darkest ~4%) fill to
   its median tone, so the two crossed samples no longer draw a slab grid, and
   the procedural repaired patches are gone.

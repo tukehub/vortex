@@ -1,9 +1,6 @@
 extends Node3D
-## The Uji i Ftohtë tunnel: the baked mesh from tools/build_vlore_tunnel.gd
-## (cliff, portal collars, lined bore with emissive light strips; world
-## coordinates on the race spline), its materials, a breakwater of boulders
-## along the sea side of both approaches, and scrub where the cliff meets the
-## hillside. No real-time lights: the strips are emissive.
+## Uji i Ftohtë's baked limestone cut, concrete portals and original bore.
+## Both directions share the same baked surfaces and decorative placements.
 
 const MODEL := preload("res://assets/cities/vlore/tunnel.glb")
 const ROCK := Color("#a3a098")
@@ -11,8 +8,8 @@ const ROCK := Color("#a3a098")
 ## each approach; scrub and loose rock along the inland seam.
 const BREAKWATER_REACH := 95.0
 const BOULDER_EVERY := 1.6
-const SCRUB_COUNT := 26
-const SEAM_ROCKS := 12
+var _shadow_near: Array[MeshInstance3D] = []
+var _shadow_high: Array[MeshInstance3D] = []
 
 
 func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) -> void:
@@ -24,14 +21,24 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 	var model := MODEL.instantiate()
 	var materials := _materials(terrain)
 	var props := {}
-	for child: Node in model.get_children():
+	var talus := []
+	var maquis := [[], []]
+	var shrub_index := 0
+	for child: Node3D in model.get_children():
+		var at := (model as Node3D).transform * child.transform
+		if String(child.name).begins_with("TalusSite"):
+			talus.append(at)
+			continue
+		if String(child.name).begins_with("MaquisSite"):
+			maquis[shrub_index % 2].append(at)
+			shrub_index += 1
+			continue
 		var mesh_node := child as MeshInstance3D
 		if mesh_node == null:
 			continue
-		var at := (model as Node3D).transform * mesh_node.transform
 		model.remove_child(mesh_node)
 		mesh_node.owner = null
-		if String(mesh_node.name).begins_with("Boulder") or String(mesh_node.name).begins_with("Scrub"):
+		if String(mesh_node.name).begins_with("Boulder") or String(mesh_node.name).begins_with("Scrub") or mesh_node.name == "TalusScan":
 			props[String(mesh_node.name)] = mesh_node.mesh
 			mesh_node.free()
 			continue
@@ -42,10 +49,27 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 		mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mesh_node.visibility_range_end = 620.0 if mesh_node.name == "TunnelBore" else 1100.0
 		add_child(mesh_node)
+		if mesh_node.name == "Portals":
+			_shadow_near.append(mesh_node)
+		elif mesh_node.name == "WingWalls":
+			_shadow_high.append(mesh_node)
 	model.free()
 	_seawall(track, start, length, -inland, terrain)
 	_breakwater(track, start, length, -inland, terrain, props, materials)
-	_seam(track, start, length, inland, terrain, props, materials)
+	for i in 2:
+		_batch("SeamScrub%d" % i, props.get("Scrub%d" % i), maquis[i], materials.scrub, 210.0)
+	_batch("SeamRocks", props.get("TalusScan"), talus, materials.debris, 250.0)
+	Quality.budget_changed.connect(_update_shadows)
+	_update_shadows()
+
+
+func _update_shadows() -> void:
+	var portal_mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Quality.preset != "low" and Quality.pressure_stage < 2 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var wing_mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Quality.preset == "high" and Quality.pressure_stage == 0 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for mesh in _shadow_near:
+		mesh.cast_shadow = portal_mode
+	for mesh in _shadow_high:
+		mesh.cast_shadow = wing_mode
 
 
 func _materials(terrain: Terrain) -> Dictionary:
@@ -62,14 +86,17 @@ func _materials(terrain: Terrain) -> Dictionary:
 	rock.uv1_world_triplanar = true
 	rock.uv1_triplanar_sharpness = 4.0
 	rock.uv1_scale = Vector3.ONE * 0.12
-	var masonry := StandardMaterial3D.new()
-	masonry.resource_name = "portal_masonry"
-	masonry.albedo_texture = preload("res://assets/textures/concrete_wall_diff.jpg")
-	masonry.albedo_color = Color(0.86, 0.83, 0.78)
-	masonry.roughness = 0.86
-	masonry.uv1_triplanar = true
-	masonry.uv1_world_triplanar = true
-	masonry.uv1_scale = Vector3.ONE * 0.35
+	var cliff := ShaderMaterial.new()
+	cliff.shader = preload("res://shaders/vlore_limestone.gdshader")
+	cliff.set_shader_parameter("stone_map", rock.albedo_texture)
+	cliff.set_shader_parameter("rock_arm", preload("res://assets/textures/limestone_arm.jpg"))
+	cliff.set_shader_parameter("scrub_map", preload("res://assets/textures/grass_diff.jpg"))
+	cliff.set_shader_parameter("landscape", preload("res://assets/cities/vlore/ground_macro.png"))
+	cliff.set_shader_parameter("water_y", terrain.water_surface)
+	var masonry := ShaderMaterial.new()
+	masonry.shader = preload("res://shaders/vlore_portal_concrete.gdshader")
+	masonry.set_shader_parameter("concrete", preload("res://assets/textures/concrete_wall_diff.jpg"))
+	masonry.set_shader_parameter("concrete_normal", preload("res://assets/textures/concrete_wall_nor.jpg"))
 	var lining := StandardMaterial3D.new()
 	lining.resource_name = "tunnel_interior"
 	lining.albedo_texture = preload("res://assets/textures/concrete_diff.jpg")
@@ -97,15 +124,14 @@ func _materials(terrain: Terrain) -> Dictionary:
 	shore.set_shader_parameter("water_y", terrain.water_surface if terrain.has_water else -1.2)
 	var scrub := StandardMaterial3D.new()
 	scrub.resource_name = "scrub"
-	scrub.vertex_color_use_as_albedo = false
-	scrub.albedo_texture = preload("res://assets/textures/grass_diff.jpg")
-	scrub.albedo_color = Color(0.42, 0.50, 0.30)
-	scrub.roughness = 0.95
-	scrub.uv1_triplanar = true
-	scrub.uv1_world_triplanar = true
-	scrub.uv1_scale = Vector3.ONE * 0.8
-	return {"cliff_rock": rock, "portal_masonry": masonry, "tunnel_interior": lining,
-		"ceiling_lights": strips, "shoreline": shore, "scrub": scrub}
+	scrub.vertex_color_use_as_albedo = true
+	scrub.albedo_texture = preload("res://assets/foliage/tirana/leaf_sprays.png")
+	scrub.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	scrub.alpha_scissor_threshold = .36
+	scrub.cull_mode = BaseMaterial3D.CULL_DISABLED
+	scrub.roughness = .95
+	return {"cliff_rock": cliff, "portal_masonry": masonry, "tunnel_interior": lining,
+		"ceiling_lights": strips, "shoreline": shore, "scrub": scrub, "debris": rock}
 
 
 ## Boulders between the coastal wall and the sea, both approaches: random Y
@@ -126,27 +152,6 @@ func _breakwater(track: RaceTrack, start: float, length: float, coast: float, te
 			s += BOULDER_EVERY
 	for i in 4:
 		_batch("Breakwater%d" % i, props.get("Boulder%d" % i), groups[i], materials.shoreline, 420.0)
-
-
-## Scrub and a few loose rocks where the cliff's inland foot meets the hill.
-func _seam(track: RaceTrack, start: float, length: float, inland: float, terrain: Terrain, props: Dictionary, materials: Dictionary) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7311
-	var bushes := [[], []]
-	var rocks := []
-	for i in SCRUB_COUNT + SEAM_ROCKS:
-		var s := start - 12.0 + rng.randf() * (length + 24.0)
-		var p := track.pos(s, inland * rng.randf_range(26.0, 46.0))
-		p.y = terrain.height_at(p.x, p.z) - 0.1
-		var scale := rng.randf_range(0.8, 1.3)
-		var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(scale, scale * rng.randf_range(0.8, 1.2), scale))
-		if i < SCRUB_COUNT:
-			bushes[i % 2].append(Transform3D(basis, p))
-		else:
-			rocks.append(Transform3D(basis.scaled(Vector3.ONE * 0.55), p))
-	for i in 2:
-		_batch("SeamScrub%d" % i, props.get("Scrub%d" % i), bushes[i], materials.scrub, 380.0)
-	_batch("SeamRocks", props.get("Boulder0"), rocks, materials.cliff_rock, 380.0)
 
 
 func _batch(node_name: String, mesh: Mesh, transforms: Array, material: Material, reach: float) -> void:
