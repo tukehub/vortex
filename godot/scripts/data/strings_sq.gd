@@ -447,7 +447,7 @@ const T := {
 	"city.vlore.landmarks": ["Monumenti i Pavarësisë", "Lungomare"],
 	"city.berat.region": "Shqipëri",
 	"city.berat.blurb": "Qyteti i një mbi një dritareve. Të gjitha të shohin kur humb.",
-	"city.berat.landmarks": ["Kalaja", "Mangalemi", "Gorica"],
+	"city.berat.landmarks": ["Kalaja e Beratit", "Mangalemi", "Gorica", "Ura e Goricës", "Lumi Osum"],
 	"city.gjirokaster.region": "Shqipëri",
 	"city.gjirokaster.blurb": "Gurë, shi dhe kthesa. Qyteti i gurtë nuk fal.",
 	"city.gjirokaster.landmarks": ["Kalaja", "Çatitë e gurta"],

@@ -134,6 +134,8 @@ func _ready() -> void:
 				castle.built, ", ", castle.merlons, " merlons")
 		if city.id == "korce":
 			_test_korce(scene)
+		if city.id == "berat":
+			_test_berat(scene)
 		if city.id == "vlore":
 			# Lungomare: palms on the sea side, on dry ground and clear of the
 			# road; café terraces on the land side.
@@ -430,3 +432,59 @@ func _test_korce(scene: RaceScene) -> void:
 	assert(scene.track.dist_to(w_at.x, w_at.z) > scene.track.half_w + 6.0, "the warrior's pedestal is off the road")
 	print("KORCE: ", snappedf(scene.track.L, 1.0), " m lap; cathedral ", cathedral.windows, " windows, ", cathedral.domes,
 		" domes; school ", school.windows, " windows, ", snappedf(gap, 0.1), " m from the line")
+
+
+## Berat: the lap along both banks of the Osum, the river and its bridges, the
+## houses of Mangalem, Gorica and the castle, and the castle on its hill.
+func _test_berat(scene: RaceScene) -> void:
+	assert(scene.track.L > 8500.0 and scene.track.L < 9500.0, "the riverside lap is about 8.9 km")
+	var river := scene.river
+	assert(river != null and river.water_chunks >= 10, "the Osum runs through the city")
+	assert(river.race_bridges == 2, "the race crosses the Osum twice, on bridges")
+	assert(river.footbridges == 2 and river.arches >= 5, "Ura e Goricës on its arches, and the Mangalem footbridge")
+	assert(river.wall_metres > 1000.0, "embankments where the road runs beside the river")
+	# The race road stays above the water wherever it runs by the river.
+	var lowest := INF
+	for k in range(0, scene.track.M, 3):
+		var p := scene.track.pos(k * scene.track.ds, 0.0)
+		var best := INF
+		var level := 0.0
+		for i in range(0, river.pts.size(), 2):
+			var d := river.pts[i].distance_squared_to(Vector2(p.x, p.z))
+			if d < best:
+				best = d
+				level = river.surface[i]
+		if best < 90.0 * 90.0:
+			lowest = minf(lowest, p.y - level)
+	assert(lowest > 1.5, "the road keeps above the river (%.1f m)" % lowest)
+	var q := scene.quarters
+	assert(q != null and q.houses > 400 and q.windows > 4000, "the old quarters' houses and their thousand windows")
+	var meshes := 0
+	for child in q.get_children():
+		var mi := child as MeshInstance3D
+		assert(mi.mesh != null and mi.material_override != null)
+		meshes += 1
+	assert(meshes == q.blocks * 5, "five materials a block: stone, plaster, roof, timber, windows")
+	# No house stands on the race road.
+	var houses: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(OldQuarter.path_for("berat")))
+	for house: Dictionary in houses.houses:
+		for p: Array in house.ring:
+			assert(scene.track.dist_to(float(p[0]), float(p[1])) > scene.track.half_w, "house %d off the road" % int(house.id))
+	var marks: Node = null
+	for child in scene.props.get_children():
+		if child is Landmarks:
+			marks = child
+	var castle := marks.get_node_or_null("castle_berat/BeratCastle") as BeratCastle
+	assert(castle != null, "Berat castle is built from its mapped walls")
+	assert(castle.towers >= 20 and castle.merlons > 300 and castle.wall_lines >= 5, "curtain wall, towers and inner walls")
+	assert(castle.churches >= 8 and castle.domes >= 3, "the castle's Byzantine churches, some domed")
+	assert(castle.get_node_or_null("CastleFlag") != null, "the flag over the southern spur")
+	var masonry := castle.get_node("CastleMasonry") as MeshInstance3D
+	assert(masonry.visibility_range_end >= 4000.0, "the castle stays in sight from the lap")
+	var hill := castle.global_position
+	var above := hill.y - scene.track.height(scene.track.locate_xz(hill.x, hill.z).x)
+	assert(above > 100.0, "the castle stands high over the river road (%.0f m)" % above)
+	print("BERAT: ", snappedf(scene.track.L, 1.0), " m lap; ", q.houses, " houses, ", q.windows, " windows; castle ",
+		castle.towers, " towers, ", castle.churches, " churches; river ", snappedf(river.wall_metres, 1.0), " m of embankment, lowest road ",
+		snappedf(lowest, 0.1), " m above the water")
+

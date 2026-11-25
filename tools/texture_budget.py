@@ -27,10 +27,10 @@ FLAT = re.compile(r'^assets/(ui|powerups|fonts)/|^assets/icon(_192)?\.png$')
 DATA = re.compile(r'^assets/cities/[^/]+/(splat|ground_macro)\.png$')
 # Not shipped (export_presets.cfg exclude_filter): leave as fetched.
 UNSHIPPED = re.compile(r'^assets/props/(street_bin|promenade_lamp|utility_box|bench)/'
-                       r'|^assets/cities/(berat|gjirokaster|tetove)/')
+                       r'|^assets/cities/(gjirokaster|tetove)/')
 # Detail maps (normal, ARM) of the CC0 surface sets: grain and relief at a
 # few metres, never filling the screen. 512 px keeps them sharp at 720p.
-DETAIL_512 = re.compile(r'^assets/textures/((sand|promenade_paving|palm_bark|castle_wall|pole_metal|ashlar_buff|rubble_wall|clay_roof|stucco)_(nor|arm)|marble_rock_rough)\.jpg$')
+DETAIL_512 = re.compile(r'^assets/textures/((sand|promenade_paving|palm_bark|castle_wall|pole_metal|ashlar_buff|rubble_wall|clay_roof|stucco|river_pebbles|dark_timber|old_roof)_(nor|arm)|marble_rock_rough)\.jpg$')
 # Coastal 1K atlases are sliced into mipmapped texture arrays.
 COAST_ARRAYS = re.compile(r'^assets/cities/vlore/(ground_layers\.jpg|ground_layers_pbr\.webp)$')
 # Tall bark strip: 1024 x 2048 at source, a palm trunk never needs it.

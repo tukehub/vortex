@@ -6,7 +6,7 @@ extends Node3D
 
 const TREE_CHUNK_SIZE := 400.0
 ## Cities whose mapped trees use the three-LOD street trees shared with Tirana.
-const STREET_TREE_CITIES := ["tirane", "vlore", "shkoder", "korce"]
+const STREET_TREE_CITIES := ["tirane", "vlore", "shkoder", "korce", "berat"]
 var track_lamps: Array = []          # [x,y,z,yaw]
 var lights: Array[OmniLight3D] = []
 var light_slots := 0

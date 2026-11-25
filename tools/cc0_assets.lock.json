@@ -443,5 +443,95 @@
         "bytes": 564611
       }
     ]
+  },
+  "river_pebbles": {
+    "source": "polyhaven",
+    "id": "dry_river_pebbles",
+    "name": "Dry River Pebbles",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/dry_river_pebbles",
+    "files": [
+      {
+        "path": "godot/assets/textures/river_pebbles_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_diff_1k.jpg",
+        "md5": "970ed34655bdf437d6016b130742668f",
+        "bytes": 876327
+      },
+      {
+        "path": "godot/assets/textures/river_pebbles_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_nor_gl_1k.jpg",
+        "md5": "309cc625d2f3834f281720bdd1d8cdbe",
+        "bytes": 1137689
+      },
+      {
+        "path": "godot/assets/textures/river_pebbles_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dry_river_pebbles/dry_river_pebbles_arm_1k.jpg",
+        "md5": "7be441f0617574d89171b51e0a50cf1d",
+        "bytes": 795617
+      }
+    ]
+  },
+  "dark_timber": {
+    "source": "polyhaven",
+    "id": "dark_wooden_planks",
+    "name": "Dark Wooden Planks",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/dark_wooden_planks",
+    "files": [
+      {
+        "path": "godot/assets/textures/dark_timber_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wooden_planks/dark_wooden_planks_diff_1k.jpg",
+        "md5": "7ec8fe3e0b84289a4add3b10a54090bb",
+        "bytes": 701221
+      },
+      {
+        "path": "godot/assets/textures/dark_timber_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wooden_planks/dark_wooden_planks_nor_gl_1k.jpg",
+        "md5": "4093b4023a4270b3a06b762076106d58",
+        "bytes": 658444
+      },
+      {
+        "path": "godot/assets/textures/dark_timber_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wooden_planks/dark_wooden_planks_arm_1k.jpg",
+        "md5": "5e5911f2c6d4fbce78c995ec7591eaa9",
+        "bytes": 777830
+      }
+    ]
+  },
+  "old_roof": {
+    "source": "polyhaven",
+    "id": "roof_09",
+    "name": "Roof 09",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/roof_09",
+    "files": [
+      {
+        "path": "godot/assets/textures/old_roof_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_09/roof_09_diff_1k.jpg",
+        "md5": "b9ab9e6b8ae7c83e19efaea6442511e7",
+        "bytes": 553309
+      },
+      {
+        "path": "godot/assets/textures/old_roof_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_09/roof_09_nor_gl_1k.jpg",
+        "md5": "a97decabde63b9ab0671563231c6850f",
+        "bytes": 325412
+      },
+      {
+        "path": "godot/assets/textures/old_roof_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_09/roof_09_arm_1k.jpg",
+        "md5": "d4eb6ffdae472d60791204cfee9f8c7d",
+        "bytes": 278085
+      }
+    ]
   }
 }

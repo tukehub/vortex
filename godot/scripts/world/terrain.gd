@@ -59,6 +59,7 @@ func load_city(city_id: String, splat: Texture2D) -> void:
 		_carve_water()
 		var n := int(near.n)
 		shore_tex = ImageTexture.create_from_image(Image.create_from_data(n, n, false, Image.FORMAT_R8, water_mask))
+	_full_detail_chunks(dir)
 	mat = ShaderMaterial.new()
 	mat.shader = SHADER
 	if city_id == "vlore":
@@ -299,6 +300,25 @@ static func _lod_indices(cells: int, step: int, cuts := {}) -> PackedInt32Array:
 	return indices
 
 
+## Near-grid chunks a river (river.json) runs through keep their full
+## 15 m detail at every distance.
+var _full_detail := {}
+
+
+func _full_detail_chunks(dir: String) -> void:
+	_full_detail.clear()
+	if not FileAccess.file_exists(dir + "river.json"):
+		return
+	var r: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(dir + "river.json"))
+	var span := CHUNK * float(near.cell)
+	for i in range(0, r.x.size(), 4):
+		for dx: float in [-60.0, 0.0, 60.0]:
+			for dz: float in [-60.0, 0.0, 60.0]:
+				var px := float(r.x[i]) + dx - float(near.x0)
+				var pz := float(r.z[i]) + dz - float(near.z0)
+				_full_detail[Vector2i(floori(px / span), floori(pz / span))] = true
+
+
 func _build_near() -> void:
 	var n := int(near.n)
 	var cell := float(near.cell)
@@ -318,6 +338,9 @@ func _build_near() -> void:
 			mi.position = center
 			var cuts: Dictionary = chunk_cuts.get(Vector2i(cx, cz), {})
 			var chunk_lods := lods if cuts.is_empty() else {1.5: _lod_indices(CHUNK, 4, cuts)}
+			if _full_detail.has(Vector2i(cx, cz)):
+				# A river's channel is a few cells wide: no coarse LOD may fill it.
+				chunk_lods = {}
 			mi.mesh = _grid_mesh(near, near_h, cx * CHUNK, cz * CHUNK, CHUNK, 1, Rect2(), center, chunk_lods, cuts)
 			mi.material_override = mat
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

@@ -35,6 +35,8 @@ def query(cid):
   relation["natural"="water"]({bb});
   way["leisure"~"^(park|pitch|garden)$"]({bb});
   way["waterway"~"^(river|stream|canal)$"]({bb});
+  way["barrier"="city_wall"]({bb});
+  way["historic"~"^(city_gate|castle|ruins)$"]({bb});
   way["railway"="rail"]({bb});
   node["natural"="tree"]({bb});
   node["highway"="street_lamp"]({bb});

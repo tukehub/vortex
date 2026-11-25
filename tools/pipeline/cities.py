@@ -215,23 +215,66 @@ CITIES = {
     },
     'berat': {
         'name': 'Berat',
-        'origin': (40.7055, 19.9520),          # centre, below the castle
+        'origin': (40.6965, 19.9560),          # mid-loop, on the Osum between Gorica and the Bilçë bridge
         'near_km': 4.5, 'far_km': 24.0,
+        'osm_radius': 2800,
+        'building_radius': 2600, 'prop_radius': 2600,
         'half_width': 9.0,
+        'exclude_pedestrian': True,
+        # A lap with the Osum alongside the whole way. From Gorica, west
+        # along Rruga Shpiragu under the Gorica houses with Mangalem and the
+        # castle across the river, over the SH74 bridge, back east on Rruga
+        # Antipatrea under Mangalem, south-east down Rruga Shëtitorja Osumi to
+        # Ura e Bilçës, then north-west on the riverside road of the left bank
+        # back to Gorica.
         'waypoints': [
-            (40.7050, 19.9522),   # centre
-            (40.7035, 19.9600),   # Gorica side, west
-            (40.7038, 19.9510),   # Gorica bridge area
-            (40.7046, 19.9478),   # under Mangalem
+            (40.70350, 19.94720),   # Ishull, Gorica: Mangalem across the river
+            (40.70250, 19.94300),   # Rruga Shpiragu under Gorica
+            (40.70225, 19.93950),   # Rruga Shpiragu, west
+            (40.70300, 19.93762),   # the SH74 bridge
+            (40.70343, 19.94000),   # Rruga Staver Naço
+            (40.70410, 19.94650),   # Rruga Antipatrea under Mangalem
+            (40.70330, 19.95280),   # Rruga Shëtitorja Osumi
+            (40.69634, 19.95975),   # Shëtitorja Osumi, south-east
+            (40.69209, 19.96936),
+            (40.68780, 19.97610),   # Ura e Bilçës
+            (40.68629, 19.97050),   # the riverside road on the left bank
+            (40.69020, 19.96497),
+            (40.69231, 19.95825),
+            (40.69729, 19.95446),   # north-west along the Osum to Gorica
+            (40.69911, 19.95340),
+        ],
+        # Start/finish on Ishull in Gorica, 120 m before the Gorica bridge:
+        # the grid looks up the Osum at Mangalem's windows and the castle.
+        'finish_before': {'ll': (40.70283, 19.94478), 'metres': 120.0},
+        'river': {'way_name': 'Osum', 'width': 46.0},
+        # The quarters of a thousand windows: every mapped house in them is
+        # built as a Berat house (old_quarters.py), not a generic block.
+        'old_quarters': {
+            'mangalem': [(40.7041, 19.9446), (40.7046, 19.9532), (40.7062, 19.9541), (40.7076, 19.9526),
+                         (40.7087, 19.9497), (40.7078, 19.9465), (40.7058, 19.9443)],
+            'gorica': [(40.7034, 19.9442), (40.7036, 19.9507), (40.7016, 19.9512), (40.6995, 19.9478),
+                       (40.6994, 19.9440), (40.7010, 19.9430)],
+            'kala': 'way:426996540',
+        },
+        # Pines and scrub on the castle hill round Mangalem and on the slope
+        # above Gorica.
+        'woods': [
+            {'poly': [(40.7040, 19.9405), (40.7046, 19.9470), (40.7062, 19.9480), (40.7090, 19.9490), (40.7100, 19.9520),
+                      (40.7125, 19.9505), (40.7128, 19.9420), (40.7085, 19.9392), (40.7055, 19.9398)]},
+            # The cliff under the castle's southern spur, above the river road.
+            {'poly': [(40.7044, 19.9444), (40.7046, 19.9468), (40.7058, 19.9474), (40.7072, 19.9478), (40.7080, 19.9466),
+                      (40.7066, 19.9450), (40.7050, 19.9442)], 'every': 320.0, 'in_quarters': True},
+            {'poly': [(40.7010, 19.9402), (40.6995, 19.9438), (40.6986, 19.9488), (40.6978, 19.9522), (40.6958, 19.9506),
+                      (40.6960, 19.9430), (40.6982, 19.9394)]},
         ],
         'landmarks': [
-            {'id': 'castle_berat', 'll': (40.71000, 19.94300), 'yaw': 0},
-            {'id': 'mangalem', 'll': (40.70650, 19.94600), 'yaw': 0},
-            {'id': 'gorica', 'll': (40.70330, 19.94700), 'yaw': 180},
-            {'id': 'bridge_gorica', 'll': (40.70400, 19.95000), 'yaw': 0},
-            {'id': 'mosque', 'll': (40.70560, 19.95080), 'yaw': 0},
+            # Kalaja e Beratit, built from its mapped walls (berat_castle.py);
+            # the river builds Ura e Goricës from its mapped footbridge.
+            {'id': 'castle_berat', 'll': (40.70804, 19.94609), 'yaw': 0},
         ],
         'style': 'old',
+        'palette': 'old',
     },
     'gjirokaster': {
         'name': 'Gjirokastër',

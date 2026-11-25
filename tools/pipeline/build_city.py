@@ -33,6 +33,9 @@ import vlore_terrain_detail
 import seafront  # noqa: E402
 import street_props  # noqa: E402
 import rozafa  # noqa: E402
+from river import River  # noqa: E402
+import old_quarters  # noqa: E402
+import berat_castle  # noqa: E402
 import finish_line  # noqa: E402
 import fetch_dem  # noqa: E402
 from showcase_facades import bake as bake_showcase_facades
@@ -1225,6 +1228,45 @@ def build_props(osm, ref, hw, terrain_sample, city, proj, out_json, landmark_tf,
                     break
         if len(trees) >= 6000:
             break
+    # Wooded hillsides named in the config (Berat's castle hill and the slope
+    # above Gorica): trees on open ground, never on a mapped building or the road.
+    if city.get('woods'):
+        from PIL import Image as _Image, ImageDraw as _Draw
+        quarters = [p for name, p in old_quarters.quarter_polygons(city.get('old_quarters', {}), osm, proj)]
+        for wood in city['woods']:
+            poly = [proj.to_xz(lat, lon) for lat, lon in wood['poly']]
+            every = float(wood.get('every', 210.0))
+            arr = np.array(poly)
+            mn, mx = arr.min(axis=0), arr.max(axis=0)
+            res = 2.0
+            wpx, hpx = int((mx[0] - mn[0]) / res) + 1, int((mx[1] - mn[1]) / res) + 1
+            mask = _Image.new('L', (wpx, hpx), 0)
+            md = _Draw.Draw(mask)
+            md.polygon([((p[0] - mn[0]) / res, (p[1] - mn[1]) / res) for p in poly], fill=255)
+            if not wood.get('in_quarters', False):
+                for q in quarters:
+                    if len(q) > 2:
+                        md.polygon([((x - mn[0]) / res, (z - mn[1]) / res) for x, z in q], fill=0)
+            for w in osm.ways.values():
+                if 'building' not in (w.get('tags') or {}):
+                    continue
+                ring = osm.coords(w)
+                if not ring or not any(mn[0] - 20 < x < mx[0] + 20 and mn[1] - 20 < z < mx[1] + 20 for x, z in ring[:1]):
+                    continue
+                md.polygon([((x - mn[0]) / res, (z - mn[1]) / res) for x, z in ring], fill=0, outline=0)
+            mask = np.array(mask.filter(ImageFilter.MinFilter(5)))
+            area = float((mask > 0).sum()) * res * res
+            n = int(area / every)
+            cand = rng.uniform(mn, mx, size=(n * 3, 2))
+            planted = 0
+            for x, z in cand:
+                px, pz = int((x - mn[0]) / res), int((z - mn[1]) / res)
+                if 0 <= px < wpx and 0 <= pz < hpx and mask[pz, px] and ref.nearest(x, z)[0] > hw + 6.0:
+                    trees.append([round(float(x), 1), round(float(terrain_sample([x], [z])[0]), 1), round(float(z), 1), round(0.75 + 0.75 * rng.random(), 2)])
+                    planted += 1
+                    if planted >= n:
+                        break
+            log(f'  woods: {planted} trees on {area / 10000:.1f} ha')
     # lamps along the track every 28 m, alternating sides, where OSM has none nearby
     track_lamps = []
     step = int(28 / SAMPLE)
@@ -1500,6 +1542,15 @@ def build(cid, route_only=False):
     near = mean_filter(min_filter(near))
     nm = meta['near']
     y_raw = sample_grid(near, nm['x0'], nm['z0'], nm['cell'], dense[:, 0], dense[:, 1])
+    river = None
+    if city.get('river'):
+        # The river's level comes from the DEM before any road shaping; the
+        # race road is held at deck height where it crosses.
+        river = River(city['river'], osm, near, nm)
+        y_raw = river.hold_riverside(dense, y_raw)
+        y_raw = river.lift_crossings(dense, y_raw, SAMPLE)
+        log(f'  river {city["river"]["way_name"]}: {len(river.pts) * 5.0:.0f} m, surface '
+            f'{river.surface[0]:.1f}..{river.surface[-1]:.1f} m, {len(river._cross)} crossings')
     if city.get('sea'):
         y_raw = np.maximum(y_raw, 1.5)
     if 'tunnel' in city:
@@ -1519,6 +1570,14 @@ def build(cid, route_only=False):
         debug_map(osm, ref, hw, city, proj, os.path.join(CACHE, f'{cid}_zoom.png'), span=1800, size=1800)
         return
     near = conform_terrain(near, nm['x0'], nm['z0'], nm['cell'], ref, hw)
+    if river is not None:
+        river.fit_to_track(ref, hw)
+        river.find_footbridges(osm)
+        carved = river.carve(near, ref, hw)
+        save_json(os.path.join(out, 'river.json'), river.to_json())
+        log(f'  river: {carved} terrain cells carved, {len(river.bridges)} bridges, '
+            f'{len(river.footbridges)} footbridges, '
+            f'walls {int(river.bank_l.sum() + river.bank_r.sum()) * 5} m')
     sea = bool(city.get('sea') or city.get('lake'))
     sea_level = 0.3 if city.get('sea') else (float(np.percentile(near, 2)) + 0.5 if city.get('lake') else -50.0)
     if sea:
@@ -1577,8 +1636,17 @@ def build(cid, route_only=False):
         seafront_props = {'idx': idx, 'side': side, 'water': (mask, wnm), 'surface': surface,
                           'palms': seafront.palms(ref, hw, idx, side, mask, wnm, terrain_sample, surface, rnd)}
         log(f'  seafront: {len(idx) * SAMPLE:.0f} m of road, sea on the {"+" if side > 0 else "-"} normal side')
-    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'),
+    quarter_houses, quarter_polys = {}, []
+    if city.get('old_quarters'):
+        quarter_polys = old_quarters.quarter_polygons(city['old_quarters'], osm, proj)
+        quarter_houses = old_quarters.select(osm, quarter_polys)
+    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), list(city.get('landmark_buildings', ())) + list(quarter_houses), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'),
                     sightline_rays(city, proj, ref, terrain_sample))
+    if quarter_houses:
+        baked = old_quarters.bake(osm, quarter_houses, quarter_polys, terrain_sample, river, ref, hw)
+        save_json(os.path.join(out, 'houses.json'), baked)
+        counts = {name: sum(1 for h in baked['houses'] if h['q'] == i) for i, name in enumerate(baked['quarters'])}
+        log(f'  old quarters: {len(baked["houses"])} houses {counts}')
     if cid == 'tirane':
         bake_showcase_facades(Path(out))
     elif cid == "vlore":
@@ -1589,6 +1657,13 @@ def build(cid, route_only=False):
     # Roundabout islands, as baked into props (capped to the road), go to
     # the track too: the game runs the road up to each island's kerb.
     props_out = load_json(os.path.join(out, 'props.json'))
+    if river is not None:
+        # Nothing mapped stands in the river or on its gravel banks.
+        kept = [t for t in props_out['trees'] if not river.water_at(t[0], t[2])]
+        log(f'  river: {len(props_out["trees"]) - len(kept)} trees off the water and banks')
+        props_out['trees'] = kept
+        props_out['lamps'] = [l for l in props_out['lamps'] if not river.water_at(l[0], l[2])]
+        save_json(os.path.join(out, 'props.json'), props_out)
     islands = [[a['x'], a['z'], a['radius']] for a in props_out.get('landmarks', []) if 'radius' in a]
     # Landmarks the race must show from the road: no corner board stands
     # within `open_view` metres of them (the game reads track.json 'views').
@@ -1608,6 +1683,8 @@ def build(cid, route_only=False):
     street_props.process_city(cid)
     if cid == 'shkoder':
         rozafa.process_city()
+    if cid == 'berat':
+        berat_castle.process_city(cid, city, os.path.join(CACHE, 'osm', f'{cid}.json'), out)
     if cid == "vlore":
         coastal_vegetation.bake(Path(out))
         vlore_terrain_detail.bake(Path(out))

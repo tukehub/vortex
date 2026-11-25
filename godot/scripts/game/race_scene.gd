@@ -32,6 +32,9 @@ var hud: Hud
 var input: RaceInput
 var effects: FxVisual
 var buildings: Buildings
+## A city's river (river.json) and its traditional quarters (houses.json).
+var river: CityRiver
+var quarters: OldQuarter
 var props: Props
 var reflections: RaceReflections
 var pine_forest: Node3D
@@ -213,6 +216,16 @@ func _build_world() -> void:
 	add_child(bld)
 	bld.load_city(city_id)
 	bld.set_env(sky.night, sky.wet)
+	if FileAccess.file_exists(CityRiver.path_for(city_id)):
+		river = CityRiver.new()
+		add_child(river)
+		river.build(city_id, terrain, track)
+		river.set_env(sky.wet, sky.night)
+	if FileAccess.file_exists(OldQuarter.path_for(city_id)):
+		quarters = OldQuarter.new()
+		add_child(quarters)
+		quarters.build(city_id, terrain)
+		quarters.set_night(sky.night)
 	props = Props.new()
 	add_child(props)
 	props.load_city(city_id, terrain, track, reverse)
@@ -1040,6 +1053,10 @@ func _update_weather(dt: float) -> void:
 			sea.set_env(sky.wet, sky.night)
 		buildings.set_env(sky.night, sky.wet)
 		props.set_night(sky.night)
+		if river != null:
+			river.set_env(sky.wet, sky.night)
+		if quarters != null:
+			quarters.set_night(sky.night)
 		for car in cars:
 			car.set_night(sky.night)
 		CarVisual.set_wet(sky.wet)

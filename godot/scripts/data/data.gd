@@ -55,7 +55,7 @@ const CITIES := [
 	{"id": "vlore", "env": "sunset", "laps": 2, "neon": "#ffd23a", "horizon": "sea", "hdri": "sunset", "stars": 4},
 	{"id": "shkoder", "env": "golden", "laps": 2, "neon": "#4ee0ff", "horizon": "mountains", "hdri": "golden", "stars": 7},
 	{"id": "korce", "env": "day", "laps": 2, "neon": "#e8423f", "horizon": "mountains", "hdri": "day", "stars": 10},
-	{"id": "berat", "env": "dusk", "laps": 2, "neon": "#ffb347", "horizon": "mountains", "hdri": "dusk", "stars": 12},
+	{"id": "berat", "env": "golden", "laps": 2, "neon": "#ffb347", "horizon": "mountains", "hdri": "golden", "stars": 12},
 	{"id": "gjirokaster", "env": "rain", "laps": 2, "neon": "#3d9dff", "horizon": "mountains", "hdri": "rain", "stars": 14},
 	{"id": "tetove", "env": "day", "laps": 2, "neon": "#ff5fc8", "horizon": "mountains", "hdri": "day", "stars": 16},
 ]

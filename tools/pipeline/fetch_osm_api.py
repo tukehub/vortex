@@ -26,6 +26,7 @@ WATERWAY = re.compile(r'^(river|stream|canal)$')
 
 def wanted_way(t):
     return ('highway' in t or 'building' in t or 'landuse' in t
+            or t.get('barrier') == 'city_wall' or t.get('historic') in ('city_gate', 'castle', 'ruins')
             or NATURAL.match(t.get('natural', '')) or LEISURE.match(t.get('leisure', ''))
             or WATERWAY.match(t.get('waterway', '')) or t.get('railway') == 'rail')
 

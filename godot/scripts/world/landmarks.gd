@@ -226,6 +226,11 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			heritage.name = "KorceHeritage"
 			root.add_child(heritage)
 			heritage.build(str(anchor.id), terrain)
+		elif str(anchor.id) == "castle_berat" and FileAccess.file_exists(BeratCastle.BERAT_DATA):
+			var berat := BeratCastle.new()
+			berat.name = "BeratCastle"
+			root.add_child(berat)
+			berat.build(terrain)
 		elif str(anchor.id) == "rozafa" and FileAccess.file_exists(RozafaCastle.DATA):
 			var castle := RozafaCastle.new()
 			castle.name = "RozafaCastle"
