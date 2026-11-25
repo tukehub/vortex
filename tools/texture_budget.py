@@ -30,7 +30,7 @@ UNSHIPPED = re.compile(r'^assets/props/(street_bin|promenade_lamp|utility_box|be
                        r'|^assets/cities/(berat|gjirokaster|tetove)/')
 # Detail maps (normal, ARM) of the CC0 surface sets: grain and relief at a
 # few metres, never filling the screen. 512 px keeps them sharp at 720p.
-DETAIL_512 = re.compile(r'^assets/textures/(sand|limestone|promenade_paving|palm_bark|castle_wall|pole_metal)_(nor|arm)\.jpg$')
+DETAIL_512 = re.compile(r'^assets/textures/((sand|limestone|promenade_paving|palm_bark|castle_wall|pole_metal)_(nor|arm)|marble_rock_rough)\.jpg$')
 # Tall bark strip: 1024 x 2048 at source, a palm trunk never needs it.
 DIFFUSE_1024 = re.compile(r'^assets/textures/palm_bark_diff\.jpg$')
 

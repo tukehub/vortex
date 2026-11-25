@@ -134,6 +134,23 @@ CITIES = {
         ],
         'tunnel': ((40.4212347, 19.4876934), (40.4205612, 19.4869312)),
         'turnaround': ((40.4191404, 19.4866541), (40.4197696, 19.4902821)),
+        # Kuzum Baba from the road: the temple and the tomb stay in sight on
+        # the return up the boulevard (dead ahead, then off the right) and
+        # after the Flag Square turn down to the line. Buildings whose roofs
+        # cross a driver's line of sight to either are left out.
+        'sightlines': [
+            {'eyes': [(40.461235, 19.488986), (40.463506, 19.489733), (40.464195, 19.489934),
+                      (40.465461, 19.490325), (40.466239, 19.49081), (40.466664, 19.490929)],
+             'targets': [((40.467274, 19.494629), 12.0), ((40.467831, 19.492989), 7.0)]},
+            {'eyes': [(40.470444, 19.491083), (40.468599, 19.491166), (40.467875, 19.491213)],
+             'targets': [((40.467274, 19.494629), 12.0), ((40.467831, 19.492989), 7.0)]},
+            # Teatri Petro Marko between the Muradie Mosque and the stadium:
+            # its red facade in view down the boulevard both ways.
+            {'eyes': [(40.467262, 19.490934), (40.466357, 19.4907), (40.46558, 19.490223), (40.464947, 19.490021)],
+             'targets': [((40.46488, 19.49068), 6.0)]},
+            {'eyes': [(40.461647, 19.489129), (40.463847, 19.489824), (40.464826, 19.490129)],
+             'targets': [((40.46488, 19.49068), 6.0)]},
+        ],
         # Both carriageways are one road; along Lungomare a rounded 10 cm
         # median runs down its middle (the seafront stretch below).
         'median': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943)},
@@ -239,26 +256,41 @@ CITIES = {
         'name': 'Shkodër',
         'origin': (42.0640, 19.5110),          # Sheshi Perash, the middle of the centre loop
         'near_km': 4.5, 'far_km': 24.0,
-        # Dense mapped housing: the lap stays within 1 km of the origin.
+        # The lap reaches Rozafa and the Buna/lake shore, 2.5 km south-west.
+        'osm_radius': 3400,
         'building_radius': 1500,
         'half_width': 10.0,
         'exclude_pedestrian': True,
-        # A 3.45 km centre loop: Sheshi Demokracia, Rruga Studenti and
-        # Bulevardi Zogu I south-west, Bulevardi Mehmet Pashë Plaku east to
-        # Sheshi Perash, Rruga Edith Durham and Bulevardi Skënderbeu north,
-        # Rruga Teuta past the Ebu Bekr mosque back to the square.
+        # A 7.7 km loop from the centre round Rozafa's hill and back: Sheshi
+        # Demokracia and Rruga Studenti, Bulevardi Zogu I and Rruga Mbreti
+        # Gent south-west, Rruga Pazarit down to the roundabout at the castle's
+        # west foot by the Buna bridge, Rruga Agron and Rruga Bexhene under its
+        # south side along the Drin, over the saddle and up Rruga 9 Nuset and
+        # Rruga e Terzive, Bulevardi Mehmet Pashë Plaku east to Sheshi Perash,
+        # Rruga Edith Durham and Bulevardi Skënderbeu north, Rruga Teuta past
+        # the Ebu Bekr mosque back to the square.
         'waypoints': [
-            (42.0679, 19.5121),   # Sheshi Demokracia, by Teatri Migjeni
-            (42.0669, 19.5108),   # Rruga Studenti
-            (42.0609, 19.5051),   # Bulevardi Zogu I
-            (42.0584, 19.5029),   # Zogu I meets Mehmet Pashë Plaku
-            (42.0585, 19.5055),   # Bulevardi Mehmet Pashë Plaku
+            (42.0679, 19.5121),       # Sheshi Demokracia, by Teatri Migjeni
+            (42.0669, 19.5108),       # Rruga Studenti
+            (42.0584, 19.5029),       # Zogu I meets Mehmet Pashë Plaku
+            (42.055731, 19.500353),   # Rruga Mbreti Gent
+            (42.051467, 19.495057),   # Rruga Pazarit
+            (42.04495, 19.48985),     # the roundabout by Ura e re e Bunës
+            (42.043723, 19.491029),   # Rruga Agron into Rruga Bexhene
+            (42.044376, 19.494633),   # Rruga Bexhene, under the castle, by the Drin
+            (42.052399, 19.504233),   # Rruga e Terzive
+            (42.0585, 19.5055),       # Bulevardi Mehmet Pashë Plaku
             (42.0601, 19.5097),
-            (42.0612, 19.5128),   # Sheshi Perash
-            (42.0631, 19.5157),   # Rruga Edith Durham
-            (42.0644, 19.5172),   # Durham meets Skënderbeu
-            (42.0660, 19.5150),   # Bulevardi Skënderbeu
-            (42.0675, 19.5130),   # Rruga Teuta
+            (42.0612, 19.5128),       # Sheshi Perash
+            (42.0631, 19.5157),       # Rruga Edith Durham
+            (42.0644, 19.5172),       # Durham meets Skënderbeu
+            (42.0660, 19.5150),       # Bulevardi Skënderbeu
+            (42.0675, 19.5130),       # Rruga Teuta
+        ],
+        # Two Bexhene segments do not meet in OSM at the castle saddle, so the
+        # router zig-zags there; the race road takes one curve over it.
+        'shortcuts': [
+            {'from': (42.04634, 19.49692), 'via': [(42.04722, 19.49790)], 'to': (42.04806, 19.49905)},
         ],
         # Round the acute Zogu I / Mehmet Pashë Plaku corner so the 20 m road
         # does not fold over itself.

@@ -87,12 +87,23 @@ func _ready() -> void:
 			assert(wet > 0)
 			print("SEA: ", city.id, " surface ", surface, " m, ", wet, " water cells")
 		if city.id == "shkoder":
-			# The centre loop shares Tirana's street trees and city facades.
+			# The lap shares Tirana's street trees and city facades.
 			var street_trees := scene.props.vegetation
 			assert(street_trees != null and street_trees.name == "StreetTrees", "Shkodër plants the shared street trees")
 			assert(street_trees.entries.size() > 0)
 			assert(scene.buildings.facade_mat.shader == Buildings.FACADE_SHADER, "Shkodër uses the shared city facades")
-			assert(scene.track.L > 3000.0 and scene.track.L < 4000.0, "the centre loop is about 3.5 km")
+			assert(scene.track.L > 7000.0 and scene.track.L < 8500.0, "the lap runs from the centre round Rozafa's hill, about 7.7 km")
+			# Under the castle the lap runs beside the rivers: the Buna by the
+			# bridge roundabout, the Drin below the south walls.
+			var by_water := 0.0
+			for k in range(0, scene.track.M, 5):
+				var p := scene.track.pos(k * scene.track.ds, 0.0)
+				var near_river := false
+				for offset: Vector2 in [Vector2(-200, 0), Vector2(200, 0), Vector2(0, -200), Vector2(0, 200), Vector2(-140, -140), Vector2(140, 140), Vector2(-140, 140), Vector2(140, -140)]:
+					near_river = near_river or scene.terrain.is_water(p.x + offset.x, p.z + offset.y)
+				if near_river:
+					by_water += scene.track.ds * 5.0
+			assert(by_water > 600.0, "the lap runs within 200 m of the river for a while (%.0f m)" % by_water)
 			var shk_marks: Node = null
 			for child in scene.props.get_children():
 				if child is Landmarks:
@@ -113,10 +124,12 @@ func _ready() -> void:
 			assert(masonry.visibility_range_end >= 2500.0, "the castle stays in sight from the lap")
 			assert(castle.get_node_or_null("CastleFlag") != null, "the flag flies over the citadel")
 			var root := castle.get_parent() as Node3D
+			var nearest_wall := INF
 			for p: Array in JSON.parse_string(FileAccess.get_file_as_string(RozafaCastle.DATA)).wall:
 				var world := root.position + Vector3(float(p[0]), 0, float(p[1]))
-				assert(scene.track.dist_to(world.x, world.z) > 1000.0, "the castle stands well off the lap")
-				break
+				nearest_wall = minf(nearest_wall, scene.track.dist_to(world.x, world.z))
+			assert(nearest_wall > scene.track.half_w + 20.0, "the castle walls stand clear of the road (%.0f m)" % nearest_wall)
+			assert(nearest_wall < 250.0, "the lap passes under the castle walls (%.0f m)" % nearest_wall)
 			print("SHKODER: ", snappedf(scene.track.L, 1.0), " m lap, ", street_trees.entries.size(), " street trees; Rozafa ",
 				castle.built, ", ", castle.merlons, " merlons")
 		if city.id == "vlore":
@@ -260,6 +273,26 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 		turn_dot = minf(turn_dot, approach.dot(track.tangent(turn + after)))
 	assert(turn_dot < -0.85, "the road reverses heading after the southern portal")
 	assert(scene.road.get_node_or_null("UjiIFtohteTunnel/TunnelBore") != null)
+	# The baked tunnel: four material slots, mobile budget, emissive strips
+	# instead of lights, boulders on the shore and scrub on the seam.
+	var tunnel_node := scene.road.get_node("UjiIFtohteTunnel")
+	var slots := {}
+	var tunnel_tris := 0
+	for name: String in ["Cliff", "Portals", "TunnelBore"]:
+		var mesh := (tunnel_node.get_node(name) as MeshInstance3D).mesh
+		tunnel_tris += mesh.get_faces().size() / 3
+		for i in mesh.get_surface_count():
+			slots[mesh.surface_get_material(i).resource_name] = true
+	for slot: String in ["cliff_rock", "portal_masonry", "tunnel_interior", "ceiling_lights"]:
+		assert(slots.has(slot), "tunnel material slot " + slot)
+	assert(tunnel_tris < 12000, "tunnel stays under 12k triangles (%d)" % tunnel_tris)
+	assert(tunnel_node.find_children("*", "OmniLight3D", true, false).is_empty(), "tunnel lighting is emissive, not real-time lights")
+	assert((tunnel_node.get_node("Cliff") as MeshInstance3D).get_surface_override_material(0).uv1_world_triplanar, "cliff rock projects in world space")
+	var boulders := 0
+	for i in 4:
+		boulders += (tunnel_node.get_node("Breakwater%d" % i) as MultiMeshInstance3D).multimesh.instance_count
+	assert(boulders > 80, "a breakwater along both approaches (%d boulders)" % boulders)
+	assert(tunnel_node.get_node_or_null("SeamScrub0") != null, "scrub on the cliff-hillside seam")
 	print("VLORE OUT-AND-BACK: %.0f m, carriageways at least %.1f m apart" % [track.L, tight])
 	for i in track.M * 4:
 		var s := i * track.ds * 0.25

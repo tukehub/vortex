@@ -54,7 +54,7 @@ func _ready() -> void:
 					var at := Showcase.forward_s(track, combined[marks.size() + i].x, reverse)
 					check(absf(at - Showcase.CROSSINGS[i]) < 0.01, "showcase crossing stays at its physical position")
 			Quality.set_preset("low")
-			check(float(road.surface_mat.get_shader_parameter("detail")) == 0.0, "low skips manholes, gullies and patches")
+			check(float(road.surface_mat.get_shader_parameter("detail")) == 0.0, "low skips manholes and gullies")
 			Quality.set_preset("medium")
 			check(float(road.surface_mat.get_shader_parameter("detail")) == 1.0, "medium draws them")
 			road.queue_free()
@@ -72,7 +72,7 @@ func _ready() -> void:
 		check(inferred > 0, "%s fills gaps in its mapped furniture (%d added)" % [city_id, inferred])
 	# Road hardware: realistic density, inside the carriageway, off the edge line.
 	var hw := 10.0
-	var counts := {"manhole": 0, "gully": 0, "patch": 0}
+	var counts := {"manhole": 0, "gully": 0}
 	for h in RoadMesh.hardware_near(0.0, 10000.0, hw):
 		counts[h.kind] += 1
 		var d := absf(float(h.d))
@@ -81,11 +81,8 @@ func _ready() -> void:
 				check(is_equal_approx(fposmod(d, 5.0), 2.5), "manholes sit mid-lane")
 			"gully":
 				check(d + 0.26 < hw - 0.55, "gullies stay inside the edge line")
-			"patch":
-				check(d < hw - 0.8, "patches stay on the carriageway")
 	check(counts.manhole > 180 and counts.manhole < 280, "about one manhole per 44 m (%d in 10 km)" % counts.manhole)
 	check(counts.gully > 320 and counts.gully < 380, "about one gully per 28 m (%d in 10 km)" % counts.gully)
-	check(counts.patch > 90 and counts.patch < 160, "about one patch per 80 m (%d in 10 km)" % counts.patch)
 	for c in 200:
 		var v := RoadMesh.cell_hash(c, 6.1)
 		check(v >= 0.0 and v < 1.0, "cell hash stays in [0, 1)")

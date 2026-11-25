@@ -28,7 +28,8 @@ static func _offset(track: RaceTrack, s: float, d: float) -> float:
 		return d
 	var k := posmod(roundi(s / track.ds), track.M)
 	if RoadMesh.joined_side(track, k) != signf(d):
-		return d
+		# Facing a roundabout island the road runs to its kerb: no boards.
+		return NAN if RoadMesh.isle_side(track, k) == signf(d) else d
 	var edge := track.EDGE_L[k] if d < 0.0 else track.EDGE_R[k]
 	if edge < track.half_w + 2.0 * absf(track.JOIN[k]) - 0.05:
 		return NAN

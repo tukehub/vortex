@@ -177,6 +177,7 @@ func _build_world() -> void:
 	add_child(road)
 	road.build(track, float(tj.get("hw", track.half_w)), sky.wet, terrain.height_at, reverse)
 	road.set_layout(int(tj.get("lanes", 4)), bool(tj.get("one_way", false)))
+	road.add_island_aprons(track)
 	if tj.has("tunnel"):
 		var tunnel := preload("res://scripts/world/vlore_tunnel.gd").new()
 		tunnel.name = "UjiIFtohteTunnel"

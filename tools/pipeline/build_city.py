@@ -573,6 +573,30 @@ def _spline_section(points, start_tangent, end_tangent):
     return spline(np.linspace(0.0, along[-1], max(3, int(along[-1] / SAMPLE) + 1)))
 
 
+def apply_shortcuts(dense, city, proj):
+    """Replace short knots in the mapped route with a smooth racing line.
+
+    city['shortcuts']: [{'from': ll, 'via': [ll, ...], 'to': ll}], each
+    'from' before 'to' along the lap. Where the mapped streets meet in a
+    zig-zag (or OSM leaves a gap between two segments of one street), the
+    20 m race road runs a spline through 'via' instead, tangent to the route
+    at both joins. Buildings, props and terrain then follow the new line.
+    """
+    for cut in city.get('shortcuts', ()):
+        a = np.asarray(proj.to_xz(*cut['from']))
+        b = np.asarray(proj.to_xz(*cut['to']))
+        i = int(np.argmin(np.linalg.norm(dense - a, axis=1)))
+        j = int(np.argmin(np.linalg.norm(dense - b, axis=1)))
+        if i < 1 or j <= i + 2 or j >= len(dense) - 1:
+            raise ValueError(f'shortcut {cut} does not follow the route order')
+        if np.linalg.norm(dense[i] - a) > 15 or np.linalg.norm(dense[j] - b) > 15:
+            raise ValueError(f'shortcut {cut} ends are off the route')
+        points = [dense[i]] + [list(proj.to_xz(*ll)) for ll in cut.get('via', ())] + [dense[j]]
+        inserted = _spline_section(points, dense[i + 1] - dense[i - 1], dense[j + 1] - dense[j - 1])
+        dense = np.vstack([dense[:i], inserted, dense[j + 1:]])
+    return dense
+
+
 def route_tirana_polytechnic_uturn(dense):
     """A separated return past Polytechnic, towards Blloku.
 
@@ -854,7 +878,66 @@ def overlaps_landmark_bounds(points, zones):
                for x0, z0, x1, z1 in zones)
 
 
-def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS, palette=None):
+def sightline_rays(city, proj, ref, terrain_sample):
+    """city['sightlines']: [{'eyes': [ll, ...], 'targets': [(ll, rise m), ...]}].
+    Eye points every ~10 m along each polyline of road positions, 2 m above
+    the road (the chase camera); targets `rise` above their ground. Returns
+    [(eye xyz, target xyz)] for blocks_sightline()."""
+    rays = []
+    for line in city.get('sightlines', ()):
+        pts = np.array([proj.to_xz(*ll) for ll in line['eyes']], float)
+        eyes = []
+        for a, b in zip(pts[:-1], pts[1:]):
+            n = max(1, int(np.linalg.norm(b - a) / 10.0))
+            eyes += [a + (b - a) * k / n for k in range(n)]
+        eyes.append(pts[-1])
+        for ll, rise in line['targets']:
+            tx, tz = proj.to_xz(*ll)
+            target = np.array([tx, float(terrain_sample(np.array([tx]), np.array([tz]))[0]) + rise, tz])
+            for e in eyes:
+                y = ref.y[ref.nearest(e[0], e[1])[1]] + 2.0
+                rays.append((np.array([e[0], y, e[1]]), target))
+    return rays
+
+
+def _inside(poly, x, z):
+    """Even-odd test of points (x, z arrays) against a polygon ring."""
+    inside = np.zeros(len(x), bool)
+    n = len(poly)
+    for i in range(n):
+        x0, z0 = poly[i]
+        x1, z1 = poly[(i + 1) % n]
+        cross = (z0 > z) != (z1 > z)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            xi = x0 + (z - z0) * (x1 - x0) / (z1 - z0)
+        inside ^= cross & (x < xi)
+    return inside
+
+
+def blocks_sightline(ring, top, rays):
+    """True when a building (footprint ring, roof height `top`) stands in front
+    of a target along any (eye, target) ray: the ray passes over its footprint
+    lower than its roof."""
+    arr = np.asarray(ring, float)
+    lo, hi = arr.min(axis=0) - 1.0, arr.max(axis=0) + 1.0
+    for eye, target in rays:
+        e, t = eye[[0, 2]], target[[0, 2]]
+        if (max(e[0], t[0]) < lo[0] or min(e[0], t[0]) > hi[0] or max(e[1], t[1]) < lo[1] or min(e[1], t[1]) > hi[1]):
+            continue
+        steps = np.linspace(0.0, 1.0, max(2, int(np.linalg.norm(t - e) / 1.5)))
+        pts = e[None, :] + steps[:, None] * (t - e)[None, :]
+        near = (pts[:, 0] >= lo[0]) & (pts[:, 0] <= hi[0]) & (pts[:, 1] >= lo[1]) & (pts[:, 1] <= hi[1])
+        if not near.any():
+            continue
+        hit = _inside(arr, pts[near, 0], pts[near, 1])
+        if hit.any():
+            line_y = eye[1] + steps[near][hit] * (target[1] - eye[1])
+            if (top > line_y).any():
+                return True
+    return False
+
+
+def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buildings=(), landmark_zones=(), height_fn=None, radius=BUILD_RADIUS, palette=None, sightlines=()):
     excluded_ids = set(landmark_buildings)
     excluded_ways = set(excluded_ids)
     for rel in osm.rels:
@@ -882,6 +965,7 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
 
     chunks = {}
     kept = 0
+    cleared = 0
     pal = PALETTES.get(palette or style, PALETTES['old'])
     for bid, tags, ring in footprints:
         ring = clean_ring(ring)
@@ -931,6 +1015,9 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
         height = override if override is not None else parse_height(tags, bid, style)
         base = float(terrain_sample(arr[:, 0], arr[:, 1]).min()) - 0.6
         top = base + height
+        if sightlines and blocks_sightline(ring, top + 2.0, sightlines):
+            cleared += 1
+            continue
         seed_c = rnd(bid, 2)
         col = pal[int(seed_c * len(pal)) % len(pal)]
         if override is not None:
@@ -1026,7 +1113,7 @@ def build_buildings(osm, ref, hw, terrain_sample, style, out_path, landmark_buil
         if mi is not None:
             roots.append(g.node(f'chunk_{kx}_{kz}', mi, (ox, 0, oz)))
     size = g.write(out_path, roots)
-    log(f'  buildings kept {kept}, chunks {len(roots)}, tris {tri_total}, glb {size // 1024} kB')
+    log(f'  buildings kept {kept}, cleared {cleared} from sight lines, chunks {len(roots)}, tris {tri_total}, glb {size // 1024} kB')
     return kept
 
 
@@ -1386,6 +1473,9 @@ def build(cid, route_only=False):
         dense, length = resample_closed(dense, SAMPLE)
         dense = repair_road_bends(dense, hw)
         dense, length = resample_closed(dense, SAMPLE)
+    if city.get('shortcuts'):
+        dense = apply_shortcuts(dense, city, proj)
+        dense, length = resample_closed(dense, SAMPLE)
     if city.get('repair_bends'):
         for sigma in (8, 12, 20):
             dense = repair_road_bends(dense, hw + 1.5, sigma)
@@ -1486,7 +1576,8 @@ def build(cid, route_only=False):
         seafront_props = {'idx': idx, 'side': side, 'water': (mask, wnm), 'surface': surface,
                           'palms': seafront.palms(ref, hw, idx, side, mask, wnm, terrain_sample, surface, rnd)}
         log(f'  seafront: {len(idx) * SAMPLE:.0f} m of road, sea on the {"+" if side > 0 else "-"} normal side')
-    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'))
+    build_buildings(osm, ref, hw, terrain_sample, city['style'], os.path.join(out, 'buildings.glb'), city.get('landmark_buildings', ()), landmark_clearance_zones(city, proj), height_fn, city.get('building_radius', BUILD_RADIUS), city.get('palette'),
+                    sightline_rays(city, proj, ref, terrain_sample))
     if cid == 'tirane':
         bake_showcase_facades(Path(out))
     elif cid == "vlore":
@@ -1494,6 +1585,14 @@ def build(cid, route_only=False):
         coastal_macro.bake(Path(out))
     build_side_roads(osm, ref, hw, terrain_sample, os.path.join(out, 'roads.glb'), radius=city.get('osm_radius', 2600))
     build_props(osm, ref, hw, terrain_sample, city, proj, os.path.join(out, 'props.json'), None, seafront_props)
+    # Roundabout islands, as baked into props (capped to the road), go to
+    # the track too: the game runs the road up to each island's kerb.
+    props_out = load_json(os.path.join(out, 'props.json'))
+    islands = [[a['x'], a['z'], a['radius']] for a in props_out.get('landmarks', []) if 'radius' in a]
+    if islands:
+        track_out = load_json(os.path.join(out, 'track.json'))
+        track_out['islands'] = islands
+        save_json(os.path.join(out, 'track.json'), track_out)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.
     street_props.process_city(cid)
     if cid == 'shkoder':

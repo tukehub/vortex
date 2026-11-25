@@ -202,7 +202,7 @@ static func cell_hash(c: float, salt: float) -> float:
 
 
 ## Where road.gdshader sets hardware between lap positions s0 and s1:
-## [{"kind": "manhole" | "gully" | "patch", "s": metres, "d": metres across}].
+## [{"kind": "manhole" | "gully", "s": metres, "d": metres across}].
 ## Mirrors the shader's cell rules; lane_count is the shader default (4).
 static func hardware_near(s0: float, s1: float, hw: float, lane_count := 4.0) -> Array:
 	var out := []
@@ -215,15 +215,10 @@ static func hardware_near(s0: float, s1: float, hw: float, lane_count := 4.0) ->
 		if cell_hash(c, 7.3) < 0.85:
 			var side := -1.0 if cell_hash(c, 1.9) < 0.5 else 1.0
 			out.append({"kind": "gully", "s": (c + 0.5) * 24.0, "d": side * (hw - 0.86)})
-	for c in range(floori(s0 / 31.0), floori(s1 / 31.0) + 1):
-		if cell_hash(c, 4.7) < 0.38:
-			var wid := 1.0 + cell_hash(c, 2.9) * 2.4
-			out.append({"kind": "patch", "s": (c + 0.15 + 0.7 * cell_hash(c, 8.1)) * 31.0,
-				"d": (cell_hash(c, 5.5) * 2.0 - 1.0) * maxf(0.0, hw - wid * 0.5 - 0.8)})
 	return out.filter(func(h): return float(h.s) >= s0 and float(h.s) <= s1)
 
 
-## Manholes, gullies and patches cost a few ALU ops a pixel; low skips them.
+## Manholes and gullies cost a few ALU ops a pixel; low skips them.
 func apply_quality() -> void:
 	surface_mat.set_shader_parameter("detail", 1.0 if bool(Quality.p.get("road_detail", true)) else 0.0)
 
@@ -265,6 +260,7 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 		if up.y < 0.0:
 			up = -up
 		var side_joined := joined_side(track, k)
+		var side_isle := isle_side(track, k) if side_joined == 0.0 else 0.0
 		var mid := absf(track.JOIN[k]) if side_joined != 0.0 else hw + shoulder
 		# The two passes meet half way between their centres' heights.
 		var mid_dy := pair_rise(track, k * track.ds)
@@ -273,6 +269,9 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 			var pair: Array[Vector3]
 			if side == side_joined:
 				pair = [Vector3(side * (mid + 0.15), mid_dy - 0.03, 1.0), Vector3(side * mid, mid_dy, 1.0)]
+			elif side == side_isle:
+				# Toward a roundabout island: level asphalt, then the apron.
+				pair = [Vector3(side * (hw + 0.8), -0.01, 1.0), Vector3(side * (hw + 0.4), 0.0, 1.0)]
 			else:
 				pair = [Vector3(side * (hw + shoulder), -0.02, 0.0), Vector3(side * (hw + shoulder * 0.5), -0.01, 0.5)]
 			if side > 0.0:
@@ -282,7 +281,8 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 		for col in cols:
 			st.set_normal(up)
 			st.set_uv(Vector2(col.x, s))
-			st.set_uv2(Vector2(side_joined, mid))
+			# Island side: no edge line or gutter, and no centre line (far y).
+			st.set_uv2(Vector2(side_joined, mid) if side_isle == 0.0 else Vector2(side_isle, 1000.0))
 			st.set_color(Color(1, 1, 1, col.z))
 			st.add_vertex(p + Vector3(nx, 0.0, nz) * col.x + Vector3(0, col.y, 0))
 	for i in M:
@@ -312,9 +312,90 @@ static func joined_side(track: RaceTrack, k: int) -> float:
 	return -1.0 if track.JOIN[k] < 0.0 else 1.0
 
 
-## True when the segment from sample i to the next is joined on `side`.
+## -1 or 1: the side of sample k facing a roundabout island; 0: none.
+static func isle_side(track: RaceTrack, k: int) -> float:
+	return track.ISLE[k] if track.ISLE.size() == track.M else 0.0
+
+
+## True when the segment from sample i to the next is open on `side`: the
+## other pass joins there, or it faces a roundabout island.
 static func open_side(track: RaceTrack, i: int, side: float) -> bool:
-	return joined_side(track, i) == side or joined_side(track, (i + 1) % track.M) == side
+	for k: int in [i, (i + 1) % track.M]:
+		if joined_side(track, k) == side or isle_side(track, k) == side:
+			return true
+	return false
+
+
+## Asphalt from each roundabout island's kerb out under the road around it,
+## so the road runs round a circle with nothing but the kerb at its edge.
+## Built with the road's own material, 2.5 cm under its surface.
+func add_island_aprons(track: RaceTrack) -> void:
+	if track.islands.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bins := 240
+	for isle: Vector3 in track.islands:
+		var c := Vector2(isle.x, isle.y)
+		var r := isle.z
+		var reach := PackedFloat32Array()
+		for k in bins + 1:
+			reach.append(apron_reach(track, c, r, TAU * k / bins))
+		# Far from the road's frame: no lane marks, no edge or centre line.
+		var off := Vector2(4000.0 - c.x, track.L * 0.5 - c.y)
+		for k in bins:
+			var a := TAU * k / bins
+			var b := TAU * (k + 1) / bins
+			var ua := Vector2(cos(a), sin(a))
+			var ub := Vector2(cos(b), sin(b))
+			var rings := [r, (r + minf(reach[k], reach[k + 1])) * 0.5]
+			for ring_i in 2:
+				var r0: float = rings[ring_i]
+				var a1: float = rings[1] if ring_i == 0 else reach[k]
+				var b1: float = rings[1] if ring_i == 0 else reach[k + 1]
+				var quad := [c + ua * r0, c + ua * a1, c + ub * b1, c + ub * r0]
+				for index in [0, 1, 2, 0, 2, 3]:
+					var q: Vector2 = quad[index]
+					st.set_normal(Vector3.UP)
+					st.set_uv(q + off)
+					st.set_uv2(Vector2(1.0, 0.0))
+					st.set_color(Color(1, 1, 1, 1))
+					st.add_vertex(Vector3(q.x, _apron_height(track, q, isle) - 0.025, q.y))
+	st.generate_tangents()
+	var apron := MeshInstance3D.new()
+	apron.name = "RoundaboutAprons"
+	apron.mesh = st.commit()
+	apron.material_override = surface_mat
+	apron.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(apron)
+
+
+## Metres from an island's centre, along `angle`, to just under the road
+## around it: a carriageway, or the joined middle where the passes meet (the
+## gores between them). The island's radius (no apron) where nothing is hit.
+static func apron_reach(track: RaceTrack, centre: Vector2, radius: float, angle: float) -> float:
+	var u := Vector2(cos(angle), sin(angle))
+	var t := radius
+	while t < 85.0:
+		var q := centre + u * t
+		var n := track.nearest(q.x, q.y, track.half_w + 8.0)
+		if n >= 0:
+			var off := (q - Vector2(track.X[n], track.Z[n])).dot(Vector2(track.NX[n], track.NZ[n]))
+			var along := absf((q - Vector2(track.X[n], track.Z[n])).dot(Vector2(-track.NZ[n], track.NX[n])))
+			if along < track.ds * 1.5:
+				if absf(off) < track.half_w:
+					return t + 0.6
+				if track.PAIR.size() == track.M and track.PAIR[n] >= 0 and absf(off - track.JOIN[n]) < absf(track.JOIN[n]) - track.half_w + 0.2:
+					return t + 0.6
+		t += 0.75
+	return radius
+
+
+static func _apron_height(track: RaceTrack, q: Vector2, isle: Vector3) -> float:
+	var n := track.nearest(q.x, q.y, 40.0)
+	if n < 0:
+		n = track.nearest(isle.x, isle.y, 120.0)
+	return track.Y[n] if n >= 0 else 0.0
 
 
 func _build_kerbs(track: RaceTrack, hw: float) -> void:
