@@ -32,6 +32,9 @@ func _ready() -> void:
 	views.append(["asphalt", track.pos(420.0, 1.5) + Vector3.UP * 1.1, track.pos(432.0, -1.0)])
 	var portal := track.locate_xz(data.tunnel[0][0], data.tunnel[0][1]).x
 	views.append(["tunnel", track.pos(portal - 70.0, 1.0) + Vector3.UP * 2.2, track.pos(portal, 0.0) + Vector3.UP * 4.0])
+	views.append(["tunnel_inside", track.pos(portal + 30.0, 1.5) + Vector3.UP * 1.8, track.pos(portal + 60.0, 0.0) + Vector3.UP * 2.6])
+	var exit_s := track.locate_xz(data.tunnel[1][0], data.tunnel[1][1]).x
+	views.append(["tunnel_exit", track.pos(exit_s + 45.0, -2.0) + Vector3.UP * 3.0, track.pos(exit_s, 0.0) + Vector3.UP * 4.0])
 	views.append(["tunnel_side", track.pos(portal - 40.0, 14.0) + Vector3.UP * 9.0, track.pos(portal + 10.0, -8.0) + Vector3.UP * 4.0])
 	for id in ["skela_roundabout", "flag_square_island"]:
 		var c: Vector3 = marks[id]

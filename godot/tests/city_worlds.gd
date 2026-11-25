@@ -273,6 +273,26 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 		turn_dot = minf(turn_dot, approach.dot(track.tangent(turn + after)))
 	assert(turn_dot < -0.85, "the road reverses heading after the southern portal")
 	assert(scene.road.get_node_or_null("UjiIFtohteTunnel/TunnelBore") != null)
+	# The baked tunnel: four material slots, mobile budget, emissive strips
+	# instead of lights, boulders on the shore and scrub on the seam.
+	var tunnel_node := scene.road.get_node("UjiIFtohteTunnel")
+	var slots := {}
+	var tunnel_tris := 0
+	for name: String in ["Cliff", "Portals", "TunnelBore"]:
+		var mesh := (tunnel_node.get_node(name) as MeshInstance3D).mesh
+		tunnel_tris += mesh.get_faces().size() / 3
+		for i in mesh.get_surface_count():
+			slots[mesh.surface_get_material(i).resource_name] = true
+	for slot: String in ["cliff_rock", "portal_masonry", "tunnel_interior", "ceiling_lights"]:
+		assert(slots.has(slot), "tunnel material slot " + slot)
+	assert(tunnel_tris < 12000, "tunnel stays under 12k triangles (%d)" % tunnel_tris)
+	assert(tunnel_node.find_children("*", "OmniLight3D", true, false).is_empty(), "tunnel lighting is emissive, not real-time lights")
+	assert((tunnel_node.get_node("Cliff") as MeshInstance3D).get_surface_override_material(0).uv1_world_triplanar, "cliff rock projects in world space")
+	var boulders := 0
+	for i in 4:
+		boulders += (tunnel_node.get_node("Breakwater%d" % i) as MultiMeshInstance3D).multimesh.instance_count
+	assert(boulders > 80, "a breakwater along both approaches (%d boulders)" % boulders)
+	assert(tunnel_node.get_node_or_null("SeamScrub0") != null, "scrub on the cliff-hillside seam")
 	print("VLORE OUT-AND-BACK: %.0f m, carriageways at least %.1f m apart" % [track.L, tight])
 	for i in track.M * 4:
 		var s := i * track.ds * 0.25

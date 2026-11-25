@@ -30,7 +30,7 @@ func _ready() -> void:
 			if scene.sea_rocks != null and not scene.sea_rocks.placed.is_empty():
 				var rock: Vector3 = scene.sea_rocks.placed[scene.sea_rocks.placed.size() / 2].origin
 				_frame_point("rocks", rock, 7.0, 2.0)
-			_frame_node("tunnel", scene.road.find_child("CliffAndPortals", true, false), 0.6)
+			_frame_node("tunnel", scene.road.find_child("Cliff", true, false), 0.6)
 			var palms := scene.props.get_node_or_null("Palms")
 			if palms != null:
 				var trunks := palms.get_node("PalmTrunks") as MultiMeshInstance3D
