@@ -216,6 +216,16 @@ func load_anchors(anchors: Array, terrain: Terrain = null) -> void:
 			hill.name = "KuzumBaba"
 			root.add_child(hill)
 			hill.build(str(anchor.id), terrain)
+		elif str(anchor.id) == "korce_cathedral":
+			var cathedral := KorceCathedral.new()
+			cathedral.name = "KorceCathedral"
+			root.add_child(cathedral)
+			cathedral.build(terrain)
+		elif str(anchor.id) in ["mesonjetorja", "national_warrior"]:
+			var heritage := KorceHeritage.new()
+			heritage.name = "KorceHeritage"
+			root.add_child(heritage)
+			heritage.build(str(anchor.id), terrain)
 		elif str(anchor.id) == "rozafa" and FileAccess.file_exists(RozafaCastle.DATA):
 			var castle := RozafaCastle.new()
 			castle.name = "RozafaCastle"

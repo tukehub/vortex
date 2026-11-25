@@ -25,6 +25,7 @@ Mobiliet e kafeneve: Outdoor Table Chair Set 01 nga James Ray Cock — CC0 1.0 (
 Rëra e plazhit (Coast Sand 04), shkëmbi gëlqeror (Rock Face 03), shtrimi i shëtitores (Precast Stone Paving), lëvorja e palmave (Palm Tree Bark), muret e kështjellës (Castle Wall Slates), suvaja (White Stucco), qepenat (Painted Metal Shutter) dhe qielli i natës me shi (Kloppenheim 07 Pure Sky): Poly Haven — CC0 1.0 (polyhaven.com).
 Koshi i mbeturinave (Metal Trash Can), feneri i shëtitores (Street Lamp 01), kutia elektrike (Utility Box 01) dhe stoli (Painted Wooden Bench): Poly Haven — CC0 1.0. Autorët dhe skedarët: tools/cc0_assets.lock.json.
 Metali i shtyllave: Metal032 nga ambientCG (ambientcg.com) — CC0 1.0.
+Korçë — guri i Katedrales Ngjallja e Krishtit: Sandstone Blocks 05, Rob Tuytel (polyhaven.com/a/sandstone_blocks_05); muret e Mësonjëtores: Stone Wall, Charlotte Baglioni dhe Dario Barresi (polyhaven.com/a/stone_wall); tjegullat e kupolave dhe të çatisë: Clay Roof Tiles 02, Amal Kumar (polyhaven.com/a/clay_roof_tiles_02); të gjitha CC0 1.0. Modelet e Katedrales, Mësonjëtores dhe Luftëtarit Kombëtar janë interpretime origjinale sipas fotografive dhe gjurmëve në OpenStreetMap.
 Semaforët: “Traffic Light - Complex” nga Urban Mini Props Pack - Free; i kthyer dhe i thjeshtuar në rreth 5 600 trekëndësha për pajisje celulare.
 
 [b]Fotografia e pemës[/b]

@@ -305,6 +305,66 @@ CITIES = {
         'style': 'old',
         'palette': 'tirana',
     },
+    'korce': {
+        'name': 'Korçë',
+        'origin': (40.6200, 20.7800),          # between the cathedral square and Rruga 1 Maji
+        'near_km': 4.5, 'far_km': 24.0,
+        'half_width': 9.0,
+        'exclude_pedestrian': True,
+        # A 3.1 km loop through the centre: down Bulevardi Republika past
+        # Mësonjëtorja and the Resurrection Cathedral on its square, round the
+        # roundabout onto Bulevardi Fan Noli, north-west past the Old Bazaar,
+        # Rruga Edit Durham and Sheshi i Teatrit by the Çajupi theatre, up
+        # Rruga Midhi Kostani, a short stretch of Rruga Teli Samsuri, then
+        # Rruga 1 Maji and Rruga Raqi Qirinxhi back across the grid of villas
+        # to Republika.
+        'waypoints': [
+            (40.61850, 20.78258),   # Bulevardi Republika, southbound
+            (40.61606, 20.78018),   # the cathedral square, Luftëtari Kombëtar
+            (40.61520, 20.77830),   # Bulevardi Fan Noli, north-west of the roundabout
+            (40.61700, 20.77590),   # Fan Noli by the Old Bazaar
+            (40.61812, 20.77650),   # Rruga Edit Durham
+            (40.61880, 20.77720),   # Sheshi i Teatrit
+            (40.62050, 20.77630),   # Rruga Midhi Kostani
+            (40.62360, 20.77350),   # Midhi Kostani, north
+            (40.62497, 20.77358),   # Rruga Teli Samsuri
+            (40.62380, 20.77560),   # Rruga 1 Maji
+            (40.62050, 20.78040),   # Rruga Raqi Qirinxhi
+        ],
+        # Start/finish on Republika, 100 m before the square and the cathedral:
+        # the grid looks down the boulevard at the domes and bell towers.
+        'finish_before': {'ll': (40.616193, 20.780096), 'metres': 100.0},
+        # Both landmarks in view from the boulevard both ways and across the
+        # square: buildings whose roofs cross a driver's line of sight to the
+        # cathedral's domes and towers or to Mësonjëtorja are left out.
+        'sightlines': [
+            {'eyes': [(40.61902, 20.78282), (40.61794, 20.78237), (40.61700, 20.78130), (40.61640, 20.78060)],
+             'targets': [((40.615718, 20.780848), 18.0), ((40.616464, 20.780262), 5.0)]},
+            {'eyes': [(40.61464, 20.77931), (40.61530, 20.77960), (40.61580, 20.77990)],
+             'targets': [((40.615718, 20.780848), 18.0), ((40.616464, 20.780262), 5.0)]},
+        ],
+        'landmarks': [
+            # Katedralja Ngjallja e Krishtit (OSM way 1165161082), its curved
+            # portico, steps and twin bell towers facing the square and the
+            # boulevard (west-north-west).
+            {'id': 'korce_cathedral', 'll': (40.615718, 20.780848), 'yaw': 59.0,
+             'clear_half': (26, 26)},
+            # Mësonjëtorja, the first Albanian school (1887), now the National
+            # Museum of Education (OSM way 461159519). Brought 42 m through
+            # the garden toward Republika, its oriel front turned to the boulevard,
+            # so the house reads from the race (a racing-game adaptation).
+            {'id': 'mesonjetorja', 'll': (40.616704, 20.779866), 'yaw': -128.0,
+             'offset_x': 33.2, 'offset_z': 26.0, 'clear_half': (16, 16), 'open_view': 26.0},
+            # Luftëtari Kombëtar (Odhise Paskali, 1932) on the cathedral square.
+            {'id': 'national_warrior', 'll': (40.616193, 20.780096), 'yaw': 59.0,
+             'offset_x': -3.0, 'offset_z': -2.0, 'clear_half': (5, 5)},
+            # Xhamia e Iliaz Mirahorit (1494) by the Old Bazaar.
+            {'id': 'mosque', 'll': (40.615862, 20.775402), 'yaw': 0},
+        ],
+        'landmark_buildings': [1165161082, 461159519, 197795957],
+        'style': 'old',
+        'palette': 'old',
+    },
     'tetove': {
         'name': 'Tetovë',
         'origin': (42.0100, 20.9710),          # centre, by the Painted Mosque

@@ -352,5 +352,96 @@
         "bytes": 1988600
       }
     ]
+  },
+  "ashlar_buff": {
+    "source": "polyhaven",
+    "id": "sandstone_blocks_05",
+    "name": "Sandstone Blocks 05",
+    "authors": [
+      "Rob Tuytel"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/sandstone_blocks_05",
+    "files": [
+      {
+        "path": "godot/assets/textures/ashlar_buff_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_blocks_05/sandstone_blocks_05_diff_1k.jpg",
+        "md5": "2c3651fdf1071d7b60d82f0e86953968",
+        "bytes": 635678
+      },
+      {
+        "path": "godot/assets/textures/ashlar_buff_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_blocks_05/sandstone_blocks_05_nor_gl_1k.jpg",
+        "md5": "cb9d5f4e66155a34236d6e2420ce276b",
+        "bytes": 1224895
+      },
+      {
+        "path": "godot/assets/textures/ashlar_buff_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_blocks_05/sandstone_blocks_05_arm_1k.jpg",
+        "md5": "d6eff1ed1206fac358da4a4d2a5e407d",
+        "bytes": 160386
+      }
+    ]
+  },
+  "rubble_wall": {
+    "source": "polyhaven",
+    "id": "stone_wall",
+    "name": "Stone Wall",
+    "authors": [
+      "Charlotte Baglioni",
+      "Dario Barresi"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/stone_wall",
+    "files": [
+      {
+        "path": "godot/assets/textures/rubble_wall_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_wall/stone_wall_diff_1k.jpg",
+        "md5": "451e4c5e2309af341fcdc1f1d637b1d6",
+        "bytes": 836975
+      },
+      {
+        "path": "godot/assets/textures/rubble_wall_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_wall/stone_wall_nor_gl_1k.jpg",
+        "md5": "5c686c6c907ae2a1bb5c438ad96da055",
+        "bytes": 1172420
+      },
+      {
+        "path": "godot/assets/textures/rubble_wall_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_wall/stone_wall_arm_1k.jpg",
+        "md5": "d5d55c2e68c56448e4af54791da47a6d",
+        "bytes": 586703
+      }
+    ]
+  },
+  "clay_roof": {
+    "source": "polyhaven",
+    "id": "clay_roof_tiles_02",
+    "name": "Clay Roof Tiles 02",
+    "authors": [
+      "Amal Kumar"
+    ],
+    "licence": "CC0-1.0",
+    "page": "https://polyhaven.com/a/clay_roof_tiles_02",
+    "files": [
+      {
+        "path": "godot/assets/textures/clay_roof_diff.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_roof_tiles_02/clay_roof_tiles_02_diff_1k.jpg",
+        "md5": "43c45fa3ac4c68ffb28aa813cec32608",
+        "bytes": 903929
+      },
+      {
+        "path": "godot/assets/textures/clay_roof_nor.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_roof_tiles_02/clay_roof_tiles_02_nor_gl_1k.jpg",
+        "md5": "9e24ddc6fbf048291f8e24bfb1f16e6d",
+        "bytes": 990101
+      },
+      {
+        "path": "godot/assets/textures/clay_roof_arm.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/clay_roof_tiles_02/clay_roof_tiles_02_arm_1k.jpg",
+        "md5": "b3ecf39f9c8eb803131f84fbfe20e865",
+        "bytes": 564611
+      }
+    ]
   }
 }

@@ -61,7 +61,7 @@ func _ready() -> void:
 				closest = opposite
 		if best < 20.0:
 			check(int(turn.side) == -int(closest.side), "reverse lap flips a physical corner's direction")
-	for city in ["tirane", "berat", "gjirokaster", "shkoder", "tetove", "vlore"]:
+	for city in ["tirane", "berat", "gjirokaster", "shkoder", "korce", "tetove", "vlore"]:
 		ground_checks(city)
 	damage_checks()
 	await caption_checks()

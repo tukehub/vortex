@@ -1590,9 +1590,19 @@ def build(cid, route_only=False):
     # the track too: the game runs the road up to each island's kerb.
     props_out = load_json(os.path.join(out, 'props.json'))
     islands = [[a['x'], a['z'], a['radius']] for a in props_out.get('landmarks', []) if 'radius' in a]
-    if islands:
+    # Landmarks the race must show from the road: no corner board stands
+    # within `open_view` metres of them (the game reads track.json 'views').
+    views = []
+    for lm in city.get('landmarks', []):
+        if 'open_view' in lm:
+            vx, vz = proj.to_xz(*lm['ll'])
+            views.append([round(vx + lm.get('offset_x', 0), 1), round(vz + lm.get('offset_z', 0), 1), float(lm['open_view'])])
+    if islands or views:
         track_out = load_json(os.path.join(out, 'track.json'))
-        track_out['islands'] = islands
+        if islands:
+            track_out['islands'] = islands
+        if views:
+            track_out['views'] = views
         save_json(os.path.join(out, 'track.json'), track_out)
     # Street furniture near the circuit (3.4): its own small Overpass fetch.
     street_props.process_city(cid)

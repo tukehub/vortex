@@ -16,7 +16,8 @@ const POST_EVERY := 10.0
 
 var band: MeshInstance3D
 var posts: MultiMeshInstance3D
-## One entry per bend: {"turn", "from", "to" (lap metres), "d", "points" (band bottoms)}.
+## One entry per bend: {"turn", "from", "to" (lap metres), "d", "points" (band
+## bottoms), "shown" (per point: false where the band is left out)}.
 var bands: Array[Dictionary] = []
 
 
@@ -36,7 +37,9 @@ static func _offset(track: RaceTrack, s: float, d: float) -> float:
 	return signf(d) * (edge + OUTSIDE)
 
 
-func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
+## `views`: [[x, z, radius], ...] round landmarks the road must show
+## (track.json "views"): no band stands within them.
+func build(track: RaceTrack, guide: Guide, height_at := Callable(), views: Array = []) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var post_transforms: Array[Transform3D] = []
@@ -55,6 +58,9 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 			var at_d := _offset(track, s, d)
 			shown.append(not is_nan(at_d))
 			var p := track.pos(s, d if is_nan(at_d) else at_d)
+			for v in views:
+				if Vector2(p.x - float(v[0]), p.z - float(v[1])).length() < float(v[2]):
+					shown[shown.size() - 1] = false
 			if height_at.is_valid():
 				p.y = maxf(p.y, float(height_at.call(p.x, p.z)))
 			points.append(p)
@@ -83,7 +89,7 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable()) -> void:
 			if shown[i] and (travelled >= next_post or i == count - 1):
 				post_transforms.append(Transform3D(Basis.IDENTITY, points[i] + Vector3.UP * 0.6))
 				next_post = travelled + POST_EVERY
-		bands.append({"turn": turn, "from": track.mod_s(from), "to": track.mod_s(from + length), "length": length, "d": d, "points": points})
+		bands.append({"turn": turn, "from": track.mod_s(from), "to": track.mod_s(from + length), "length": length, "d": d, "points": points, "shown": shown})
 	band = MeshInstance3D.new()
 	band.name = "CornerBands"
 	band.mesh = st.commit()

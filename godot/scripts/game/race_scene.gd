@@ -196,7 +196,7 @@ func _build_world() -> void:
 	var route_signs := RouteSigns.new()
 	route_signs.name = "RouteSigns"
 	road.add_child(route_signs)
-	route_signs.build(track, route_guide, terrain.base_height_at)
+	route_signs.build(track, route_guide, terrain.base_height_at, tj.get("views", []))
 	RaceReflections.hide_detail(route_signs.posts)
 	buildings = Buildings.new()
 	var side_path := "res://assets/cities/%s/roads.glb" % city_id

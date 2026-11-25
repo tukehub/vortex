@@ -132,6 +132,8 @@ func _ready() -> void:
 			assert(nearest_wall < 250.0, "the lap passes under the castle walls (%.0f m)" % nearest_wall)
 			print("SHKODER: ", snappedf(scene.track.L, 1.0), " m lap, ", street_trees.entries.size(), " street trees; Rozafa ",
 				castle.built, ", ", castle.merlons, " merlons")
+		if city.id == "korce":
+			_test_korce(scene)
 		if city.id == "vlore":
 			# Lungomare: palms on the sea side, on dry ground and clear of the
 			# road; café terraces on the land side.
@@ -375,3 +377,56 @@ func _passes(track: RaceTrack, at: Vector3) -> Array:
 			out.append(low * track.ds)
 		k += 1
 	return out
+
+
+## Korçë: the lap down Bulevardi Republika past the Resurrection Cathedral and
+## Mësonjëtorja, both built in detail, textured, in view and off the road.
+func _test_korce(scene: RaceScene) -> void:
+	var trees := scene.props.vegetation
+	assert(trees != null and trees.name == "StreetTrees" and trees.entries.size() > 0, "Korçë plants the shared street trees")
+	assert(scene.track.L > 2800.0 and scene.track.L < 3500.0, "the centre loop is about 3.1 km")
+	var marks: Node = null
+	for child in scene.props.get_children():
+		if child is Landmarks:
+			marks = child
+	var cathedral := marks.get_node_or_null("korce_cathedral/KorceCathedral") as KorceCathedral
+	assert(cathedral != null, "the Resurrection Cathedral is built")
+	assert(cathedral.doors == 3 and cathedral.domes == 4 and cathedral.tower_tops.size() == 2, "three portico doors, four domes, two bell towers")
+	assert(cathedral.windows > 80, "arched windows round the church, drums and towers")
+	for part in ["CathedralAshlar", "CathedralTrim", "CathedralTiles"]:
+		var mesh := cathedral.get_node(part) as MeshInstance3D
+		var mat := mesh.material_override as StandardMaterial3D
+		assert(mat.albedo_texture != null and mat.normal_enabled and mat.roughness_texture != null, part + " is textured: colour, normal and roughness")
+		assert(mesh.visibility_range_end >= 2500.0, part + " stays in sight round the lap")
+	var tower: Vector3 = cathedral.to_global(cathedral.tower_tops[0])
+	assert(tower.y - cathedral.global_position.y > 32.0, "the bell towers stand about 34 m")
+	var front_dome := (cathedral.get_node("CathedralTiles") as MeshInstance3D).get_aabb()
+	assert(front_dome.size.y > 15.0 and front_dome.size.x > 25.0, "tiled roof and domes rise over the round church")
+	var cat_at := cathedral.global_position
+	assert(scene.track.dist_to(cat_at.x, cat_at.z) > scene.track.half_w + 35.0, "the cathedral and its steps stand back across the square")
+	var school := marks.get_node_or_null("mesonjetorja/KorceHeritage") as KorceHeritage
+	assert(school != null and school.windows >= 30 and school.bars > 150, "Mësonjëtorja: its windows and the forecourt railing")
+	for part in ["SchoolRubbleWalls", "SchoolRoof"]:
+		var mat := (school.get_node(part) as MeshInstance3D).material_override as StandardMaterial3D
+		assert(mat.albedo_texture != null and mat.normal_enabled, part + " is textured")
+	assert(school.get_node_or_null("SchoolFlag") != null and school.get_node_or_null("SchoolPlaque") != null)
+	var school_at := school.global_position
+	var gap := scene.track.dist_to(school_at.x, school_at.z)
+	assert(gap > scene.track.half_w + 13.0 and gap < scene.track.half_w + 22.0, "the school fronts the boulevard (%.1f m)" % gap)
+	# No corner board between the road and the school's front.
+	var signs := scene.road.get_node("RouteSigns")
+	var hidden := 0
+	for band: Dictionary in signs.bands:
+		var pts: Array = band.points
+		for i in pts.size():
+			var p: Vector3 = pts[i]
+			if Vector2(p.x - school_at.x, p.z - school_at.z).length() < 20.0:
+				assert(not band.shown[i], "no chevron band in front of Mësonjëtorja")
+				hidden += 1
+	assert(hidden > 0, "the bend by the school has its band left out there")
+	var warrior := marks.get_node_or_null("national_warrior/KorceHeritage")
+	assert(warrior != null and warrior.get_node_or_null("WarriorBronze") != null, "Luftëtari Kombëtar stands on the square")
+	var w_at := (warrior as Node3D).global_position
+	assert(scene.track.dist_to(w_at.x, w_at.z) > scene.track.half_w + 6.0, "the warrior's pedestal is off the road")
+	print("KORCE: ", snappedf(scene.track.L, 1.0), " m lap; cathedral ", cathedral.windows, " windows, ", cathedral.domes,
+		" domes; school ", school.windows, " windows, ", snappedf(gap, 0.1), " m from the line")
