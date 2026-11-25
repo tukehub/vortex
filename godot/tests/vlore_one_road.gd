@@ -127,8 +127,9 @@ func _ready() -> void:
 		if Props.in_open_road(track, v.x, v.z):
 			boards_in_road += 1
 	check(boards_in_road == 0, "corner boards stand off the joined road (%d)" % boards_in_road)
-	# Roundabouts: the road runs to each island's kerb, round a circle.
-	check(track.islands.size() == 2, "Sheshi Pavarsia and Flag Square have islands")
+	# Roundabouts: the road runs to each island's kerb, round a circle. The
+	# sprint no longer turns at Flag Square: Sheshi Pavarsia's is the one.
+	check(track.islands.size() == 1, "Sheshi Pavarsia has its island")
 	var aprons := road.get_node_or_null("RoundaboutAprons") as MeshInstance3D
 	check(aprons != null and aprons.mesh.get_faces().size() > 0, "asphalt fills round the islands")
 	for isle: Vector3 in track.islands:
