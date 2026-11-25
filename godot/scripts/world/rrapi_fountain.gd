@@ -7,24 +7,19 @@ extends Node3D
 ##   island    from where the carriageways part to where they are 36 m
 ##             apart: granite kerbs round a lawn, a paved ring round the
 ##             fountain
-##   fountain  Luani, after the city's own: a gilded lion standing on a
-##             worn slab on a rock, in a low round basin of mossy concrete,
-##             a thin stream from its mouth into the water
-##             (shaders/fountain_water.gdshader), two plane trees behind.
-##             The body, mane, legs and curled tail are modelled here; the
-##             face is the CC0 "Lion Head" (Poly Haven, reduced by
-##             tools/build_lion_head.gd) on the front of the mane
+##   fountain  Luani, the city's own: the supplied lion sculpture, gilded,
+##             standing on a worn slab on a rock in a low round basin of
+##             mossy concrete, a thin stream from its mouth into the water
+##             (shaders/fountain_water.gdshader), two plane trees behind
 ## The great plane tree itself is the "rrapi_tree" anchor (plane_tree()).
 ## Local frame: the lion looks toward -Z, up the shore road at the traffic
 ## coming down from Lungomare.
 
-const LION := "res://assets/landmarks/lion_head.res"
-## The standing lion: life size (1.5 m nose to rump), its body built here,
-## its face the CC0 Lion Head on the front of the mane.
-const LION_SCALE := 1.15
-const LION_Z := 0.35
-const HEAD_SCALE := 1.0
-const HEAD_AT := Vector3(0, 0.95, -0.6)
+## Luani: the supplied lion sculpture (tools/build_luani.py), life size,
+## 1.45 m nose to rump; luani.json holds its transform and mouth.
+const LION := "res://assets/landmarks/luani/luani.obj"
+const LION_META := "res://assets/landmarks/luani/luani.json"
+const LION_Z := 0.2
 const BASIN_R := 1.75
 const BASIN_H := 0.5
 const RIM := 0.28
@@ -187,7 +182,7 @@ func _fountain(y0: float) -> void:
 	var rock_c := Vector3(0, y0 + 0.36, LION_Z + 0.05)
 	_lumpy(rock, rock_c, Vector3(0.6, 0.42, 1.15), Color(0.9, 0.88, 0.82), 7)
 	var slab_top := y0 + 0.86
-	LandmarkKit.box(rock, Vector3(0, slab_top - 0.07, LION_Z + 0.12), Vector3(0.62, 0.14, 2.05), Color(0.97, 0.95, 0.9))
+	LandmarkKit.box(rock, Vector3(0, slab_top - 0.07, LION_Z), Vector3(0.7, 0.14, 1.6), Color(0.97, 0.95, 0.9))
 	var rock_mat := LandmarkKit.material(0.92)
 	rock_mat.albedo_texture = preload("res://assets/textures/concrete_diff.jpg")
 	rock_mat.normal_enabled = true
@@ -195,33 +190,31 @@ func _fountain(y0: float) -> void:
 	rock_mat.uv1_triplanar = true
 	rock_mat.uv1_scale = Vector3.ONE * 0.8
 	add_child(LandmarkKit.mesh_node(rock, rock_mat, "FountainRock", REACH))
-	# The lion, standing on the slab, its mouth over the water.
+	# Luani, standing on the slab, its mouth over the water.
 	var lion := Node3D.new()
 	lion.name = "Lion"
 	lion.position = Vector3(0, slab_top, LION_Z)
-	lion.scale = Vector3.ONE * LION_SCALE
 	add_child(lion)
-	var gold := lion_material()
-	lion.add_child(_lion_body(gold))
-	if ResourceLoader.exists(LION):
-		var head := MeshInstance3D.new()
-		head.name = "LionHead"
-		head.mesh = load(LION)
-		var m := gold.duplicate() as StandardMaterial3D
-		m.vertex_color_use_as_albedo = false
-		m.normal_enabled = true
-		m.normal_texture = load("res://assets/props/lion_head/lion_head_lion_head_nor_gl.jpg")
-		m.normal_scale = 1.2
-		head.material_override = m
-		head.scale = Vector3.ONE * HEAD_SCALE
-		head.position = HEAD_AT
-		head.visibility_range_end = 700.0
-		lion.add_child(head)
+	if ResourceLoader.exists(LION) and FileAccess.file_exists(LION_META):
+		var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(LION_META))
+		var k := float(meta.scale)
+		var off := Vector3(float(meta.offset[0]), float(meta.offset[1]), float(meta.offset[2]))
+		var statue := MeshInstance3D.new()
+		statue.name = "LionStatue"
+		statue.mesh = load(LION)
+		statue.material_override = lion_material()
+		statue.scale = Vector3.ONE * k
+		statue.position = off * k
+		statue.visibility_range_end = 900.0
+		lion.add_child(statue)
+		var m := Vector3(float(meta.mouth[0]), float(meta.mouth[1]), float(meta.mouth[2]))
+		mouth = lion.position + (m + off) * k
 		built_lion = true
-	mouth = lion.position + (HEAD_AT + Vector3(0, 0.16 * HEAD_SCALE, -0.2 * HEAD_SCALE)) * LION_SCALE
+	else:
+		mouth = lion.position + Vector3(0, 0.75, -0.8)
 	var water_y := y0 + BASIN_H - 0.1
 	_water(water_y)
-	_stream(mouth, Vector3(0, water_y, mouth.z - 0.75))
+	_stream(mouth, Vector3(mouth.x, water_y, mouth.z - 0.6))
 	# The plane trees the fountain stands under.
 	for at: Vector3 in [Vector3(-2.9, y0, 1.9), Vector3(2.6, y0, 2.6)]:
 		var tree := plane_tree()
@@ -230,130 +223,18 @@ func _fountain(y0: float) -> void:
 		add_child(tree)
 
 
-## Gilded paint over the cast, a little worn: the gold catches the sky.
+## The statue's gilding: the baked gold over the sculpt's own normal and
+## roughness maps (tools/build_luani.py).
 static func lion_material() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.vertex_color_is_srgb = true
-	m.albedo_color = Color(0.86, 0.66, 0.32)
+	m.albedo_texture = load("res://assets/landmarks/luani/luani_gilt.jpg")
+	m.normal_enabled = true
+	m.normal_texture = load("res://assets/landmarks/luani/luani_nor.jpg")
+	m.roughness_texture = load("res://assets/landmarks/luani/luani_rough.jpg")
+	m.roughness = 1.0
 	m.metallic = 0.85
-	m.roughness = 0.38
 	m.metallic_specular = 0.6
 	return m
-
-
-## The lion in its own frame (metres; it looks toward -Z, feet at y = 0):
-## a lofted body from rump to neck, a shaggy mane, four legs (the near
-## fore leg stepping out), paws, and the tail curling up behind.
-func _lion_body(gold: Material) -> MeshInstance3D:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Torso: [z, centre height, half width, half height] from rump to neck.
-	var torso := [[0.8, 0.86, 0.04, 0.05], [0.74, 0.85, 0.14, 0.16], [0.6, 0.84, 0.19, 0.22],
-		[0.4, 0.85, 0.18, 0.2], [0.17, 0.87, 0.16, 0.18], [-0.06, 0.88, 0.19, 0.23],
-		[-0.26, 0.92, 0.22, 0.27], [-0.43, 1.0, 0.21, 0.27], [-0.56, 1.08, 0.17, 0.22], [-0.63, 1.1, 0.05, 0.06]]
-	var rings: Array = []
-	for row: Array in torso:
-		rings.append(_ring(Vector3(0, row[1], row[0]), Vector3(0, 0, -1), float(row[2]), float(row[3]), 18, 2.4))
-	_loft(st, rings, Color(0.98, 0.95, 0.9))
-	# The mane round the neck and shoulders, shaggy.
-	_lumpy(st, Vector3(0, 1.12, -0.42), Vector3(0.28, 0.33, 0.26), Color(0.92, 0.86, 0.78), 3)
-	# Legs: [hip or shoulder, knee, ankle, paw] for each.
-	var legs := [
-		[Vector3(-0.13, 0.86, -0.36), Vector3(-0.14, 0.5, -0.42), Vector3(-0.13, 0.14, -0.56), Vector3(-0.13, 0.05, -0.64)],
-		[Vector3(0.13, 0.86, -0.36), Vector3(0.14, 0.5, -0.36), Vector3(0.13, 0.14, -0.36), Vector3(0.13, 0.05, -0.43)],
-		[Vector3(-0.15, 0.8, 0.56), Vector3(-0.15, 0.52, 0.66), Vector3(-0.14, 0.22, 0.74), Vector3(-0.13, 0.05, 0.64)],
-		[Vector3(0.15, 0.8, 0.56), Vector3(0.15, 0.52, 0.62), Vector3(0.14, 0.22, 0.7), Vector3(0.13, 0.05, 0.58)]]
-	for i in legs.size():
-		var leg: Array = legs[i]
-		var hind := i >= 2
-		_tube(st, [leg[0], leg[1], leg[2], leg[3]], [0.11 if hind else 0.09, 0.075, 0.055, 0.05], Color(0.9, 0.84, 0.74))
-		# Paw: flattened, reaching forward.
-		var paw: Vector3 = leg[3] + Vector3(0, -0.005, -0.05)
-		_lumpy(st, paw, Vector3(0.07, 0.05, 0.1), Color(0.82, 0.76, 0.66), 1)
-		if hind:
-			# Thigh and haunch muscle over the hind leg.
-			_lumpy(st, Vector3(leg[0].x * 1.05, 0.74, 0.55), Vector3(0.1, 0.22, 0.19), Color(0.97, 0.94, 0.88), 0)
-		else:
-			_lumpy(st, Vector3(leg[0].x * 1.1, 0.8, -0.36), Vector3(0.08, 0.17, 0.12), Color(0.97, 0.94, 0.88), 0)
-	# The tail: down from the rump, then curling up behind, a tuft at its end.
-	var tail := [Vector3(0, 0.88, 0.78), Vector3(0, 0.66, 0.95), Vector3(0.03, 0.46, 1.02),
-		Vector3(0.05, 0.4, 1.14), Vector3(0.05, 0.52, 1.24), Vector3(0.04, 0.7, 1.22)]
-	_tube(st, tail, [0.04, 0.035, 0.03, 0.028, 0.026, 0.025], Color(0.92, 0.86, 0.76))
-	_lumpy(st, tail[tail.size() - 1] + Vector3(0, 0.04, -0.02), Vector3(0.055, 0.075, 0.055), Color(0.9, 0.82, 0.7), 2)
-	st.index()
-	st.generate_normals()
-	var mi := MeshInstance3D.new()
-	mi.name = "LionBody"
-	mi.mesh = st.commit()
-	mi.material_override = gold
-	mi.visibility_range_end = 900.0
-	return mi
-
-
-## A superellipse cross-section round `c`, square to `along`.
-static func _ring(c: Vector3, along: Vector3, rx: float, ry: float, n: int, e: float) -> PackedVector3Array:
-	var side := along.cross(Vector3.UP).normalized()
-	if side.length_squared() < 0.5:
-		side = Vector3.RIGHT
-	var up := side.cross(along).normalized() * -1.0
-	if up.y < 0.0:
-		up = -up
-	var out := PackedVector3Array()
-	for k in n:
-		var a := TAU * k / n
-		var ca := cos(a)
-		var sa := sin(a)
-		var x := signf(ca) * pow(absf(ca), 2.0 / e) * rx
-		var y := signf(sa) * pow(absf(sa), 2.0 / e) * ry
-		out.append(c + side * x + up * y)
-	return out
-
-
-static func _loft(st: SurfaceTool, rings: Array, col: Color) -> void:
-	var n: int = (rings[0] as PackedVector3Array).size()
-	var mids: Array[Vector3] = []
-	for r: PackedVector3Array in rings:
-		var m := Vector3.ZERO
-		for v in r:
-			m += v
-		mids.append(m / r.size())
-	for i in rings.size() - 1:
-		var a: PackedVector3Array = rings[i]
-		var b: PackedVector3Array = rings[i + 1]
-		for k in n:
-			var k1 := (k + 1) % n
-			for e: Array in [[a[k], i], [b[k], i + 1], [b[k1], i + 1], [a[k], i], [b[k1], i + 1], [a[k1], i]]:
-				var v: Vector3 = e[0]
-				st.set_color(col)
-				st.set_normal((v - mids[int(e[1])]).normalized())
-				st.add_vertex(v)
-	# Close both ends.
-	for end: int in [0, rings.size() - 1]:
-		var r: PackedVector3Array = rings[end]
-		var mid := Vector3.ZERO
-		for v in r:
-			mid += v
-		mid /= r.size()
-		for k in n:
-			var k1 := (k + 1) % n
-			var tri := [mid, r[k1], r[k]] if end == 0 else [mid, r[k], r[k1]]
-			var cap := (mids[0] - mids[1]).normalized() if end == 0 else (mids[end] - mids[end - 1]).normalized()
-			for v: Vector3 in tri:
-				st.set_color(col)
-				st.set_normal(cap)
-				st.add_vertex(v)
-
-
-## A smooth tube through `pts` with radii `radii`, capped at both ends.
-static func _tube(st: SurfaceTool, pts: Array, radii: Array, col: Color) -> void:
-	var rings: Array = []
-	for i in pts.size():
-		var a: Vector3 = pts[maxi(i - 1, 0)]
-		var b: Vector3 = pts[mini(i + 1, pts.size() - 1)]
-		var along := (b - a).normalized()
-		rings.append(_ring(pts[i], along, float(radii[i]), float(radii[i]), 10, 2.0))
-	_loft(st, rings, col)
 
 
 ## An ellipsoid with a gently lumpy surface (`shag` > 0 makes it shaggier).
@@ -384,7 +265,7 @@ func _water(y: float) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://shaders/fountain_water.gdshader")
 	mat.set_shader_parameter("pool", true)
-	mat.set_shader_parameter("fall", Vector2(0.0, mouth.z - 0.75))
+	mat.set_shader_parameter("fall", Vector2(mouth.x, mouth.z - 0.6))
 	var n := ArchKit.node(disc, mat, "BasinWater", 500.0)
 	n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(n)

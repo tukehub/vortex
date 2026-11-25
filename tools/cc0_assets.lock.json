@@ -593,23 +593,5 @@
         "bytes": 718960
       }
     ]
-  },
-  "lion_head": {
-    "source": "polyhaven",
-    "id": "lion_head",
-    "name": "Lion Head",
-    "authors": [
-      "Tina"
-    ],
-    "licence": "CC0-1.0",
-    "page": "https://polyhaven.com/a/lion_head",
-    "files": [
-      {
-        "path": "godot/assets/props/lion_head/lion_head.glb",
-        "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/lion_head/lion_head_1k.gltf",
-        "md5": "0f1e7df7001849cc5393308f7f878d97",
-        "bytes": 3199440
-      }
-    ]
   }
 }

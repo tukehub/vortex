@@ -86,15 +86,18 @@ Between them stands an island (`RrapiFountain`) from where they part to where
 they are 36 m apart. RoadMesh leaves out the race kerbs on its side
 (`split_side`), and the island has its own granite kerb round a lawn. On it:
 
-- **The fountain: Luani**, after the city's famous one. A gilded lion
-  stands on a worn slab on a rock, in a low round basin of mossy concrete,
-  and a thin stream runs from its mouth into the water
-  (`shaders/fountain_water.gdshader`). Two plane trees stand behind it.
-  There is no free full-body lion model, so the body is built in
-  `rrapi_fountain.gd`: a lofted torso, a shaggy mane, four legs with the
-  near forefoot stepping out, and a tail curling up behind. The face is the
-  CC0 "Lion Head" by Tina (Poly Haven), reduced from 47 000 to 4 100
-  triangles by `tools/build_lion_head.gd` and gilded to match.
+- **The fountain: Luani**, the city's own lion. The supplied lion
+  sculpture stands gilded on a worn slab on a rock, in a low round basin of
+  mossy concrete. A thin stream runs from its mouth into the water
+  (`shaders/fountain_water.gdshader`), and two plane trees stand behind it.
+  `tools/build_luani.py` brings the model in:
+  - **Mesh:** the ZBrush mesh as is, 21 000 triangles.
+  - **Textures:** its normal and roughness maps at 1024 px, and a gold
+    albedo baked from the source colour's shading.
+  - **`luani.json`:** life size (1.45 m nose to rump), and where its mouth
+    is.
+![Luani at Rrapi](images/vlore-luani.webp)
+
 - **The plane tree.** Rrapi itself, the city's CC0 broadleaf grown to
   plane-tree size, with leaf clumps cut from the photographic tree.
 
