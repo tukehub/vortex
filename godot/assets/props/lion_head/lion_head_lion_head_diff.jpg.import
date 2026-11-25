@@ -18,7 +18,7 @@ dest_files=["res://.godot/imported/lion_head_lion_head_diff.jpg-3c37e742f42de984
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1
