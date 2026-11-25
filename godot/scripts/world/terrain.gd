@@ -5,6 +5,8 @@ extends Node3D
 ## grid (90 m cells, 80 km) is a single coarse ring mesh for the horizon.
 ## Shading is a 4-channel splat (R road, G vegetation, B water, A urban).
 
+signal wetness_changed(wet: float)
+
 const CHUNK := 40                 # near-grid cells per chunk edge (600 m)
 const SHADER := preload("res://shaders/terrain.gdshader")
 const DETAIL := preload("res://scripts/world/terrain_detail.gd")
@@ -127,6 +129,7 @@ func is_water(x: float, z: float) -> bool:
 
 func set_env(wet: float, snow: float, night: float) -> void:
 	mat.set_shader_parameter("wetness", wet)
+	wetness_changed.emit(wet)
 	mat.set_shader_parameter("snow", snow)
 	mat.set_shader_parameter("night", night)
 
@@ -153,6 +156,16 @@ func height_at(x: float, z: float) -> float:
 	return base_height_at(x, z) if is_nan(refined) else refined
 
 
+## Match the fine or base triangles, for objects that must contact the
+## rendered ground even where adjacent corners have different heights.
+func surface_height_at(x: float, z: float) -> float:
+	var refined := detail.height_at(x, z)
+	if not is_nan(refined):
+		return refined
+	var h := _sample(near, near_h, x, z, true)
+	return base_height_at(x, z) if is_nan(h) else h
+
+
 ## Keep the original bilinear sample for road shoulders and track-side geometry.
 func base_height_at(x: float, z: float) -> float:
 	var h := _sample(near, near_h, x, z)
@@ -161,7 +174,7 @@ func base_height_at(x: float, z: float) -> float:
 	return h if not is_nan(h) else 0.0
 
 
-func _sample(g: Dictionary, h: PackedFloat32Array, x: float, z: float) -> float:
+func _sample(g: Dictionary, h: PackedFloat32Array, x: float, z: float, triangular := false) -> float:
 	var n := int(g.n)
 	var cell := float(g.cell)
 	var fx := (x - float(g.x0)) / cell
@@ -176,6 +189,8 @@ func _sample(g: Dictionary, h: PackedFloat32Array, x: float, z: float) -> float:
 	var h10 := h[iz * n + ix + 1]
 	var h01 := h[(iz + 1) * n + ix]
 	var h11 := h[(iz + 1) * n + ix + 1]
+	if triangular:
+		return h00 + tx*(h10-h00) + tz*(h01-h00) + maxf(tx+tz-1.0, 0.0)*(h11-h10-h01+h00)
 	return lerpf(lerpf(h00, h10, tx), lerpf(h01, h11, tx), tz)
 
 

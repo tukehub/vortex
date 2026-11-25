@@ -241,14 +241,13 @@ func _build_sea_rocks() -> void:
 	var anchors := []
 	for anchor: Dictionary in props.landmarks:
 		if SeaRocks.ANCHORS.has(anchor.get("id", "")):
-			anchors.append({"x": anchor.x, "z": anchor.z, "radius": SeaRocks.ANCHORS[anchor.id]})
+			anchors.append({"x": anchor.x, "z": anchor.z, "yaw": anchor.yaw, "radius": SeaRocks.ANCHORS[anchor.id]})
 	if anchors.is_empty():
 		return
 	sea_rocks = SeaRocks.new()
 	sea_rocks.name = "SeaRocks"
 	add_child(sea_rocks)
 	sea_rocks.build(terrain, track, anchors)
-	sea_rocks.set_wet(sky.wet)
 	RaceReflections.hide_detail(sea_rocks)
 
 
@@ -1039,8 +1038,6 @@ func _update_weather(dt: float) -> void:
 		terrain.set_env(sky.wet, 0.0, sky.night)
 		if sea != null:
 			sea.set_env(sky.wet, sky.night)
-		if sea_rocks != null:
-			sea_rocks.set_wet(sky.wet)
 		buildings.set_env(sky.night, sky.wet)
 		props.set_night(sky.night)
 		for car in cars:

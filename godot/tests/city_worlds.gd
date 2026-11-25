@@ -288,10 +288,8 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	assert(tunnel_tris < 12000, "tunnel stays under 12k triangles (%d)" % tunnel_tris)
 	assert(tunnel_node.find_children("*", "OmniLight3D", true, false).is_empty(), "tunnel lighting is emissive, not real-time lights")
 	_check_tunnel_cut(tunnel_node, track, entry, exit)
-	var boulders := 0
-	for i in 4:
-		boulders += (tunnel_node.get_node("Breakwater%d" % i) as MultiMeshInstance3D).multimesh.instance_count
-	assert(boulders > 80, "a breakwater along both approaches (%d boulders)" % boulders)
+	var field := tunnel_node.get_node("TunnelRockField") as RockField
+	assert(field.placed.size() > 120 and field.chunks.size() > 3, "clustered breakwater and talus on both approaches")
 	assert(tunnel_node.get_node_or_null("SeamScrub0") != null, "scrub on the cliff-hillside seam")
 	print("VLORE OUT-AND-BACK: %.0f m, carriageways at least %.1f m apart" % [track.L, tight])
 	for i in track.M * 4:
@@ -312,10 +310,8 @@ func _test_vlore_circuit(scene: RaceScene, marks: Node) -> void:
 	assert(bore.mesh.get_aabb().size.length() < 145.0, "reverse race must build the same short bore")
 	assert(tunnel.get_node("Portals").global_transform.is_equal_approx(tunnel_node.get_node("Portals").global_transform),
 		"both directions share the same baked portal alignment")
-	var reverse_talus := tunnel.get_node("SeamRocks") as MultiMeshInstance3D
-	var talus := tunnel_node.get_node("SeamRocks") as MultiMeshInstance3D
-	assert(reverse_talus.multimesh.get_instance_transform(0).is_equal_approx(talus.multimesh.get_instance_transform(0)),
-		"talus placement is stable across race directions")
+	var reverse_field := tunnel.get_node("TunnelRockField") as RockField
+	assert(reverse_field.placed == field.placed, "rock placement is stable across race directions")
 	tunnel.queue_free()
 
 
@@ -331,8 +327,6 @@ func _check_tunnel_cut(tunnel: Node3D, track: RaceTrack, entry: float, exit: flo
 	var concrete: PackedColorArray = portal.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
 	assert(Array(stone).any(func(color: Color) -> bool: return color.r < .75 and color.b > .1), "baked limestone recesses and joints")
 	assert(Array(concrete).any(func(color: Color) -> bool: return color.r < .58), "baked collar soffit occlusion")
-	var talus := tunnel.get_node("SeamRocks") as MultiMeshInstance3D
-	assert(talus.multimesh.mesh.get_faces().size() / 3 <= 500 and talus.multimesh.instance_count >= 20)
 	assert(cliff.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
 	var previous := Quality.preset
 	Quality.set_preset("high")

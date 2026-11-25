@@ -1,0 +1,167 @@
+{
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "sources": [
+    {
+      "id": "rock_07",
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "page": "https://polyhaven.com/a/rock_07",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_07/rock_07_1k.gltf",
+          "md5": "2bdb563c126a9d284e60e94951759e2f",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_07/rock_07.bin",
+          "md5": "817b2cfd1626cb06f18a825f87f58ec3",
+          "path": "rock_07.bin"
+        }
+      ]
+    },
+    {
+      "id": "rock_09",
+      "authors": [
+        "Jenelle van Heerden"
+      ],
+      "page": "https://polyhaven.com/a/rock_09",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_09/rock_09_1k.gltf",
+          "md5": "d12ac6e8433fe1346fe6945154269f66",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_09/rock_09.bin",
+          "md5": "6f2f71c9ca594566c1a3b29da27293a1",
+          "path": "rock_09.bin"
+        }
+      ]
+    },
+    {
+      "id": "boulder_01",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "page": "https://polyhaven.com/a/boulder_01",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01_1k.gltf",
+          "md5": "26e2eef4a1f68c9557c65cd375b21d6c",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+          "md5": "27a19fa031d8b4c3a09261f19c444dc5",
+          "path": "boulder_01.bin"
+        }
+      ]
+    },
+    {
+      "id": "stone_01",
+      "authors": [
+        "Dario Barresi",
+        "Rico Cilliers"
+      ],
+      "page": "https://polyhaven.com/a/stone_01",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/stone_01/stone_01_1k.gltf",
+          "md5": "3dd857c5c56ce0194869ba53ad003c88",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/stone_01/stone_01.bin",
+          "md5": "f64c71f0097f1536c030d397b9783078",
+          "path": "stone_01.bin"
+        }
+      ]
+    },
+    {
+      "id": "namaqualand_boulder_02",
+      "authors": [
+        "Greg Zaal",
+        "Rico Cilliers"
+      ],
+      "page": "https://polyhaven.com/a/namaqualand_boulder_02",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_02/namaqualand_boulder_02_1k.gltf",
+          "md5": "0730814e31f50e85defd7b8833a02070",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_02/namaqualand_boulder_02.bin",
+          "md5": "aa8f2212633a07a7e9a805e90977f4fd",
+          "path": "namaqualand_boulder_02.bin"
+        }
+      ]
+    },
+    {
+      "id": "namaqualand_boulder_03",
+      "authors": [
+        "Dario Barresi",
+        "Jenelle van Heerden"
+      ],
+      "page": "https://polyhaven.com/a/namaqualand_boulder_03",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_03/namaqualand_boulder_03_1k.gltf",
+          "md5": "419d98b4512f1bc06245555c84f6effc",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_03/namaqualand_boulder_03.bin",
+          "md5": "ded61ea310a66144546eac2a891b6dba",
+          "path": "namaqualand_boulder_03.bin"
+        }
+      ]
+    },
+    {
+      "id": "namaqualand_boulder_05",
+      "authors": [
+        "Dario Barresi",
+        "Jenelle van Heerden"
+      ],
+      "page": "https://polyhaven.com/a/namaqualand_boulder_05",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_05/namaqualand_boulder_05_1k.gltf",
+          "md5": "93b2f39714f9b4d19197335eb22d9283",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/namaqualand_boulder_05/namaqualand_boulder_05.bin",
+          "md5": "64bca194605dee7e361d43beabb3d4b7",
+          "path": "namaqualand_boulder_05.bin"
+        }
+      ]
+    },
+    {
+      "id": "coast_rocks_05",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "page": "https://polyhaven.com/a/coast_rocks_05",
+      "files": [
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/coast_rocks_05/coast_rocks_05_1k.gltf",
+          "md5": "4d4e9186fe053d2385913fd2bf7eddd9",
+          "path": "gltf"
+        },
+        {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/coast_rocks_05/coast_rocks_05.bin",
+          "md5": "9d4e639dd13128e96335a5d9828b3f47",
+          "path": "coast_rocks_05.bin"
+        }
+      ],
+      "triangle_targets": [
+        380,
+        176,
+        96
+      ]
+    }
+  ]
+}

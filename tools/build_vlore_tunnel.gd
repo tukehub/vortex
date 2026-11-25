@@ -18,7 +18,6 @@ const FIRST_INLAND := 18
 const SHELL_STEP := 1.8
 const BORE_STEP := 3.0
 const MAX_TRIS := 12000
-const SCAN := "pipeline/assets/vlore_rock_07.glb"
 
 var track: RaceTrack
 ## The game's near terrain grid, water carved as Terrain does it (no Terrain
@@ -87,21 +86,11 @@ func _initialize() -> void:
 	_add(bore, _bore(start, length), interior)
 	_add(bore, _light_strips(start, length), lights)
 	_child(root, "TunnelBore", bore)
-	for i in 4:
-		var boulder := ArrayMesh.new()
-		_add(boulder, _boulder(i), rock)
-		_child(root, "Boulder%d" % i, boulder)
 	for i in 2:
 		var bush := ArrayMesh.new()
 		_add(bush, _bush(i), scrub)
 		_child(root, "Scrub%d" % i, bush)
 
-	var talus := _scan_mesh(rock)
-	if talus == null:
-		root.free()
-		quit(1)
-		return
-	_child(root, "TalusScan", talus)
 	_scatter(root, cliff, start, length)
 
 	print("TUNNEL: %.1f m bore, %d triangles" % [length, tris])
@@ -131,7 +120,7 @@ func _child(root: Node3D, node_name: String, mesh: ArrayMesh) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
 	mi.mesh = mesh
-	if not (node_name.begins_with("Boulder") or node_name.begins_with("Scrub") or node_name == "TalusScan"):
+	if not node_name.begins_with("Scrub"):
 		mi.position = origin
 	root.add_child(mi)
 	mi.owner = root
@@ -500,29 +489,6 @@ func _resample(line: PackedVector3Array, n: int) -> PackedVector3Array:
 	return out
 
 
-## An angular boulder about 1.6 m across: a jittered icosphere, faceted.
-func _boulder(variant: int) -> SurfaceTool:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 400 + variant
-	var sphere := SphereMesh.new()
-	sphere.radial_segments = 7
-	sphere.rings = 4
-	sphere.radius = 0.8
-	sphere.height = 1.25
-	var faces := sphere.get_faces()
-	var moved := {}
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for p in faces:
-		var key := Vector3i((p * 100.0).round())
-		if not moved.has(key):
-			moved[key] = p * Vector3(rng.randf_range(0.8, 1.25), rng.randf_range(0.7, 1.1), rng.randf_range(0.8, 1.25))
-		var q: Vector3 = moved[key]
-		st.set_uv(Vector2(q.x + q.y, q.z) * 0.5)
-		st.add_vertex(q + Vector3.UP * 0.35)
-	return st
-
-
 ## Crossed, inclinable sprays of lentisk/maquis foliage from the shared atlas.
 func _bush(variant: int) -> SurfaceTool:
 	var st := SurfaceTool.new()
@@ -546,40 +512,6 @@ func _bush(variant: int) -> SurfaceTool:
 	return st
 
 
-## A compact photogrammetry silhouette, normalized around its ground contact.
-func _scan_mesh(material: Material) -> ArrayMesh:
-	var path: String = get_script().resource_path.get_base_dir().path_join(SCAN)
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	var error := doc.append_from_file(path, state)
-	if error != OK:
-		printerr("Unable to open the optimized Rock 07 scan: ", error_string(error))
-		return null
-	var scene := doc.generate_scene(state)
-	var result := ArrayMesh.new()
-	for obj in scene.find_children("*", "MeshInstance3D", true, false):
-		var model := obj as MeshInstance3D
-		for i in model.mesh.get_surface_count():
-			var st := SurfaceTool.new()
-			st.create_from(model.mesh, i)
-			var arrays := st.commit_to_arrays()
-			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var bounds := model.mesh.get_aabb()
-			var foot := Vector3(bounds.get_center().x, bounds.position.y, bounds.get_center().z)
-			var span := maxf(bounds.size.x, bounds.size.z)
-			var uvs := PackedVector2Array()
-			for j in verts.size():
-				verts[j] = (verts[j] - foot) / span
-				uvs.append(Vector2(verts[j].x, verts[j].z))
-			arrays[Mesh.ARRAY_VERTEX] = verts
-			arrays[Mesh.ARRAY_TEX_UV] = uvs
-			result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			result.surface_set_material(result.get_surface_count() - 1, material)
-			tris += (arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
-	scene.free()
-	return result if result.get_surface_count() > 0 else null
-
-
 ## Project decorative anchors onto the baked cut once, during the bake.
 ## The shipped scene just instances the prototypes at these fixed sites.
 func _scatter(root: Node3D, cliff: ArrayMesh, start: float, length: float) -> void:
@@ -593,28 +525,52 @@ func _scatter(root: Node3D, cliff: ArrayMesh, start: float, length: float) -> vo
 		for i in 26:
 			var reach := rng.randf_range(3.5, 40.0)
 			var inland := rng.randf_range(10.5, 23.5)
-			var p := _at(s + reach*sign_out, -inland, 0.0)
-			var heights_at := _scatter_height(p, faces)
+			var p := _at(s + reach * sign_out, -inland, 0.0)
+			var contact := _scatter_contact(p, faces)
+			var normal := Vector3(contact.y, contact.z, contact.w)
 			var plant := i >= 13
-			if plant and heights_at.y < .66:
+			if plant and normal.y < .66:
 				continue
-			var prefix := "MaquisSite" if plant else "TalusSite"
-			p.y = heights_at.x - (.08 if plant else .04)
-			var radius := rng.randf_range(.54, 1.32) if plant else rng.randf_range(.25, 1.12)
-			if reach < 15.0 and inland < 14.0:
-				radius *= .66
-			var marker := Node3D.new()
-			marker.name = "%s%02d" % [prefix, counts[prefix]]
-			counts[prefix] += 1
-			marker.transform = Transform3D(Basis(Vector3.UP, rng.randf()*TAU).scaled(
-				Vector3(radius, radius*rng.randf_range(.76, 1.16), radius)), p + origin)
-			root.add_child(marker)
-			marker.owner = root
+			p.y = contact.x
+			var width := rng.randf_range(.36, 1.12)
+			if plant:
+				width *= 1.25
+				p.y -= .08
+			_scatter_marker(root, "MaquisSite" if plant else "TalusSite", p,
+				Vector3.UP if plant else normal, width, rng, counts)
+			if not plant:
+				for j in rng.randi_range(3, 6):
+					var angle := rng.randf() * TAU
+					var radial := rng.randf_range(.32, 1.15) * width
+					var q := p + Vector3(cos(angle), 0., sin(angle)) * radial
+					var world := q + origin
+					if track.dist_to(world.x, world.z) < track.half_w + 4.6:
+						continue
+					var ground := _scatter_contact(q, faces)
+					q.y = ground.x
+					var contact_normal := Vector3(ground.y, ground.z, ground.w)
+					if absf(q.y - p.y) < 1.6:
+						_scatter_marker(root, "TalusSite", q, contact_normal,
+							rng.randf_range(.096, .29), rng, counts)
 
 
-func _scatter_height(p: Vector3, faces: PackedVector3Array) -> Vector2:
-	var best := _height(p.x + origin.x, p.z + origin.z) - origin.y
-	var slope := 1.0
+func _scatter_marker(root: Node3D, prefix: String, p: Vector3, up: Vector3,
+		width: float, rng: RandomNumberGenerator, counts: Dictionary) -> void:
+	var yaw := rng.randf() * TAU
+	var axis := (Vector3(cos(yaw), 0., sin(yaw)) - up * up.dot(Vector3(cos(yaw), 0., sin(yaw)))).normalized()
+	var marker := Node3D.new()
+	marker.name = "%s%03d" % [prefix, counts[prefix]]
+	counts[prefix] += 1
+	marker.transform = Transform3D(Basis(axis, up, axis.cross(up)).scaled(Vector3.ONE * width), p + origin)
+	root.add_child(marker)
+	marker.owner = root
+
+
+func _scatter_contact(p: Vector3, faces: PackedVector3Array) -> Vector4:
+	var world := p + origin
+	var best := _height(world.x, world.z) - origin.y
+	var normal := Vector3(_height(world.x-.6, world.z) - _height(world.x+.6, world.z),
+		1.2, _height(world.x, world.z-.6) - _height(world.x, world.z+.6)).normalized()
 	for i in range(0, faces.size(), 3):
 		var a := faces[i]
 		var b := faces[i+1]
@@ -625,5 +581,7 @@ func _scatter_height(p: Vector3, faces: PackedVector3Array) -> Vector2:
 		var hit: Variant = Geometry3D.ray_intersects_triangle(Vector3(p.x, 65.0, p.z), Vector3.DOWN, a, b, c)
 		if hit != null and hit.y > best:
 			best = hit.y
-			slope = absf((b-a).cross(c-a).normalized().y)
-	return Vector2(best, slope)
+			normal = (c-a).cross(b-a).normalized()
+			if normal.y < 0.0:
+				normal = -normal
+	return Vector4(best, normal.x, normal.y, normal.z)

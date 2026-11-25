@@ -154,19 +154,12 @@ car heave and roll, reverse joins on the right, two-way cities untouched).
   on medium and high before thermal pressure stage 2. The small wings cast
   on high with no thermal pressure. The cliff and decorative batches keep
   their baked shading at every preset.
-- The bake projects talus and low maquis onto stable sites at the cut.
-  Talus uses a 480-triangle reduction of **Rock 07** by Jenelle van Heerden
-  (Poly Haven, CC0 1.0), retextured with the game's Marble Rock 03. The
-  geometry-only source is `tools/pipeline/assets/vlore_rock_07.glb`.
-  It uses the 1K glTF geometry stream (source MD5
-  `817b2cfd1626cb06f18a825f87f58ec3`) and meshoptimizer simplification.
-  The cliffs reuse the 1K Marble Rock 03 albedo and Rock Face 03 ARM. The
-  shape and surface maps add no new texture downloads. The existing wet
-  breakwater keeps its four inexpensive shared shapes. [Rock 07](https://polyhaven.com/a/rock_07) · [License](https://polyhaven.com/license)
-- Rebuild after changing the route or the local terrain bake.
+- The bake projects talus and low maquis onto the cut. The markers carry
+  the contact height and surface normal, including for gravel around the
+  larger blocks. The tunnel and the courts use the same rock library.
+  Rebuild the cut after changing the route or local terrain.
   `godot --headless --path godot --script ../tools/build_vlore_tunnel.gd`
-  produces a GLB with 7,562 triangles including shared rock and plant
-  prototypes. The bake rejects a result over 12,000 triangles.
+  produces its visual mesh, vegetation prototypes, and placement markers.
 - **Asphalt** is continuous: the photo's cracks (its darkest ~4%) fill to
   its median tone, so the two crossed samples no longer draw a slab grid, and
   the procedural repaired patches are gone.
@@ -183,14 +176,11 @@ Captures: `tests/vlore_round2_visual.tscn`.
 
 After the photographs of that shore at night:
 
-- **Rock armour** (`scripts/world/sea_rocks.gd`, `shaders/sea_rock.gdshader`):
-  angular ochre and grey limestone boulders piled from 1.6 m out in the water
-  up the bank (to 3 m above the sea, at most 9 m in), two layers over the
-  toe; ~11 000 stones along the waterline within 140 m of the race road,
-  420 m either side of the courts. The waterline is traced from the baked
-  water mask, then walked inland to where the bank actually leaves the water
-  (the mask's line sits on the dropped seabed). Stones are darker, glossier
-  and algae-tinted up to 0.9 m above the water; rain wets them all.
+- **Rock armour** clusters along the actual waterline within 140 m of the
+  race road. Each cluster has a few larger blocks, a skirt of broken stone,
+  and a finer gravel fringe. Waterline and road clearances constrain the
+  scatter. At Uji i Ftohtë, the same models form breakwater clusters and
+  slope-aligned talus beside both portals.
 - **Water** (`shaders/sea.gdshader`): green-teal near the shore and on wave
   faces turned to the viewer; a warped Voronoi **lace** of foam that forms
   behind each set of waves, thins seaward and drifts in rafts; a broken
@@ -199,24 +189,38 @@ After the photographs of that shore at night:
   18–120 m from the camera, every 0.45–1.1 s. Off on Low and under
   performance pressure (`fx_extras`).
 
-### Cost
+![Limestone scan clusters on the Vlorë bank](images/vlore-rock-scans.webp)
 
-Fixed camera on the rocks (the worst case), Mobile renderer, 1280×720
-(lavapipe; primitive counts are device-independent):
+### Rock library and rendering
 
-| | Medium | Low |
-|---|---|---|
-| Without rocks | 486 k triangles, 175 draws | 484 k, 172 |
-| With rocks | 634 k (+148 k), 204 draws | 564 k (+81 k), 200 |
-| Chase camera on the grid | unchanged (587 k) | unchanged |
+Eight Poly Haven CC0 scans share the existing 1K Rock Face 03 albedo,
+OpenGL normal and packed AO/roughness/metallic maps. The scan shapes place
+neutral limestone at both sites, with varying scale, colour, orientation and
+spray exposure. Water and rain lower roughness and darken the stone. Vertex
+ambient occlusion comes from the scan's recesses and normalized base.
+Placement samples the rendered terrain triangles and sinks each rock
+according to the slope and its actual height.
 
-Per 96 m chunk and stone shape there are two MultiMeshes: 56-triangle stones
-within 75 m of the chunk centre, 30-triangle ones to 420 m. Low and pressure
-stage ≥ 2 draw 55% of the stones (shuffled, so the pile thins evenly). No
-shadows, one material. The lace is evaluated only within 22 m of the shore
-and 260 m of the camera.
+The 141,188-byte GLB holds the three authored LODs for all eight models.
+Most have 380, 132 and 40 triangles. The compound coastal scan retains
+379, 173 and 95 to preserve its separate formations. Each 56 m chunk keeps
+one MultiMesh per active shape, plus a single batch for low-poly gravel. The LOD switches meshes about 52 m and
+136 m from the chunk footprint, with hysteresis, and culls the batch at
+390 m. Distance removes gravel and then small fragments. Low quality and
+thermal pressure use coarser settings. All batches share the limestone
+material and use baked shading. The three shared 1K Android ASTC files
+total about 4 MiB including mipmaps. An isolated occupied chunk in the desktop
+Mobile renderer submitted 51,040, 16,783 and 3,810 triangles at the three LODs,
+and zero past its visibility range. Phone frame time remains unmeasured.
 
-Not verified on a phone: frame time at the seafront on the target devices.
+Rebuild the library with Node.js 22+ and the Python pipeline tools. Only
+the checksum-pinned source geometry is downloaded. Scan names, authors
+and URLs are recorded in the source manifest. [Source manifest](../tools/pipeline/rock_scans/sources.json) · [CC0 license](https://polyhaven.com/license)
+
+```sh
+npm ci --prefix tools/pipeline/rock_scans
+python3 tools/pipeline/rock_scans/bake.py
+```
 
 ## Tests
 
@@ -227,7 +231,7 @@ Not verified on a phone: frame time at the seafront on the target devices.
 - `tests/vlore_one_road`: the joined road and the Lungomare median.
 - `tests/vlore_kuzum_baba`: the line on the first (outbound) pass.
 - `tests/sea_rocks`: stones along the waterline, off the road, near the
-  courts; both LODs; thinner on Low; spray only when `fx_extras`.
+  courts; all three LODs; baked shading; slope burial; gravel thinning; spray only when `fx_extras`.
 - `tools/pipeline/test_out_and_back.py`: merge join (shallow merge kept
   whole, converging road cut back, impossible merge refused), carriageway
   gate, first-pass seafront.

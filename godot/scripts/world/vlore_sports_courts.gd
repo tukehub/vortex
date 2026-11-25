@@ -4,14 +4,18 @@ extends Node3D
 const WHITE := Color("#f0eee3")
 const POST := Color("#435355")
 const BASE := Color("#d8c9ae")
+# Local centre along Z, width, length. The footing extends 1.35 m on each side.
+const COURTS := [Vector3(-44.0, 23., 33.), Vector3(-7.5, 20., 33.), Vector3(37.0, 28., 48.)]
+
 
 
 func build() -> void:
 	var st := LandmarkKit.begin()
 	var fence := LandmarkKit.begin()
-	_court(st, fence, -44.0, Vector2(23, 33), Color("#258cc9"))
-	_court(st, fence, -7.5, Vector2(20, 33), Color("#bf5149"))
-	_court(st, fence, 37.0, Vector2(28, 48), Color("#559c49"))
+	var paints := [Color("#258cc9"), Color("#bf5149"), Color("#559c49")]
+	for i in COURTS.size():
+		var court: Vector3 = COURTS[i]
+		_court(st, fence, court.x, Vector2(court.y, court.z), paints[i])
 	_tennis(st, fence, -44.0)
 	_basketball(st, -7.5)
 	_football(st, fence, 37.0)
@@ -28,6 +32,14 @@ func build() -> void:
 	var net := LandmarkKit.mesh_node(fence, mesh_material, "ChainLink", 360.0)
 	net.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(net)
+
+
+static func overlaps_footing(xz: Vector2, radius: float) -> bool:
+	for court: Vector3 in COURTS:
+		var half := Vector2(court.y, court.z) * .5 + Vector2.ONE * (1.35 + radius)
+		if absf(xz.x) < half.x and absf(xz.y-court.x) < half.y:
+			return true
+	return false
 
 
 func _court(st: SurfaceTool, fence: SurfaceTool, z: float, size: Vector2, tint: Color) -> void:

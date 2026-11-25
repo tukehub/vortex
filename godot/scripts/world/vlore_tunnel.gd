@@ -7,7 +7,6 @@ const ROCK := Color("#a3a098")
 ## Breakwater: boulders between the coastal wall and the water, per metre of
 ## each approach; scrub and loose rock along the inland seam.
 const BREAKWATER_REACH := 95.0
-const BOULDER_EVERY := 1.6
 var _shadow_near: Array[MeshInstance3D] = []
 var _shadow_high: Array[MeshInstance3D] = []
 
@@ -21,7 +20,7 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 	var model := MODEL.instantiate()
 	var materials := _materials(terrain)
 	var props := {}
-	var talus := []
+	var talus: Array[Transform3D] = []
 	var maquis := [[], []]
 	var shrub_index := 0
 	for child: Node3D in model.get_children():
@@ -38,7 +37,7 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 			continue
 		model.remove_child(mesh_node)
 		mesh_node.owner = null
-		if String(mesh_node.name).begins_with("Boulder") or String(mesh_node.name).begins_with("Scrub") or mesh_node.name == "TalusScan":
+		if String(mesh_node.name).begins_with("Scrub"):
 			props[String(mesh_node.name)] = mesh_node.mesh
 			mesh_node.free()
 			continue
@@ -55,10 +54,9 @@ func build(track: RaceTrack, portals: Array, reverse: bool, terrain: Terrain) ->
 			_shadow_high.append(mesh_node)
 	model.free()
 	_seawall(track, start, length, -inland, terrain)
-	_breakwater(track, start, length, -inland, terrain, props, materials)
+	_place_rocks(RaceTrack.load_city("vlore", false) if reverse else track, portals, terrain, talus)
 	for i in 2:
 		_batch("SeamScrub%d" % i, props.get("Scrub%d" % i), maquis[i], materials.scrub, 210.0)
-	_batch("SeamRocks", props.get("TalusScan"), talus, materials.debris, 250.0)
 	Quality.budget_changed.connect(_update_shadows)
 	_update_shadows()
 
@@ -73,22 +71,9 @@ func _update_shadows() -> void:
 
 
 func _materials(terrain: Terrain) -> Dictionary:
-	var rock := StandardMaterial3D.new()
-	rock.resource_name = "cliff_rock"
-	# Limestone (marble_rock_03, 1K): world triplanar, so strata and cracks
-	# run the same over every face of the cliff, never stretched.
-	rock.albedo_texture = preload("res://assets/textures/marble_rock_diff.jpg")
-	rock.normal_enabled = true
-	rock.normal_texture = preload("res://assets/textures/marble_rock_nor.jpg")
-	rock.roughness_texture = preload("res://assets/textures/marble_rock_rough.jpg")
-	rock.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GRAYSCALE
-	rock.uv1_triplanar = true
-	rock.uv1_world_triplanar = true
-	rock.uv1_triplanar_sharpness = 4.0
-	rock.uv1_scale = Vector3.ONE * 0.12
 	var cliff := ShaderMaterial.new()
 	cliff.shader = preload("res://shaders/vlore_limestone.gdshader")
-	cliff.set_shader_parameter("stone_map", rock.albedo_texture)
+	cliff.set_shader_parameter("stone_map", preload("res://assets/textures/marble_rock_diff.jpg"))
 	cliff.set_shader_parameter("rock_arm", preload("res://assets/textures/limestone_arm.jpg"))
 	cliff.set_shader_parameter("scrub_map", preload("res://assets/textures/grass_diff.jpg"))
 	cliff.set_shader_parameter("landscape", preload("res://assets/cities/vlore/ground_macro.png"))
@@ -116,12 +101,6 @@ func _materials(terrain: Terrain) -> Dictionary:
 	strips.emission_enabled = true
 	strips.emission = Color(1.0, 0.80, 0.52)
 	strips.emission_energy_multiplier = 2.4
-	var shore := ShaderMaterial.new()
-	shore.shader = preload("res://shaders/shoreline_rock.gdshader")
-	shore.set_shader_parameter("albedo_tex", rock.albedo_texture)
-	shore.set_shader_parameter("normal_tex", rock.normal_texture)
-	shore.set_shader_parameter("rough_tex", rock.roughness_texture)
-	shore.set_shader_parameter("water_y", terrain.water_surface if terrain.has_water else -1.2)
 	var scrub := StandardMaterial3D.new()
 	scrub.resource_name = "scrub"
 	scrub.vertex_color_use_as_albedo = true
@@ -131,27 +110,41 @@ func _materials(terrain: Terrain) -> Dictionary:
 	scrub.cull_mode = BaseMaterial3D.CULL_DISABLED
 	scrub.roughness = .95
 	return {"cliff_rock": cliff, "portal_masonry": masonry, "tunnel_interior": lining,
-		"ceiling_lights": strips, "shoreline": shore, "scrub": scrub, "debris": rock}
+		"ceiling_lights": strips, "scrub": scrub}
 
 
-## Boulders between the coastal wall and the sea, both approaches: random Y
-## turn, non-uniform 0.8-1.3 scale, settled into the seabed or beach.
-func _breakwater(track: RaceTrack, start: float, length: float, coast: float, terrain: Terrain, props: Dictionary, materials: Dictionary) -> void:
+## The same scan library as the courts. A canonical track basis keeps the
+## deposits on the coast when driving either direction.
+func _place_rocks(track: RaceTrack, portals: Array, terrain: Terrain, talus: Array[Transform3D]) -> void:
+	var field := RockField.new()
+	field.name = "TunnelRockField"
+	add_child(field)
+	field.start(terrain)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5170
-	var groups := [[], [], [], []]
-	for approach: Array in [[start - BREAKWATER_REACH, start - 2.0], [start + length + 2.0, start + length + BREAKWATER_REACH]]:
-		var s: float = approach[0]
-		while s < float(approach[1]):
-			var d := coast * (track.half_w + 3.9 + rng.randf() * 3.6)
-			var p := track.pos(s + rng.randf_range(-0.5, 0.5), d)
-			var scale := Vector3(rng.randf_range(0.8, 1.3), rng.randf_range(0.8, 1.3), rng.randf_range(0.8, 1.3))
-			p.y = terrain.height_at(p.x, p.z) - 0.35 * scale.y
-			var basis := Basis(Vector3.UP, rng.randf() * TAU).scaled(scale)
-			groups[rng.randi() % 4].append(Transform3D(basis, p))
-			s += BOULDER_EVERY
-	for i in 4:
-		_batch("Breakwater%d" % i, props.get("Boulder%d" % i), groups[i], materials.shoreline, 420.0)
+	var start := track.locate_xz(portals[0][0], portals[0][1]).x
+	var finish := track.locate_xz(portals[1][0], portals[1][1]).x
+	var y := terrain.water_surface
+	for span: Vector2 in [Vector2(start - BREAKWATER_REACH, start - 3.0),
+			Vector2(finish + 3.0, finish + BREAKWATER_REACH)]:
+		var s := span.x + rng.randf_range(1.0, 4.0)
+		while s < span.y:
+			var stretch := sin(s * .19) * 1.1
+			var p := track.pos(s, track.half_w + rng.randf_range(5.1, 9.5) + stretch)
+			var forward := track.tangent(s)
+			var strike := Vector2(forward.x, forward.z).normalized()
+			var allowed := func(q: Vector2, width: float) -> bool:
+				var ground := terrain.surface_height_at(q.x, q.y)
+				return ground >= y - 3.7 and ground < y + 4.4 and track.dist_to(q.x, q.y) > track.half_w + 3.15 + width*.7
+			field.cluster(Vector2(p.x, p.z), strike, rng.randf_range(2.3, 4.5),
+				rng.randf_range(1.06, 2.13), 1.0, allowed, rng)
+			s += rng.randf_range(4.6, 11.0)
+	# Replay baked stations after shoreline generation, using a separate seed.
+	rng.seed = 19831
+	for site in talus:
+		field.add_talus(site, rng)
+	field.finish()
+	RaceReflections.hide_detail(field)
 
 
 func _batch(node_name: String, mesh: Mesh, transforms: Array, material: Material, reach: float) -> void:
