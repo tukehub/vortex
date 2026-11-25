@@ -25,6 +25,9 @@ var bands: Array[Dictionary] = []
 ## past the far edge of a joined road on that side, or NAN where that road
 ## is narrowing to split (the band would stand on the other carriageway).
 static func _offset(track: RaceTrack, s: float, d: float) -> float:
+	# A sprint's turn past the line is not raced or drawn.
+	if track.hidden(s):
+		return NAN
 	if track.PAIR.size() != track.M:
 		return d
 	var k := posmod(roundi(s / track.ds), track.M)
@@ -46,6 +49,9 @@ func build(track: RaceTrack, guide: Guide, height_at := Callable(), views: Array
 	for turn: Dictionary in guide.turns:
 		var from := float(turn.start) - LEAD
 		var length := float(turn.span) + LEAD * 2.0
+		# The turn past a sprint's finish is never raced: no boards for it.
+		if track.hidden(float(turn.start)) or track.hidden(float(turn.start) + float(turn.span) * 0.5) or track.hidden(float(turn.start) + float(turn.span)):
+			continue
 		var d := -float(turn.side) * (track.half_w + OUTSIDE)
 		var count := maxi(2, ceili(length / STEP) + 1)
 		var points: Array[Vector3] = []

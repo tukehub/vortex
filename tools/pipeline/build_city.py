@@ -1601,6 +1601,9 @@ def build(cid, route_only=False):
     pts = [[round(float(dense[i, 0]), 2), round(float(y[i]), 2), round(float(dense[i, 1]), 2)] for i in range(0, len(dense), step)]
     if cid == 'tirane':
         pts = place_tirana_finish(pts, city, proj)
+    elif 'sprint' in city:
+        pts, sprint = finish_line.place_sprint(pts, np.asarray(proj.to_xz(*city['sprint']['ll']), float))
+        log(f'  sprint {sprint}')
     elif 'finish_before' in city:
         spec = city['finish_before']
         pts, info = finish_line.place_finish_before(pts, np.asarray(proj.to_xz(*spec['ll']), float), float(spec.get('metres', 100.0)))
@@ -1616,6 +1619,9 @@ def build(cid, route_only=False):
         # Lanes per carriageway and one-way traffic (an out-and-back circuit
         # races each direction on its own carriageway).
         **({'lanes': city['lanes']} if 'lanes' in city else {}),
+        **({'sprint': sprint} if 'sprint' in city else {}),
+        # Where the two passes part with an island between (RaceTrack.splits).
+        **({'splits': [[*(round(float(v), 2) for v in proj.to_xz(*ll)), r] for ll, r in city['splits']]} if 'splits' in city else {}),
         **({'one_way': True} if 'out_and_back' in city else {}),
     })
     log(f'  track.json {len(pts)} control points, elevation {y.min():.1f}..{y.max():.1f} m')

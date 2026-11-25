@@ -88,6 +88,42 @@ def place_finish_before(points, anchor_xz, metres):
                                            'distance_to_anchor': round(float(np.hypot(*(xz[near] - anchor_xz))), 1)}
 
 
+def place_sprint(points, line_xz):
+    """An out-and-back raced once without turning at the line: the lap passes
+    `line_xz` twice, a carriageway apart. Rotate closed `points` to start on
+    the pass the turn lies just behind, and return (points, sprint) with
+    sprint = {'start': [x, z], 'finish': [x, z]}: the finish is the other
+    pass beside the start, reached at the end of the run before the turn."""
+    xz = np.asarray([[p[0], p[2]] for p in points], float)
+    cum = _cum(xz)
+    lap = cum[-1]
+    cum = cum[:len(xz)]
+    dist = np.hypot(xz[:, 0] - line_xz[0], xz[:, 1] - line_xz[1])
+    first = int(np.argmin(dist))
+    # The nearest sample of the other pass: far along the lap from the first.
+    apart = np.abs((cum - cum[first] + lap / 2) % lap - lap / 2)
+    other = int(np.argmin(np.where(apart > 60.0, dist, np.inf)))
+    # Start where the run forward to the other pass is the long way round.
+    forward = (cum[other] - cum[first]) % lap
+    start, finish = (first, other) if forward > lap / 2 else (other, first)
+    rotated = points[start:] + points[:start]
+    return rotated, {'start': [round(float(v), 2) for v in xz[start]],
+                     'finish': [round(float(v), 2) for v in xz[finish]]}
+
+
+def process_sprint(cid):
+    city = CITIES[cid]
+    proj = Proj(*city['origin'], city.get('latitude_compression', ()))
+    path = os.path.join(OUT, cid, 'track.json')
+    with open(path, encoding='utf8') as f:
+        tj = json.load(f)
+    tj['pts'], tj['sprint'] = place_sprint(tj['pts'], np.asarray(proj.to_xz(*city['sprint']['ll']), float))
+    with open(path, 'w', encoding='utf8') as f:
+        json.dump(tj, f, separators=(',', ':'))
+    log(f'[{cid}] sprint {tj["sprint"]}')
+    return tj['sprint']
+
+
 def process_city(cid):
     city = CITIES[cid]
     spec = city.get('finish_before')

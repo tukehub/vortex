@@ -127,7 +127,7 @@ func _approaching_car(race, s: float) -> CarState:
 		if c.finished or c.wreck_t > 0.0 or not race.has_pickup_room(c):
 			continue
 		var distance: float = race.track.mod_s(s - c.s)
-		if distance > BOT_GUARD and distance <= nearest and c.progress + distance < race.laps * race.L:
+		if distance > BOT_GUARD and distance <= nearest and c.progress + distance < race.distance:
 			nearest = distance
 			best = c
 	return best
@@ -297,7 +297,7 @@ func _offer_help(race) -> void:
 	if free.is_empty():
 		return
 	for distance: float in [200.0, 195.0, 190.0]:
-		if c.progress + distance >= race.laps * race.L - 18.0:
+		if c.progress + distance >= race.distance - 18.0:
 			continue
 		var s: float = race.track.mod_s(c.s + distance)
 		if not _can_edit(race, s) or _help_weights(race, c, s, reason).is_empty():
@@ -336,9 +336,11 @@ func _assign(race, row: Dictionary, c: CarState, s: float, reason: String) -> vo
 		var tmp := choices[i]
 		choices[i] = choices[j]
 		choices[j] = tmp
+	var lanes: Array[float] = race.pickup_lanes(s)
 	for i in row.items.size():
 		var p: Dictionary = row.items[i]
 		p.s = s
+		p.d = lanes[i % lanes.size()]
 		p.type = choices[i]
 		if row.bonus:
 			p.active = true

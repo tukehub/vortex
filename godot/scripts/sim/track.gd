@@ -58,6 +58,23 @@ const ISLAND_ZONE := 75.0
 ## Lungomare's median (track.json "median"): 0..1 per sample on both passes,
 ## easing in and out over its first and last metres.
 var MEDIAN := PackedFloat32Array()
+## A sprint (track.json "sprint": {"start": [x, z], "finish": [x, z]}):
+## Vlorë's out-and-back starts on one carriageway and finishes beside the
+## start line on the other, without turning round. The loop still closes
+## through the turn past the line (the sim's road is a loop), but no car
+## races it: finish_s is where the race ends, and HIDE marks the turn's
+## samples, from SPRINT_RUNOUT past the finish to SPRINT_GRID behind the
+## start, which are not drawn.
+var sprint := false
+var finish_s := 0.0
+var HIDE := PackedByteArray()
+const SPRINT_RUNOUT := 42.0
+const SPRINT_GRID := 42.0
+## Splits (track.json "splits": [[x, z, radius], ...]): where the two passes
+## of an out-and-back part (Vlorë: the shore road to the tunnel, and
+## Dhimitër Konomi coming down), they are two roads with an island between,
+## not one, within radius of the point.
+var splits: Array[Vector3] = []
 ## Centre to centre: two carriageways and at most a 4 m strip between them.
 const JOIN_MAX_APART := 13.0
 const JOIN_TAPER := 80.0
@@ -94,6 +111,20 @@ func build(data: Dictionary, reverse := false) -> void:
 	var pts: Array[Vector3] = []
 	for p in raw:
 		pts.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
+	if reverse and data.has("sprint") and pts.size() > 2:
+		# Reversed, the sprint starts where it used to finish.
+		var f: Array = data.sprint.finish
+		var k := 0
+		var best := INF
+		for i in pts.size():
+			var d := Vector2(pts[i].x - float(f[0]), pts[i].z - float(f[1])).length_squared()
+			if d < best:
+				best = d
+				k = i
+		var turned: Array[Vector3] = []
+		for i in pts.size():
+			turned.append(pts[(k + i) % pts.size()])
+		pts = turned
 	if reverse and pts.size() > 2:
 		# Keep the start/finish anchored while travelling around the loop in
 		# the opposite order; recomputing frames also reverses steering normals.
@@ -103,8 +134,34 @@ func build(data: Dictionary, reverse := false) -> void:
 	_resample(pts)
 	_frames()
 	_grid_build()
+	splits.clear()
+	for row: Array in data.get("splits", []):
+		splits.append(Vector3(float(row[0]), float(row[1]), float(row[2])))
 	_join_build(data, reverse)
 	_island_build(data)
+	_sprint_build(data, reverse)
+
+
+func _sprint_build(data: Dictionary, reverse: bool) -> void:
+	HIDE.resize(M)
+	HIDE.fill(0)
+	sprint = data.has("sprint")
+	finish_s = L
+	if not sprint:
+		return
+	var f: Array = data.sprint.start if reverse else data.sprint.finish
+	finish_s = locate_xz(float(f[0]), float(f[1])).x
+	for i in M:
+		var at := i * ds
+		if at > finish_s + SPRINT_RUNOUT and at < L - SPRINT_GRID:
+			HIDE[i] = 1
+
+
+## True on the turn past a sprint's finish (never raced, not drawn).
+func hidden(s: float) -> bool:
+	if HIDE.size() != M:
+		return false
+	return HIDE[posmod(roundi(mod_s(s) / ds), M)] == 1
 
 
 # Closed Catmull-Rom through the control points, resampled to ~2 m arc length.
@@ -358,6 +415,12 @@ func _join_build(data: Dictionary, reverse: bool) -> void:
 			if dq < best_d:
 				best_d = dq
 				best = q
+		var parted := false
+		for sp: Vector3 in splits:
+			if p.distance_to(Vector2(sp.x, sp.y)) < sp.z:
+				parted = true
+		if parted:
+			continue
 		PAIR[i] = j
 		JOIN[i] = ((best.x - X[i]) * NX[i] + (best.z - Z[i]) * NZ[i]) * 0.5
 		other_y[i] = best.y

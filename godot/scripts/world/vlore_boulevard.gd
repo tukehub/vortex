@@ -118,7 +118,7 @@ func build(track: RaceTrack, data: Dictionary, street: PackedByteArray, terrain:
 		var next_bench := BENCH_EVERY * 0.5
 		for i in track.M:
 			var j := (i + 1) % track.M
-			if street[i] == 0 or street[j] == 0 or RoadMesh.open_side(track, i, side):
+			if street[i] == 0 or street[j] == 0 or RoadMesh.open_side(track, i, side) or RoadMesh.hidden_segment(track, i):
 				continue
 			if mouth_to[i] >= 0.0 or mouth_to[j] >= 0.0:
 				_mouth(apron, track, i, j, side, hw, maxf(mouth_to[i], mouth_to[j]), ground)
@@ -182,6 +182,7 @@ func build(track: RaceTrack, data: Dictionary, street: PackedByteArray, terrain:
 		preload("res://assets/textures/grass_nor.jpg"), null, 0.9, Color(0.48, 0.62, 0.40), 1.0)
 	hedge_mat.roughness = 0.9
 	add_child(_node(hedge, hedge_mat, "Hedges"))
+	_plaza(track, granite)
 	if not palm_rows.is_empty():
 		var p := Palms.new()
 		add_child(p)
@@ -195,6 +196,53 @@ func build(track: RaceTrack, data: Dictionary, street: PackedByteArray, terrain:
 			var n := track.nearest(x, z, 30.0)
 			return (track.Y[n] if n >= 0 else 0.0) + RoadMesh.KERB_H + 0.02
 		furniture.build({"bench": bench_rows, "bin": bin_rows}, top)
+
+
+## Sheshi i Flamurit where the race no longer turns: the sprint's hidden turn
+## (RaceTrack.HIDE) and the island it went round, paved in the square's
+## rose-grey granite out to the sidewalks' width, so the boulevard ends in
+## the square past the line.
+var plaza_area := 0.0
+
+func _plaza(track: RaceTrack, kerb_mat: Material) -> void:
+	if track.HIDE.size() != track.M:
+		return
+	var reach := track.half_w + KERB_W + SIDEWALK + 0.4
+	var pts := PackedVector2Array()
+	var y := 0.0
+	var n := 0
+	for k in track.M:
+		if track.HIDE[k] == 0:
+			continue
+		var p := Vector2(track.X[k], track.Z[k])
+		var nrm := Vector2(track.NX[k], track.NZ[k])
+		pts.append(p + nrm * reach)
+		pts.append(p - nrm * reach)
+		y += track.Y[k]
+		n += 1
+	if n < 3:
+		return
+	y = y / n + 0.03
+	var hull := Geometry2D.convex_hull(pts)
+	var st := ArchKit.begin()
+	var c := Vector2.ZERO
+	for q in hull:
+		c += q
+	c /= hull.size()
+	var centre := Vector3(c.x, y, c.y)
+	var level := func(q: Vector2) -> Vector3:
+		var k := track.nearest(q.x, q.y, 40.0)
+		return Vector3(q.x, (track.Y[k] + 0.03) if k >= 0 else y, q.y)
+	for i in hull.size() - 1:
+		var a: Vector3 = level.call(hull[i])
+		var b: Vector3 = level.call(hull[i + 1])
+		ArchKit.wall_quad(st, centre, a, b, centre, Color.WHITE, Vector3.UP)
+		plaza_area += absf((hull[i] - c).cross(hull[i + 1] - c)) * 0.5
+		# The edge, a granite step down to the ground.
+		ArchKit.wall_quad(st, a + Vector3.DOWN * 0.6, b + Vector3.DOWN * 0.6, b, a, Color(0.85, 0.85, 0.85), Vector3(a.x + b.x - 2.0 * c.x, 0, a.z + b.z - 2.0 * c.y))
+	var rose := ArchKit.material(preload("res://assets/textures/square_granite_diff.jpg"),
+		preload("res://assets/textures/square_granite_nor.jpg"), preload("res://assets/textures/square_granite_arm.jpg"), 2.4, Color(1.08, 1.0, 0.98), 0.6)
+	add_child(_node(st, rose, "FlagSquarePlaza"))
 
 
 func _node(st: SurfaceTool, mat: Material, node_name: String) -> MeshInstance3D:

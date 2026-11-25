@@ -264,7 +264,7 @@ func _check_limits() -> void:
 	_advance(race, 30.0)
 	check(int(race.pickup_director.counts.help_offers) == offers, "waiting without forward travel cannot farm assistance")
 	race = _fixture()
-	_move(race, race.player, race.laps * race.L - 170.0)
+	_move(race, race.player, race.distance - 170.0)
 	_advance(race, 3.0)
 	check(_bonus_rows(race).is_empty(), "no assistance station may be placed beyond the actual race finish")
 	race = _fixture()

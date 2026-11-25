@@ -51,7 +51,7 @@ func _ready() -> void:
 	# Out-and-back: the split round Sheshi Pavarsia on both passes, the
 	# Dhimitër Konomi merge, and the turn round the Flag Square island.
 	var skela := (landmarks.get_node("skela_roundabout") as Node3D).global_position
-	var flag := (landmarks.get_node("flag_square_island") as Node3D).global_position
+	var flag := (landmarks.get_node("independence") as Node3D).global_position
 	var skela_passes := []
 	var best := INF
 	for k in scene.track.M:

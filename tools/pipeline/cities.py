@@ -179,7 +179,11 @@ CITIES = {
             {'id': 'petro_marko', 'll': (40.46488, 19.49068), 'yaw': 72,
              'offset_x': -9, 'clear_half': (29, 26)},
             {'id': 'skela_roundabout', 'll': (40.454502, 19.486624), 'yaw': 0, 'island': 20.5},
-            {'id': 'flag_square_island', 'll': (40.470724, 19.491154), 'yaw': 0, 'island': 13.0, 'clear_half': (13, 13)},
+            # The lion fountain on the island at the Konomi split, its mouth
+            # toward the traffic coming down the shore road; the plane tree
+            # (rrapi) behind it in the gore.
+            {'id': 'rrapi_lion', 'll': (40.431001, 19.494064), 'yaw': -41.4, 'clear_half': (8, 8)},
+            {'id': 'rrapi_tree', 'll': (40.430371, 19.493851), 'yaw': 0, 'clear_half': (9, 9)},
             {'id': 'skela_corner', 'll': (40.45471, 19.48712), 'yaw': 76,
              'clear_half': (18, 27)},
             {'id': 'lungomare_gateway', 'll': (40.45228, 19.48812), 'yaw': 123,
@@ -211,9 +215,15 @@ CITIES = {
         # promenade. Sea on one side (palms), cafés and 10-15 storey blocks on the other.
         'seafront': {'from': (40.4530, 19.4865), 'to': (40.4462, 19.4943),
                      'levels': (10, 15), 'frontage': 140},
-        # Start/finish on the straight Bulevardi Ismail Qemali, 100 m before
-        # the circuit passes the Kuzum Baba park on the hill (finish_line.py).
-        'finish_before': {'ll': (40.467341, 19.493249), 'metres': 100},
+        # A sprint, out and back once with no turn at the line: start on the
+        # southbound carriageway by Sheshi i Flamurit, finish beside it on
+        # the northbound one, the line across the whole road (finish_line.py
+        # place_sprint). The turn at the square only closes the sim's loop.
+        'sprint': {'ll': (40.470091, 19.491178)},
+        # Where Dhimitër Konomi comes down to the shore road (Rrapi): the
+        # carriageways part with an island between, so the run to the tunnel
+        # cannot drift up Konomi. ((lat, lon), radius m) in track.json "splits".
+        'splits': [((40.432619, 19.494553), 50.0)],
         'sea': True,
         'style': 'seaside',
     },

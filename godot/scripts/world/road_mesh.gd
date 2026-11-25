@@ -26,6 +26,9 @@ var _terrain_height := Callable()
 ## build): 1 where the street's own granite kerbs and sidewalks replace the
 ## race kerbs, barriers and shoulder.
 var street := PackedByteArray()
+## Per sample: the side (-1, 1) facing the island where the passes part at a
+## split (RaceTrack.splits); 0 elsewhere. The island has its own kerb there.
+var split_side := PackedFloat32Array()
 
 
 func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable(), reverse := false) -> void:
@@ -40,6 +43,8 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	surface_mat.set_shader_parameter("tex_asphalt_r", load("res://assets/textures/asphalt_arm.jpg"))
 	surface_mat.set_shader_parameter("half_w", hw)
 	surface_mat.set_shader_parameter("track_len", track.L)
+	# A sprint finishes beside the start: the chequer across the other carriageway too.
+	surface_mat.set_shader_parameter("finish_s", track.finish_s if track.sprint else -1.0)
 	surface_mat.set_shader_parameter("wetness", wet)
 	if _showcase:
 		surface_mat.set_shader_parameter("showcase_length", Showcase.LENGTH)
@@ -53,6 +58,7 @@ func build(track: RaceTrack, hw: float, wet: float, terrain_height := Callable()
 	skirt_mat.albedo_texture = load("res://assets/textures/concrete_diff.jpg")
 	skirt_mat.roughness = 0.95
 
+	split_side = split_sides(track)
 	_build_surface(track, hw)
 	_build_kerbs(track, hw)
 	_build_edge_barriers(track, hw)
@@ -127,6 +133,8 @@ func set_crossings(track: RaceTrack, rows: Array, include_showcase := false) -> 
 		if track.dist_to(x, z) > track.half_w + 1.0:
 			continue
 		var at := track.locate_xz(x, z)
+		if track.hidden(at.x):
+			continue
 		marks.append(Vector2(at.x, float(row[2])))
 		var k := posmod(roundi(at.x / track.ds), track.M)
 		if track.PAIR.size() == track.M and track.PAIR[k] >= 0:
@@ -290,6 +298,8 @@ func _build_surface(track: RaceTrack, hw: float) -> void:
 			st.set_color(Color(1, 1, 1, col.z))
 			st.add_vertex(p + Vector3(nx, 0.0, nz) * col.x + Vector3(0, col.y, 0))
 	for i in M:
+		if hidden_segment(track, i):
+			continue
 		var a := i * ring
 		var b := (i + 1) * ring
 		for xi in ring - 1:
@@ -319,6 +329,46 @@ static func joined_side(track: RaceTrack, k: int) -> float:
 ## -1 or 1: the side of sample k facing a roundabout island; 0: none.
 static func isle_side(track: RaceTrack, k: int) -> float:
 	return track.ISLE[k] if track.ISLE.size() == track.M else 0.0
+
+
+## Which side of each sample faces a split's island: within reach of a
+## split, unpaired, with the other pass within ISLAND_GAP (far along the lap).
+const ISLAND_GAP := 36.0
+
+static func split_sides(track: RaceTrack) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(track.M)
+	if track.splits.is_empty():
+		return out
+	for sp: Vector3 in track.splits:
+		var near := PackedInt32Array()
+		for k in track.M:
+			if Vector2(track.X[k], track.Z[k]).distance_to(Vector2(sp.x, sp.y)) < sp.z + 140.0:
+				near.append(k)
+		for k in near:
+			if track.PAIR.size() == track.M and track.PAIR[k] >= 0:
+				continue
+			var p := Vector2(track.X[k], track.Z[k])
+			var best := -1
+			var bd := ISLAND_GAP * ISLAND_GAP
+			for j in near:
+				var gap := absi(j - k)
+				if mini(gap, track.M - gap) * track.ds < 80.0:
+					continue
+				var d := p.distance_squared_to(Vector2(track.X[j], track.Z[j]))
+				if d < bd:
+					bd = d
+					best = j
+			if best >= 0:
+				var q := Vector2(track.X[best], track.Z[best])
+				out[k] = 1.0 if (q - p).dot(Vector2(track.NX[k], track.NZ[k])) > 0.0 else -1.0
+	return out
+
+
+## True when the segment from sample i to the next is on a sprint's hidden
+## turn (RaceTrack.HIDE): nothing of the road is drawn there.
+static func hidden_segment(track: RaceTrack, i: int) -> bool:
+	return track.HIDE.size() == track.M and (track.HIDE[i] == 1 or track.HIDE[(i + 1) % track.M] == 1)
 
 
 ## True when the segment from sample i to the next runs along a city street.
@@ -414,7 +464,7 @@ func _build_kerbs(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
-			if open_side(track, i, side) or on_street(track, i):
+			if open_side(track, i, side) or on_street(track, i) or hidden_segment(track, i) or split_side[i] == side or split_side[(i + 1) % track.M] == side:
 				continue
 			var k0 := i
 			var k1 := (i + 1) % M
@@ -467,7 +517,7 @@ func _build_edge_barriers(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in track.M:
-			if open_side(track, i, side) or on_street(track, i):
+			if open_side(track, i, side) or on_street(track, i) or hidden_segment(track, i) or split_side[i] == side or split_side[(i + 1) % track.M] == side:
 				continue
 			var j := (i + 1) % track.M
 			var color := KERB_RED if int(i * track.ds / 8.0) % 2 == 0 else KERB_WHITE
@@ -512,7 +562,7 @@ func _build_skirt(track: RaceTrack, hw: float) -> void:
 	var idx := 0
 	for side: float in [-1.0, 1.0]:
 		for i in M:
-			if open_side(track, i, side) or on_street(track, i):
+			if open_side(track, i, side) or on_street(track, i) or hidden_segment(track, i) or split_side[i] == side or split_side[(i + 1) % track.M] == side:
 				continue
 			var k0 := i
 			var k1 := (i + 1) % M

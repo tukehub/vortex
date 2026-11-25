@@ -742,7 +742,7 @@ func _process(dt: float) -> void:
 				_tutorial_update()
 				input.sync_actions()
 				if state == "race" and not last500:
-					var left := race.laps * race.L - player.progress
+					var left := race.distance - player.progress
 					if player.lap == race.laps - 1 and left > 0.0 and left < 500.0:
 						last500 = true
 						hud.center(Data.t("race.last_500"), "", 2.0)
@@ -1140,7 +1140,7 @@ func _online_frame(dt: float) -> void:
 	_events()
 	input.sync_actions()
 	if state == "race" and not last500:
-		var left := race.laps * race.L - player.progress
+		var left := race.distance - player.progress
 		if player.lap == race.laps - 1 and left > 0.0 and left < 500.0:
 			last500 = true
 			hud.center(Data.t("race.last_500"), "", 2.0)

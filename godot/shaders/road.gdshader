@@ -17,6 +17,7 @@ uniform float lane_count = 4.0;
 // instead of the yellow centre line of a two-way road.
 uniform bool one_way = false;
 uniform float start_s = 0.0;
+uniform float finish_s = -1.0; // a sprint's finish line, 6 m up to it (-1: none)
 uniform vec2 stone_section = vec2(0.0); // start and length in metres
 // Road marks (plan 3.5): zebra crossings as (s, width) along the lap, from
 // props.json "road_marks" (OSM highway=crossing nodes, or one before each
@@ -241,6 +242,9 @@ void fragment() {
 	// start / finish chequer band 6 m long
 	float ds = along - start_s;
 	ds = ds - track_len * floor(ds / track_len);
+	if (finish_s >= 0.0 && along > finish_s - 6.0 && along < finish_s) {
+		ds = along - (finish_s - 6.0);
+	}
 	if (ds < 6.0 && ds > 0.0) {
 		float cx = floor(across / 1.0);
 		float cy = floor(ds / 1.0);

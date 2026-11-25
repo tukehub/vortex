@@ -42,6 +42,23 @@ func _ready() -> void:
 	views.append(["muradie_back", track.pos(qs + 40.0, 0.0) + Vector3.UP * 2.3, track.pos(qs - 20.0, 0.0) + Vector3.UP * 2.0])
 	views.append(["muradie_side", track.pos(qs, track.half_w + 2.0) + Vector3.UP * 1.7, mosque + Vector3.UP * 4.0])
 	views.append(["muradie_aerial", mosque + Vector3(60, 70, 60), mosque])
+	# The Konomi split: from the shore road heading for the tunnel, and above.
+	var split := Vector3(292.0, 0.0, -128.0)
+	var so := track.locate_xz(split.x, split.z).x
+	for back in [120.0, 60.0]:
+		views.append(["split_%d" % int(back), track.pos(so - back, 0.0) + Vector3.UP * 2.3, track.pos(so + 30.0, 0.0) + Vector3.UP * 1.5])
+	var lion: Vector3 = marks.rrapi_lion
+	var sh := Vector3(split.x, scene.terrain.height_at(split.x, split.z), split.z)
+	views.append(["split_aerial", sh + Vector3(-90, 110, -40), lion + Vector3(10, 0, -20)])
+	views.append(["split_fountain", lion + Vector3(9, 3.2, -11), lion + Vector3(0, 2.2, 0)])
+	views.append(["split_lion", lion + Vector3(2.5, 2.6, -5.5), lion + Vector3(0, 2.4, 1.0)])
+	# The line at Sheshi i Flamurit, and the boulevard's back blocks.
+	views.append(["finish_grid", track.pos(-60.0, 0.0) + Vector3.UP * 4.0, track.pos(40.0, 0.0) + Vector3.UP * 1.0])
+	if track.sprint:
+		views.append(["finish_line", track.pos(track.finish_s - 70.0, 0.0) + Vector3.UP * 2.3, track.pos(track.finish_s + 20.0, 0.0) + Vector3.UP * 1.0])
+	views.append(["finish_aerial", mon + Vector3(140, 110, 120), mon + Vector3(40, 0, 60)])
+	views.append(["infill_theatre", mosque + Vector3(260, 260, 420), mosque + Vector3(-120, 0, 300)])
+	views.append(["infill_mosque", mosque + Vector3(220, 200, -60), mosque + Vector3(-160, 0, 40)])
 	var only := OS.get_environment("VIEWS").split(",", false)
 	var out := OS.get_environment("SHOTS")
 	for v in views:

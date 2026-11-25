@@ -24,6 +24,10 @@ const CombatRules = preload("res://scripts/sim/combat_rules.gd")
 var track: RaceTrack
 var L := 0.0
 var hw := 10.0
+## Metres from the start to the chequered flag: laps * L, or on a sprint
+## (RaceTrack.sprint: Vlorë, out and back with no turn at the line) one run
+## from the start line to the finish line beside it.
+var distance := 0.0
 var opt := {}
 var laps := 2
 var diff: Dictionary
@@ -84,6 +88,9 @@ func _init(p_track: RaceTrack, p_opt: Dictionary) -> void:
 	hw = track.half_w
 	opt = p_opt
 	laps = int(opt.get("laps", 2))
+	if track.sprint:
+		laps = 1
+	distance = track.finish_s if track.sprint else laps * L
 	diff = Data.DIFFS[clampi(int(opt.get("diff", 1)), 0, 2)]
 	rng.seed = int(opt.get("seed", 1234))
 	wet = bool(opt.get("wet", false))
@@ -149,20 +156,31 @@ func grid_d() -> float:
 
 ## Pick-up stations and the adaptive director; the same for every grid.
 func _stations_and_director() -> void:
-	var n_st := clampi(roundi(L / 300.0), 5, 10)
+	var n_st := clampi(roundi(distance / laps / 300.0), 5, 10)
 	var wsum := 0.0
 	for k in Data.PW_KEYS:
 		wsum += Data.PW[k].w
 	for k in n_st:
-		var st := (k + 0.55) * L / n_st + (rng.randf() - 0.5) * 30.0
-		var side := minf(6.5, hw - 2.0)
-		for lane in [-side, 0.0, side]:
+		var st := (k + 0.55) * distance / laps / n_st + (rng.randf() - 0.5) * 30.0
+		for lane in pickup_lanes(st):
 			var kind: String = Data.TUTORIAL_PICKUPS[k % Data.TUTORIAL_PICKUPS.size()] if tutorial else _pick_type(wsum)
 			pickups.append({"id": _nid(), "s": track.mod_s(st), "d": lane, "type": kind, "alive": true, "t": 0.0})
 	compute_order()
 	if bool(opt.get("adaptive_pickups", true)) and not tutorial:
 		pickup_director = PickupDirector.new(int(opt.get("seed", 1234)))
 		pickup_director.setup(self)
+
+
+## Three pickup lanes across the road at `s`: across this carriageway, or
+## where the other pass runs alongside as one road (Vlorë), spread over both
+## carriageways, so each way of the out-and-back finds pickups on either.
+func pickup_lanes(s: float) -> Array[float]:
+	var side := minf(6.5, hw - 2.0)
+	if not track.joined(s):
+		return [-side, 0.0, side]
+	var lo := -track.edge_left(s) + 2.2
+	var hi := track.edge_right(s) - 2.2
+	return [lo, (lo + hi) * 0.5, hi]
 
 
 ## Bots drive every car except the player's, each at most twice.
@@ -384,6 +402,8 @@ func step(dt: float) -> void:
 	# laps
 	for c in cars:
 		var li := int(floor(c.progress / L))
+		if track.sprint and c.progress >= distance:
+			li = maxi(li, 1)
 		if li > c.lap:
 			c.lap = li
 			if li >= 1 and not c.finished:
@@ -427,7 +447,7 @@ func rubber_band(c: CarState) -> float:
 func _near_finish(c: CarState) -> bool:
 	# Use total race progress so earlier laps and the starting grid keep the
 	# selected assistance. This also works with the reversed track frame.
-	return c.finished or laps * L - c.progress <= FINISH_ASSIST_OFF_DISTANCE
+	return c.finished or distance - c.progress <= FINISH_ASSIST_OFF_DISTANCE
 
 
 func physics(c: CarState, dt: float) -> void:
@@ -1004,10 +1024,19 @@ func update_pickups(dt: float) -> void:
 				p.alive = true
 				emit({"t": "pickup_back", "p": p})
 			continue
+		# On a joined road a pickup may lie on the other carriageway, where the
+		# cars of the other pass run at their own s: they meet it in the world.
+		var at := Vector3.INF
+		if absf(p.d) > hw and T.joined(p.s):
+			at = T.pos(p.s, p.d)
 		for c in cars:
 			if c.wreck_t > 0.0 or c.finished:
 				continue
-			if absf(T.wrap_s(c.s - p.s)) < 3.2 and absf(c.d - p.d) < 2.6:
+			var near := absf(T.wrap_s(c.s - p.s)) < 3.2 and absf(c.d - p.d) < 2.6
+			if not near and at != Vector3.INF and T.joined(c.s):
+				var here := T.pos(c.s, c.d)
+				near = Vector2(here.x - at.x, here.z - at.z).length() < 2.9 and absf(here.y - at.y) < 2.0
+			if near:
 				var slot := pickup_slot(c, str(p.type))
 				if slot < 0:
 					continue
@@ -1238,7 +1267,10 @@ func ai_drive(c: CarState, dt: float) -> void:
 			var ds := T.wrap_s(o.s - c.s)
 			if ds > 0.0 and ds < 24.0 and absf(o.d - c.d) < 2.6 and c.v > o.v + 0.5:
 				d_t = o.d + (-3.6 if o.d > 0.0 else 3.6)
-		ai.d_t = clampf(d_t, -hw + 1.7, hw - 1.7)
+		ai.d_t = clampf(d_t, -T.edge_left(c.s) + 1.7, T.edge_right(c.s) - 1.7)
+		# A sprint ends at the line: past it, pull up.
+		if track.sprint and c.finished:
+			ai.v_t = 0.0
 	c.ctrl.gas = c.v < ai.v_t - 0.5
 	c.ctrl.brake = c.v > ai.v_t + 3.0
 	var v := maxf(c.v, 3.0)
@@ -1345,6 +1377,6 @@ func estimate() -> void:
 		if c.finished:
 			c.est = c.finish_time
 			continue
-		var remain := laps * L - c.progress
+		var remain := distance - c.progress
 		var avg := maxf(18.0, c.progress / maxf(1.0, time))
 		c.est = time + remain / avg

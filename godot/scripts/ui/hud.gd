@@ -588,8 +588,8 @@ func _update_corner_caption() -> void:
 		_corner_caption.text = Data.t("hud.corner.straight")
 		_corner_caption.modulate = UiTheme.MUTED
 		return
-	if player.progress + float(corner.distance) > race.laps * race.L:
-		_corner_caption.text = Data.t("hud.corner.finish", maxi(0, roundi(race.laps * race.L - player.progress)))
+	if player.progress + float(corner.distance) > race.distance:
+		_corner_caption.text = Data.t("hud.corner.finish", maxi(0, roundi(race.distance - player.progress)))
 		_corner_caption.modulate = UiTheme.AMBER
 		return
 	_corner_caption.text = "%s %s" % ["→" if corner.direction == "right" else "←", "%dm" % roundi(corner.distance) if float(corner.distance) > 5.0 else Data.t("hud.corner.now")]

@@ -196,6 +196,12 @@ func load_anchors(anchors: Array, terrain: Terrain = null, track: RaceTrack = nu
 			root.add_child(monument)
 			if track != null and terrain != null:
 				monument.build_square(track, terrain, root.transform)
+		elif str(anchor.id) == "rrapi_lion":
+			var fountain := RrapiFountain.new()
+			root.add_child(fountain)
+			fountain.build(track, root.transform)
+		elif str(anchor.id) == "rrapi_tree":
+			root.add_child(RrapiFountain.plane_tree())
 		elif str(anchor.id) == "independence_museum":
 			var house := IndependenceHouse.new()
 			house.name = "IndependenceHouse"
@@ -205,7 +211,7 @@ func load_anchors(anchors: Array, terrain: Terrain = null, track: RaceTrack = nu
 			heritage.name = "VloreHeritage"
 			root.add_child(heritage)
 			heritage.build(str(anchor.id), terrain)
-		elif str(anchor.id) in ["vlore_municipality", "petro_marko", "lungomare_gateway", "skela_corner", "skela_roundabout", "flag_square_island"]:
+		elif str(anchor.id) in ["vlore_municipality", "petro_marko", "lungomare_gateway", "skela_corner", "skela_roundabout"]:
 			var model := preload("res://scripts/world/vlore_civic.gd").new()
 			model.name = "VloreCivic"
 			root.add_child(model)
