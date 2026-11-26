@@ -35,6 +35,9 @@ func time_to(straight: RaceTrack, model_id: String, speed: float) -> float:
 
 
 func _ready() -> void:
+	# The garage clicks: silent, so no sound is still playing at exit.
+	var sound := Sfx.enabled
+	Sfx.enabled = false
 	# The catalogue.
 	var ids := {}
 	for m: Dictionary in Data.MODELS:
@@ -173,6 +176,7 @@ func _ready() -> void:
 	Settings.car_id = saved[2]
 	Settings.model_id = saved[3]
 	Settings.save()
-	await get_tree().create_timer(0.2).timeout
+	await get_tree().create_timer(0.3).timeout
+	Sfx.enabled = sound
 	print("CAR MODELS: catalogue, paint on any car, save migration, race, arena, online and garage; failures=%d" % failures)
 	get_tree().quit(1 if failures else 0)
