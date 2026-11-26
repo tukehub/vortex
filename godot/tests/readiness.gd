@@ -11,7 +11,11 @@ func _ready() -> void:
 	Quality.set_preset("medium")
 	Settings.dynamic_weather = true
 	var visual_track := RaceTrack.load_city("tirane")
-	for def in Data.CARS:
+	# Every paint on its rivals' car, and every car the player can choose.
+	var defs: Array = Data.CARS.duplicate()
+	for m: Dictionary in Data.MODELS:
+		defs.append(Data.car(str(Data.PAINTS[1].id), str(m.id)))
+	for def in defs:
 		var car := CarVisual.new()
 		add_child(car)
 		var paint := Color.html(def.color)

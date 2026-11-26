@@ -29,6 +29,9 @@ func _ready() -> void:
 	# collision should impart separation rather than a fixed kick.
 	var a := race.player
 	var b := race.cars[0]
+	# The same car on both sides: these checks measure how contact separates
+	# cars, not how their weights share it (rivals drive their own cars).
+	b.def = a.def
 	race.cars.clear()
 	race.cars.append(a)
 	race.cars.append(b)

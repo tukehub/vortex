@@ -170,7 +170,9 @@ func _ready() -> void:
 	drag_title_car(menu)
 	var inspected_angle := menu.garage_pivot.rotation.y
 	menu.show_page("car")
-	check(menu._fans_label.text == "700 fansa" and menu._garage_tab == "paint" and menu._garage_lists.paint.visible and not menu._garage_lists.rim.visible, "the garage opens on the paints and shows the fans")
+	check(menu._fans_label.text == "700 fansa" and menu._garage_tab == "model" and menu._garage_lists.model.visible and not menu._garage_lists.paint.visible, "the garage opens on the cars and shows the fans")
+	menu._show_garage_tab("paint")
+	check(menu._garage_lists.paint.visible and not menu._garage_lists.rim.visible and not menu._garage_lists.model.visible, "the paints have a tab of their own")
 	check(not menu._buy_btn.visible, "nothing to buy until a shop item is picked")
 	var free_paint := shop_button(menu, "paint", "uragani")
 	var shop_paint := shop_button(menu, "paint", "ari")

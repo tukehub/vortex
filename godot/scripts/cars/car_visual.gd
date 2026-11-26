@@ -43,6 +43,10 @@ static var _tyre_materials: Array[ShaderMaterial] = []
 var profile: Dictionary
 var rig_root: Node3D
 var _wheel_rest := {}
+## Optional rig calipers (VehicleRig.CALIPERS): lowercase wheel key -> node,
+## and their rest bases. They steer with their wheel but never spin.
+var rig_calipers := {}
+var _caliper_rest := {}
 var _front_lamps: Array[ShaderMaterial] = []
 var _rear_lamps: Array[ShaderMaterial] = []
 var def: Dictionary
@@ -122,6 +126,11 @@ func setup(p_def: Dictionary, p_color: Color, p_is_player: bool, cosmetics := {}
 		if profile.get("wheel_offsets", {}).has(key):
 			pivot.position = profile.wheel_offsets[key]
 		_wheel_rest[id] = pivot.basis
+		var caliper := rig_root.get_node_or_null(str(VehicleRig.CALIPERS[key])) as Node3D if not _legacy() else null
+		if caliper != null:
+			caliper.position = pivot.position
+			rig_calipers[id] = caliper
+			_caliper_rest[id] = caliper.basis
 		if _legacy() and pivot is MeshInstance3D:
 			var part := _strip_caliper(pivot)
 			if not part.is_empty():
@@ -374,7 +383,7 @@ func _make_finish_driver() -> void:
 	# Lightweight helmeted driver, revealed through the windscreen at the finish.
 	finish_driver = Node3D.new()
 	finish_driver.name = "FinishDriver"
-	finish_driver.position = Vector3(-0.35, 0.0, -0.05)
+	finish_driver.position = Vector3(-0.35, 0.0, -0.05) + profile.get("driver_offset", Vector3.ZERO)
 	# The opaque windshield hides the driver until its alpha changes at finish.
 	# Keeping these meshes active avoids introducing them during the camera move.
 	finish_driver.visible = true
@@ -950,6 +959,8 @@ func _pose_wheels() -> void:
 			pivot.rotation = Vector3(spin if left else -spin, steer + (PI if left else 0.), 0.)
 		else:
 			pivot.basis = Basis(Vector3.UP, steer) * Basis(Vector3.RIGHT, -spin) * _wheel_rest[nm]
+			if rig_calipers.has(nm):
+				(rig_calipers[nm] as Node3D).basis = Basis(Vector3.UP, steer) * _caliper_rest[nm]
 
 
 ## Two tapered shells in one shared surface. +Z points out of the exhaust.

@@ -80,7 +80,7 @@ func _init(p_opt: Dictionary) -> void:
 	if not no_player:
 		roster.append(Data.DRIVERS[clampi(driver, 0, Data.DRIVERS.size() - 1)])
 	roster.append_array(rivals)
-	var player_def: Dictionary = Data.car(str(opt.get("player_car", Data.CARS[0].id)))
+	var player_def: Dictionary = Data.car(str(opt.get("player_car", Data.CARS[0].id)), str(opt.get("player_model", "")))
 	for i in roster.size():
 		var is_player := not no_player and i == 0
 		var def: Dictionary = player_def if is_player else Data.CARS[rng.randi() % Data.CARS.size()]

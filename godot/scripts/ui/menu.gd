@@ -60,10 +60,14 @@ var _buy_btn: Button
 var _garage_tabs: HBoxContainer
 var _garage_lists := {}          # tab -> its list
 var _shop_btns := {}             # "kind:id" -> button
-var _garage_tab := "paint"
+var _garage_tab := "model"
 ## A shop item tried on but not bought: {"kind", "id"}, or empty.
 var _preview := {}
-const GARAGE_TABS := ["paint", "rim", "livery", "driver"]
+const GARAGE_TABS := ["model", "paint", "rim", "livery", "driver"]
+var _model_btns := {}            # Data.MODELS id -> button
+var _model_desc: Label
+var _stat_bars := {}             # Data.MODEL_STATS key -> ProgressBar
+var _top_speed: Label
 var _car_desc: Label
 var _set_rows := {}
 
@@ -175,10 +179,11 @@ func _build_garage() -> void:
 	_set_garage_car(str(Game.race_opts.car))
 
 
+## The garage car in paint `id`, on the chosen (or tried) car.
 func _set_garage_car(id: String) -> void:
 	if garage_car:
 		garage_car.queue_free()
-	var def: Dictionary = Data.car(id)
+	var def: Dictionary = Data.car(id, str(Game.race_opts.model))
 	garage_car = CarVisual.new()
 	garage_pivot.add_child(garage_car)
 	garage_car.setup(def, Color.html(def.color), false, {"rim": garage_choice("rim"), "livery": garage_choice("livery")})
@@ -828,7 +833,7 @@ func _page_online() -> Control:
 func lobby_host(port := NetSession.PORT) -> void:
 	Game.leave_online()
 	var session := NetSession.new()
-	if session.host(Settings.display_name(), port, str(Game.race_opts.car)) != OK:
+	if session.host(Settings.display_name(), port, str(Game.race_opts.car), str(Game.race_opts.model)) != OK:
 		_lobby_note = Data.t("online.cannot_host")
 	else:
 		Game.net = session
@@ -846,7 +851,7 @@ func lobby_join(port := NetSession.PORT) -> void:
 		return
 	Game.leave_online()
 	var session := NetSession.new()
-	if session.join(Settings.display_name(), address, port, str(Game.race_opts.car)) != OK:
+	if session.join(Settings.display_name(), address, port, str(Game.race_opts.car), str(Game.race_opts.model)) != OK:
 		_lobby_note = Data.t("online.cannot_join")
 	else:
 		Game.net = session
@@ -1168,14 +1173,16 @@ func _page_car() -> Control:
 	left.add_theme_constant_override("separation", 10)
 	panel.add_child(left)
 	# One tab per thing to choose; the shop items sit among the owned ones.
-	var tab_names := [Data.t("garage.tab.paint"), Data.t("garage.tab.rim"), Data.t("garage.tab.livery"), Data.t("garage.tab.driver")]
+	var tab_names := [Data.t("garage.tab.model"), Data.t("garage.tab.paint"), Data.t("garage.tab.rim"), Data.t("garage.tab.livery"), Data.t("garage.tab.driver")]
 	_garage_tabs = _seg(tab_names, func(i: int): _show_garage_tab(GARAGE_TABS[i]))
 	for b in _garage_tabs.get_children():
-		(b as Button).custom_minimum_size = Vector2(124, 46)
-		(b as Button).add_theme_font_size_override("font_size", 21)
+		(b as Button).custom_minimum_size = Vector2(100, 46)
+		(b as Button).add_theme_font_size_override("font_size", 20)
 	left.add_child(_garage_tabs)
 	_garage_lists.clear()
 	_shop_btns.clear()
+	_garage_lists["model"] = _model_list()
+	left.add_child(_garage_lists["model"])
 	for kind in Data.SHOP_KINDS:
 		var grid := GridContainer.new()
 		grid.name = "Shop_" + kind
@@ -1225,8 +1232,73 @@ func _page_car() -> Control:
 			Game.race_opts.city = Progress.HOME_CITY
 		Game.race_opts.event = ""
 		Game.start_race()))
-	_show_garage_tab("paint")
+	_show_garage_tab("model")
 	return c
+
+
+## Every car, all open from the start, and how the shown one drives.
+func _model_list() -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.name = "Models"
+	box.add_theme_constant_override("separation", 10)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(grid)
+	_model_btns.clear()
+	for m: Dictionary in Data.MODELS:
+		var id := str(m.id)
+		var b := UiTheme.button(Data.model_name(id))
+		b.name = "model_" + id
+		b.toggle_mode = true
+		b.custom_minimum_size = Vector2(250, 58)
+		b.add_theme_font_size_override("font_size", 21)
+		b.pressed.connect(func(): Sfx.ui_click(); _pick_model(id))
+		grid.add_child(b)
+		_model_btns[id] = b
+	_model_desc = UiTheme.label("", 20, UiTheme.MUTED)
+	_model_desc.name = "ModelDesc"
+	_model_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_model_desc.custom_minimum_size.x = 500
+	box.add_child(_model_desc)
+	var stats := GridContainer.new()
+	stats.name = "ModelStats"
+	stats.columns = 3
+	stats.add_theme_constant_override("h_separation", 12)
+	stats.add_theme_constant_override("v_separation", 6)
+	box.add_child(stats)
+	_stat_bars.clear()
+	for stat: String in Data.MODEL_STATS:
+		var label := UiTheme.label(Data.t("garage.stat.%s" % stat), 19, UiTheme.TEXT)
+		label.custom_minimum_size.x = 140
+		stats.add_child(label)
+		var bar := ProgressBar.new()
+		bar.name = "Stat_" + stat
+		bar.min_value = 0.0
+		bar.max_value = 1.0
+		bar.step = 0.0
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(240, 16)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		bar.add_theme_stylebox_override("background", UiTheme.flat(Color(1, 1, 1, 0.08), Color(1, 1, 1, 0.12), 6, 1))
+		bar.add_theme_stylebox_override("fill", UiTheme.flat(UiTheme.CYAN, UiTheme.CYAN, 6, 0))
+		stats.add_child(bar)
+		_stat_bars[stat] = bar
+		var value := UiTheme.label("", 17, UiTheme.MUTED)
+		value.custom_minimum_size.x = 96
+		if stat == "vmax":
+			_top_speed = value
+		stats.add_child(value)
+	return box
+
+
+## Every car is open: picking one takes it at once and keeps it.
+func _pick_model(id: String) -> void:
+	_preview = {}
+	_choose("model", id)
+	_set_garage_car(garage_choice("paint"))
+	_refresh_car()
 
 
 func _shop_button(kind: String, item: Dictionary) -> Button:
@@ -1273,6 +1345,8 @@ func garage_choice(kind: String) -> String:
 	if _preview.get("kind", "") == kind:
 		return str(_preview.id)
 	match kind:
+		"model":
+			return str(Game.race_opts.model)
 		"paint":
 			return str(Game.race_opts.car)
 		"rim":
@@ -1295,6 +1369,10 @@ func _pick_item(kind: String, id: String) -> void:
 
 func _choose(kind: String, id: String) -> void:
 	match kind:
+		"model":
+			Game.race_opts.model = Data.model_id(id)
+			Settings.model_id = Game.race_opts.model
+			Settings.save()
 		"paint":
 			Game.race_opts.car = id
 		"rim":
@@ -1351,11 +1429,22 @@ func _refresh_car() -> void:
 		b.add_theme_stylebox_override("normal", UiTheme.flat(Color(UiTheme.CYAN, 0.2) if worn else Color(1, 1, 1, 0.06 if owned else 0.02), border, 12, 2 if shown else 1))
 		b.add_theme_color_override("font_color", UiTheme.TEXT if owned else UiTheme.AMBER)
 	_fans_label.text = Data.t("garage.fans", Progress.fans)
+	# The cars: the chosen one lit, and how it drives.
+	var shown_model := Data.model_id(str(Game.race_opts.model))
+	for id: String in _model_btns:
+		var b: Button = _model_btns[id]
+		var chosen := id == shown_model
+		b.button_pressed = chosen
+		b.add_theme_stylebox_override("normal", UiTheme.flat(Color(UiTheme.CYAN, 0.2) if chosen else Color(1, 1, 1, 0.06), UiTheme.CYAN if chosen else Color(1, 1, 1, 0.2), 12, 2 if chosen else 1))
+	_model_desc.text = Data.t("model.%s.desc" % shown_model)
+	for stat: String in _stat_bars:
+		(_stat_bars[stat] as ProgressBar).value = Data.model_stat(shown_model, stat)
+	_top_speed.text = Data.t("garage.top_speed", roundi(float(Data.model(shown_model).vmax) * 3.6))
 	# What is shown, and whether it can be bought.
 	if _preview.is_empty():
 		_buy_btn.visible = false
-		var kind := _garage_tab if _garage_tab != "driver" else "paint"
-		_car_desc.text = "%s · %s" % [Data.CAR_MODEL, Data.shop_name(kind, garage_choice(kind))] if _garage_tab != "driver" else "%s · %s" % [Data.CAR_MODEL, Data.car_name(str(Game.race_opts.car))]
+		var kind := _garage_tab if not _garage_tab in ["driver", "model"] else "paint"
+		_car_desc.text = "%s · %s" % [Data.model_name(shown_model), Data.shop_name(kind, garage_choice(kind))]
 	else:
 		var kind := str(_preview.kind)
 		var id := str(_preview.id)

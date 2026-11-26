@@ -14,7 +14,7 @@ const SCRIPT_ROOT := "res://scripts"
 const TABLE := "res://scripts/data/strings_sq.gd"
 ## Written, but no screen shows it yet: the city selector returns with plan 8,
 ## and the old tips have no place since the loading facts replaced them.
-const RESERVED: Array[String] = ["tips", "garage.car_desc", "city.%s.region", "city.%s.blurb", "city.%s.landmarks"]
+const RESERVED: Array[String] = ["tips", "city.%s.region", "city.%s.blurb", "city.%s.landmarks"]
 ## Developer diagnostics are not UI text.
 const DIAGNOSTICS: Array[String] = ["push_error(", "push_warning(", "print(", "printerr(", "assert("]
 

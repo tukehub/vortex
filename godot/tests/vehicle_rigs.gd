@@ -3,7 +3,7 @@ extends Node
 
 func _ready() -> void:
 	Quality.set_preset("low")
-	for row in Data.CARS:
+	for row in Data.MODELS:
 		var spec: Dictionary = row.visual
 		if spec.get("legacy", false):
 			continue
@@ -53,5 +53,28 @@ func _ready() -> void:
 	car.apply_world(state, .05)
 	assert(car.nitro_jets[0].visible and absf(car.steer_vis) > 0.)
 	car.free()
-	print("VEHICLE RIGS: diagnostics, replacement GLB, dimensions, sockets, cosmetics and footprint passed")
+
+	# Rig calipers (the Gepard): on their wheel's axle, steering with the
+	# front wheels and never spinning.
+	var gepard := CarVisual.new()
+	add_child(gepard)
+	gepard.setup(Data.car("benxi", "gepard"), Color.RED, true)
+	assert(gepard.model.scene_file_path == VehicleRig.CHEETAH.model_path, "the Gepard draws its own chassis")
+	assert(gepard.rig_calipers.size() == 4, "the Gepard has four rig calipers")
+	for key: String in gepard.rig_calipers:
+		var caliper: Node3D = gepard.rig_calipers[key]
+		assert(caliper.position.is_equal_approx(gepard.wheels[key].position) and not gepard.wheels[key].is_ancestor_of(caliper))
+	var drive := ArenaCar.new(0, Data.car("benxi", "gepard"), "test", true, Color.RED)
+	drive.v = 15.0
+	drive.steer = 0.8
+	for i in 5:
+		gepard.apply_world(drive, 0.05)
+	var front: Node3D = gepard.rig_calipers.wheel_fr
+	var rear: Node3D = gepard.rig_calipers.wheel_rr
+	assert(absf(gepard.spin) > 0.1 and absf(gepard.steer_vis) > 0.01)
+	assert(is_equal_approx(front.basis.get_euler().y, gepard.steer_vis) and is_zero_approx(front.basis.get_euler().x), "front calipers steer, never spin")
+	assert(rear.basis.is_equal_approx(Basis.IDENTITY), "rear calipers stay put")
+	assert(gepard.finish_driver.position.y < -0.2, "the driver sits low in the Gepard's cabin")
+	gepard.free()
+	print("VEHICLE RIGS: diagnostics, replacement GLB, dimensions, sockets, cosmetics, calipers and footprint passed")
 	get_tree().quit()

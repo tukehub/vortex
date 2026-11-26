@@ -6,7 +6,6 @@ extends Node
 ## "city.tirane.name", "env.day") and is read through t().
 
 const GAME_NAME := "Vortex"
-const CAR_MODEL := GAME_NAME + " GT"
 const Strings := preload("res://scripts/data/strings_sq.gd")
 
 ## The active language's table (plan 9.2 swaps it for another language).
@@ -61,36 +60,63 @@ const CITIES := [
 ]
 
 # ---------------------------------------------------------------- cars
-# Shared performance and contact dimensions across all visual chassis.
-# Saved paint and shop IDs also select the visual profile in the garage and race.
-const CARS := [
-	{"id": "benxi", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#e63138",
-		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "uragani", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#246be8",
-		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "kercyesi", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#e9eff5",
-		"model": VehicleRig.HATCH.model_path, "visual": VehicleRig.HATCH, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "shigjeta", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#536476",
-		"model": VehicleRig.HATCH.model_path, "visual": VehicleRig.HATCH, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "gelendvagen", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#f6c82a",
-		"model": VehicleRig.ESTATE.model_path, "visual": VehicleRig.ESTATE, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "sprinteri", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#26b69b",
-		"model": VehicleRig.ESTATE.model_path, "visual": VehicleRig.ESTATE, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	# Shop selections (6.3) are bought with fans. Paints without a
-	# price are every player's from the start.
-	{"id": "ari", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#c9a227", "price": 600,
-		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "smerald", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#0f7a4f", "price": 500,
-		"model": VehicleRig.HATCH.model_path, "visual": VehicleRig.HATCH, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "nata", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#45526e", "price": 700,
-		"model": VehicleRig.GT.model_path, "visual": VehicleRig.GT, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "bakri", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#b8653a", "price": 600,
-		"model": VehicleRig.ESTATE.model_path, "visual": VehicleRig.ESTATE, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "neoni", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#ff2d8f", "price": 900,
-		"model": VehicleRig.HATCH.model_path, "visual": VehicleRig.HATCH, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
-	{"id": "akulli", "kind": "coupe", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "color": "#9fd7f2", "price": 800,
-		"model": VehicleRig.ESTATE.model_path, "visual": VehicleRig.ESTATE, "size": Vector3(1.94, 1.38, 4.62), "wheel_r": 0.36},
+# The cars: a chassis and how it drives. Every car is the player's from the
+# start (garage tab "Makina"); paint, rims and livery fit every car.
+# vmax: top speed (m/s); acc: acceleration (m/s², before the race's own
+# multiplier); grip: cornering grip; hp: armour (health); mass: weight in
+# contact (heavier pushes harder and is pushed less). Rivals drive them too.
+# The contact footprint (size, wheel_r) is the same for every car, so a car
+# changes how it drives, never how it fits on the road.
+const MODEL_DEFAULT := "gt"
+const MODELS := [
+	{"id": "gt", "vmax": 58.0, "acc": 8.0, "grip": 1.05, "hp": 115.0, "mass": 1.1, "visual": VehicleRig.GT},
+	{"id": "sprint", "vmax": 55.5, "acc": 9.0, "grip": 1.12, "hp": 100.0, "mass": 0.95, "visual": VehicleRig.HATCH},
+	{"id": "kombi", "vmax": 56.5, "acc": 7.3, "grip": 0.99, "hp": 145.0, "mass": 1.35, "visual": VehicleRig.ESTATE},
+	{"id": "gepard", "vmax": 61.0, "acc": 8.5, "grip": 1.1, "hp": 92.0, "mass": 1.0, "visual": VehicleRig.CHEETAH},
 ]
+## The garage's stat bars, in order.
+const MODEL_STATS := ["vmax", "acc", "grip", "hp", "mass"]
+const CAR_SIZE := Vector3(1.94, 1.38, 4.62)
+const CAR_WHEEL_R := 0.36
+
+# Paints. `model` is the car a rival drives in this colour; the player's own
+# car is chosen in the garage and wears any paint. Shop paints (6.3) are
+# bought with fans; paints without a price are every player's from the start.
+const PAINTS := [
+	{"id": "benxi", "color": "#e63138", "model": "gt"},
+	{"id": "uragani", "color": "#246be8", "model": "gt"},
+	{"id": "kercyesi", "color": "#e9eff5", "model": "sprint"},
+	{"id": "shigjeta", "color": "#536476", "model": "sprint"},
+	{"id": "gelendvagen", "color": "#f6c82a", "model": "kombi"},
+	{"id": "sprinteri", "color": "#26b69b", "model": "kombi"},
+	{"id": "ari", "color": "#c9a227", "price": 600, "model": "gt"},
+	{"id": "smerald", "color": "#0f7a4f", "price": 500, "model": "sprint"},
+	{"id": "nata", "color": "#45526e", "price": 700, "model": "gt"},
+	{"id": "bakri", "color": "#b8653a", "price": 600, "model": "kombi"},
+	{"id": "neoni", "color": "#ff2d8f", "price": 900, "model": "sprint"},
+	{"id": "akulli", "color": "#9fd7f2", "price": 800, "model": "kombi"},
+]
+## Every paint on its rivals' car: what CarState, CarVisual and the shop
+## read (id = the paint, model = the car, the car's specs and visual).
+var CARS: Array[Dictionary] = []
+## Paint + car combinations built on request, by "paint/model".
+var _car_defs := {}
+
+
+func _init() -> void:
+	for paint: Dictionary in PAINTS:
+		CARS.append(_car_def(paint, model(str(paint.model))))
+
+
+func _car_def(paint: Dictionary, spec: Dictionary) -> Dictionary:
+	var def := {"id": paint.id, "color": paint.color, "model": spec.id, "kind": "coupe",
+		"vmax": spec.vmax, "acc": spec.acc, "grip": spec.grip, "hp": spec.hp, "mass": spec.mass,
+		"visual": spec.visual, "size": CAR_SIZE, "wheel_r": CAR_WHEEL_R}
+	if paint.has("price"):
+		def.price = paint.price
+	return def
+
+
 # Shop (6.3). Rims colour the wheel rims; liveries are drawn in a second
 # colour from assets/cars/livery_atlas.png (tile = column in the atlas, -1
 # for none). Items without a price are owned from the start.
@@ -317,16 +343,58 @@ func square_name(id: String) -> String:
 	return t("arena.square.%s" % points_city(id))
 
 
-func car(id: String) -> Dictionary:
+## The paint `id` on its rivals' car, or on car `model_id` when given.
+func car(id: String, model_id := "") -> Dictionary:
+	var row: Dictionary = CARS[0]
 	for c in CARS:
 		if c.id == id:
-			return c
-	return CARS[0]
+			row = c
+			break
+	if model_id.is_empty() or model_id == row.model or not has_model(model_id):
+		return row
+	var key := "%s/%s" % [row.id, model_id]
+	if not _car_defs.has(key):
+		var paint: Dictionary = PAINTS[car_index(str(row.id))]
+		_car_defs[key] = _car_def(paint, model(model_id))
+	return _car_defs[key]
+
+
+func has_model(id: String) -> bool:
+	return MODELS.any(func(m: Dictionary) -> bool: return m.id == id)
+
+
+## A car by id; the default car for an unknown id.
+func model(id: String) -> Dictionary:
+	for m: Dictionary in MODELS:
+		if m.id == id:
+			return m
+	return MODELS[0]
+
+
+func model_id(id: String) -> String:
+	return id if has_model(id) else MODEL_DEFAULT
+
+
+## "Vortex Gepard": the car's own name after the game's.
+func model_name(id: String) -> String:
+	return t("model.%s.name" % model_id(id), GAME_NAME)
+
+
+## A garage stat bar: `stat` of car `id` between the weakest car (0.2) and
+## the strongest (1.0). Mass reads as weight: the heaviest car fills it.
+func model_stat(id: String, stat: String) -> float:
+	var lo := INF
+	var hi := -INF
+	for m: Dictionary in MODELS:
+		lo = minf(lo, float(m[stat]))
+		hi = maxf(hi, float(m[stat]))
+	var value := float(model(id)[stat])
+	return 1.0 if hi <= lo else clampf(0.2 + 0.8 * (value - lo) / (hi - lo), 0.2, 1.0)
 
 
 func car_index(id: String) -> int:
-	for i in CARS.size():
-		if CARS[i].id == id:
+	for i in PAINTS.size():
+		if PAINTS[i].id == id:
 			return i
 	return 0
 

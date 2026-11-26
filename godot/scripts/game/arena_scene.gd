@@ -66,11 +66,12 @@ func _ready() -> void:
 		elif a.begins_with("--minutes="):
 			minutes = maxf(0.1, float(a.substr(10)))
 	arena = Arena.new({"seed": seed_value, "time": minutes * 60.0, "diff": int(Game.race_opts.diff),
-		"player_name": Settings.display_name(), "player_car": str(Game.race_opts.car)})
+		"player_name": Settings.display_name(), "player_car": str(Game.race_opts.car),
+		"player_model": str(Game.race_opts.model)})
 	player = arena.player
 	if "--auto" in Game.launch_options():
 		player.autopilot = true
-	print("ARENA seed=%d minutes=%.1f diff=%d car=%s" % [seed_value, minutes, int(Game.race_opts.diff), str(Game.race_opts.car)])
+	print("ARENA seed=%d minutes=%.1f diff=%d car=%s model=%s" % [seed_value, minutes, int(Game.race_opts.diff), str(Game.race_opts.car), str(Game.race_opts.model)])
 	for c in arena.cars:
 		var visual := CarVisual.new()
 		add_child(visual)

@@ -19,8 +19,11 @@ var slot := -1
 var names: Array = []
 ## Each player's paint (a Data.CARS id) by slot.
 var cars: Array = []
-## This phone's paint, sent with HELLO.
+## Each player's car (a Data.MODELS id) by slot.
+var models: Array = []
+## This phone's paint and car, sent with HELLO.
 var car := ""
+var model := ""
 ## The race everyone agreed on (START), {} until then.
 var config: Dictionary = {}
 var lockstep: Lockstep
@@ -33,7 +36,7 @@ var _closed := false
 
 
 ## Opens a lobby on this phone. OK, or the bind error (port in use).
-func host(p_name: String, port := PORT, p_car := "") -> Error:
+func host(p_name: String, port := PORT, p_car := "", p_model := "") -> Error:
 	_enet = ENetConnection.new()
 	var err := _enet.create_host_bound("*", port, MAX_PLAYERS - 1, CHANNELS)
 	if err != OK:
@@ -45,11 +48,13 @@ func host(p_name: String, port := PORT, p_car := "") -> Error:
 	names = [p_name]
 	car = p_car
 	cars = [p_car]
+	model = p_model
+	models = [p_model]
 	return OK
 
 
 ## Connects to a host's lobby at `address` (an IP or host name).
-func join(p_name: String, address: String, port := PORT, p_car := "") -> Error:
+func join(p_name: String, address: String, port := PORT, p_car := "", p_model := "") -> Error:
 	_enet = ENetConnection.new()
 	var err := _enet.create_host(1, CHANNELS)
 	if err != OK:
@@ -61,6 +66,7 @@ func join(p_name: String, address: String, port := PORT, p_car := "") -> Error:
 		return ERR_CANT_CONNECT
 	name = p_name
 	car = p_car
+	model = p_model
 	return OK
 
 
@@ -73,7 +79,7 @@ func start(race: Dictionary) -> void:
 	config = race.duplicate(true)
 	var humans := []
 	for i in names.size():
-		humans.append({"name": names[i], "car": cars[i] if i < cars.size() else ""})
+		humans.append({"name": names[i], "car": cars[i] if i < cars.size() else "", "model": models[i] if i < models.size() else ""})
 	config["humans"] = humans
 	_broadcast(NetProto.start(config))
 	_begin()
@@ -95,7 +101,7 @@ func poll() -> Array:
 		match type:
 			ENetConnection.EVENT_CONNECT:
 				if not is_host:
-					_send(_server, NetProto.hello(name, car))
+					_send(_server, NetProto.hello(name, car, model))
 			ENetConnection.EVENT_DISCONNECT:
 				if is_host:
 					_host_lost(peer, out)
@@ -172,8 +178,9 @@ func _host_got(peer: ENetPacketPeer, bytes: PackedByteArray, out: Array) -> void
 			_peers[peer] = names.size()
 			names.append(their_name)
 			cars.append(str(msg.get("car", "")))
+			models.append(str(msg.get("model", "")))
 			_send(peer, NetProto.welcome(int(_peers[peer])))
-			_broadcast(NetProto.lobby(names, cars))
+			_broadcast(NetProto.lobby(names, cars, models))
 			out.append({"t": "lobby"})
 		NetProto.INPUT, NetProto.HASH:
 			# Trust the connection, not the message, for who sent it.
@@ -198,11 +205,13 @@ func _host_lost(peer: ENetPacketPeer, out: Array) -> void:
 	names.remove_at(gone)
 	if gone < cars.size():
 		cars.remove_at(gone)
+	if gone < models.size():
+		models.remove_at(gone)
 	for p in _peers:
 		if int(_peers[p]) > gone:
 			_peers[p] = int(_peers[p]) - 1
 			_send(p, NetProto.welcome(int(_peers[p])))
-	_broadcast(NetProto.lobby(names, cars))
+	_broadcast(NetProto.lobby(names, cars, models))
 	out.append({"t": "left", "slot": gone})
 
 
@@ -221,12 +230,14 @@ func _client_got(bytes: PackedByteArray, out: Array) -> void:
 		NetProto.LOBBY:
 			names = msg.get("names", [])
 			cars = msg.get("cars", [])
+			models = msg.get("models", [])
 			out.append({"t": "lobby"})
 		NetProto.START:
 			config = msg
 			config.erase("type")
 			names = config.humans.map(func(h: Dictionary) -> String: return str(h.name))
 			cars = config.humans.map(func(h: Dictionary) -> String: return str(h.get("car", "")))
+			models = config.humans.map(func(h: Dictionary) -> String: return str(h.get("model", "")))
 			_begin()
 			out.append({"t": "start"})
 		NetProto.INPUT, NetProto.HASH:

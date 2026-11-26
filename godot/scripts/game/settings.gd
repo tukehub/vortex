@@ -13,7 +13,9 @@ const PRESENTATION_VERSION := 1
 # with one name for the player (the rest are bots); a file before 5 keeps the
 # name its chosen driver raced under. 6 added the touch steering mode; older
 # files get the rotating wheel, which matches the wheel they now see.
-const VERSION := 6
+# 7 saves the chosen car apart from its paint; older files keep the car
+# their paint was drawn on.
+const VERSION := 7
 ## Names the six selectable drivers had, for upgrading files before 5.
 const LEGACY_DRIVERS := ["Artur", "Ritvan", "Desantin", "Eno", "Erlin", "Flori"]
 ## Longest name the player can take (fits the standings and name cards).
@@ -55,7 +57,8 @@ var vol_music := 0.7
 var vol_voice := 1.0
 var show_fps := false
 var mirror := false            # rear-view mirror: a second scene render
-var car_id := "benxi"
+var car_id := "benxi"            # the paint, Data.PAINTS
+var model_id := Data.MODEL_DEFAULT  # the car, Data.MODELS
 var rim_id := "silver"          # Data.RIMS; owned ones only, see Game.cosmetics()
 var livery_id := "none"         # Data.LIVERIES
 var player_name := ""          # empty: Data.t("player.default_name")
@@ -121,6 +124,7 @@ func load_settings(path := PATH) -> void:
 	vol_ui = cf.get_value("audio", "ui", vol_ui)
 	vol_music = clampf(float(cf.get_value("audio", "music", vol_music)), 0.0, 1.0)
 	car_id = cf.get_value("race", "car", car_id)
+	model_id = Data.model_id(str(cf.get_value("race", "model", model_id))) if file_version >= 7 else str(Data.car(str(car_id)).model)
 	if file_version >= 2:
 		rim_id = str(cf.get_value("race", "rim", rim_id))
 		livery_id = str(cf.get_value("race", "livery", livery_id))
@@ -165,6 +169,7 @@ func save(path := PATH) -> void:
 	cf.set_value("audio", "music", vol_music)
 	cf.set_value("audio", "voice", vol_voice)
 	cf.set_value("race", "car", car_id)
+	cf.set_value("race", "model", Data.model_id(model_id))
 	cf.set_value("race", "rim", rim_id)
 	cf.set_value("race", "livery", livery_id)
 	cf.set_value("race", "player_name", player_name)

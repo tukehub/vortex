@@ -64,6 +64,11 @@ github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept
 creativecommons.org/licenses/by/4.0/
 Përshtatur për Vortex: gjeometri e thjeshtuar, rrota të animuara, materiale dhe ngjyra të reja; teksturat dhe markat origjinale janë hequr.
 
+Vortex Gepard: “Generic Supercar "Cheetah"” nga mk2design (instagram.com/mk2.design), CC BY 4.0.
+sketchfab.com/3d-models/f5420af7b30c4e8c874be33cc58724f2
+creativecommons.org/licenses/by/4.0/
+Përshtatur për Vortex me tools/import_cheetah.py: pjesët e ndara sipas lojës (karroceria, xhamat, dritat, rrotat dhe frenat), materiale të reja për bojën, gomat dhe disqet, hija e pjekur e hequr, shiriti i BE-së në targë i mbuluar me blu.
+
 Model alternativ i makinës (vetëm në ndërtime që e përfshijnë): “Sports Racing Car Low Poly Game Ready” nga smileypixelstudio, licencë Royalty Free (no AI), CGTrader. Përshtatur për Vortex.
 https://www.cgtrader.com/free-3d-models/car/sport-car/sports-racing-car-low-poly-game-ready
 

@@ -81,7 +81,8 @@ const SKIP_HASH := ["track", "events", "player", "humans", "cars", "order", "opt
 
 ## opt keys: laps, diff (0..2), seed, wet, assist (bool), brake_assist (bool),
 ## handling (id in Data.HANDLING, default "arcade"), driver (index),
-## player_car (id), player_slot, no_player, bot_cars (optional Array of ids),
+## player_car (paint id), player_model (Data.MODELS id; default: the paint's
+## rival car), player_slot, no_player, bot_cars (optional Array of ids),
 ## adaptive_pickups (default true; false retains the original fixed stations),
 ## tutorial (bool).
 func _init(p_track: RaceTrack, p_opt: Dictionary) -> void:
@@ -116,7 +117,7 @@ func _grid_for_player() -> void:
 	var pslot := int(opt.get("player_slot", n - 2))
 	var bot_cars: Array = opt.get("bot_cars", [])
 	var bi := 0
-	var player_def: Dictionary = Data.car(str(opt.get("player_car", Data.CARS[0].id)))
+	var player_def: Dictionary = Data.car(str(opt.get("player_car", Data.CARS[0].id)), str(opt.get("player_model", "")))
 	for i in n:
 		var row := i / 2
 		var col := i % 2
@@ -213,7 +214,7 @@ func emit(e: Dictionary) -> void:
 	events.append(e)
 
 
-## A grid for an online race (plan 7.3): `humans` is [{name, car}] in the
+## A grid for an online race (plan 7.3): `humans` is [{name, car, model}] in the
 ## order every peer agrees on, `bots` fills the rest. Humans take the first
 ## colours and the back of the grid, bots the other colours and rival names.
 ## `player` is the first human on every peer, so everything the simulation
@@ -244,7 +245,8 @@ func _grid_for_humans(list: Array, bots: int) -> void:
 		if hi >= 0:
 			var entry: Dictionary = list[hi]
 			var human_name := str(entry.get("name", ""))
-			c = CarState.new(i, Data.car(str(entry.get("car", Data.CARS[0].id))), Data.PLAYER_FALLBACK_NAME if human_name.is_empty() else human_name, true, Color.html(Data.DRIVERS[hi].col))
+			var human_def: Dictionary = Data.car(str(entry.get("car", Data.CARS[0].id)), str(entry.get("model", "")))
+			c = CarState.new(i, human_def, Data.PLAYER_FALLBACK_NAME if human_name.is_empty() else human_name, true, Color.html(Data.DRIVERS[hi].col))
 			humans[hi] = c
 		else:
 			var drv: Dictionary = rivals[bi]

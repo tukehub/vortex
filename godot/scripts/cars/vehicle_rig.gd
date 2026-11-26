@@ -10,11 +10,24 @@ const GT := {
 const WHEELS := ["Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"]
 const LIGHTS := {"front": "Headlights", "rear": "BrakeLights"}
 const SOCKETS := {"left": "Nitro_L", "right": "Nitro_R"}
+## Optional brake calipers, one per wheel, as CarRoot children placed on the
+## wheel's axle: they steer with the front wheels but do not spin.
+const CALIPERS := {"Wheel_FL": "Caliper_FL", "Wheel_FR": "Caliper_FR", "Wheel_RL": "Caliper_RL", "Wheel_RR": "Caliper_RR"}
 
 const HATCH := {
 	"model_path": "res://assets/cars/hatch.glb", "visual_scale": 1.0,
 	"wheel_radius": .32, "wheelbase": 2.5296, "wheel_offsets": {},
 	"material_slots": {}, "light_nodes": LIGHTS, "nitro_sockets": SOCKETS, "lod_models": {},
+}
+## mk2design's "Generic Supercar Cheetah" (CC BY 4.0), converted by
+## tools/import_cheetah.py at the source's scale (0.383 m tyres, which the tyre
+## and rim shaders expect); visual_scale fits it to the game's footprint.
+## `driver_offset` moves the driver down and back into the low cabin.
+const CHEETAH := {
+	"model_path": "res://assets/cars/cheetah.glb", "visual_scale": 0.78,
+	"wheel_radius": .3832, "wheelbase": 2.996, "wheel_offsets": {},
+	"material_slots": {}, "light_nodes": LIGHTS, "nitro_sockets": SOCKETS, "lod_models": {},
+	"driver_offset": Vector3(0.0, -0.26, 0.12),
 }
 const ESTATE := {
 	"model_path": "res://assets/cars/estate.glb", "visual_scale": 1.0,

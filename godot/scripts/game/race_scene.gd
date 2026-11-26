@@ -350,6 +350,7 @@ func _build_race() -> void:
 		"tutorial": bool(Game.race_setting("tutorial")),
 		"player_name": Settings.display_name(),
 		"player_car": str(Game.race_opts.car),
+		"player_model": str(Game.race_opts.model),
 	}
 	race = Race.new(track, opts)
 	race.started = false
@@ -357,9 +358,9 @@ func _build_race() -> void:
 	if "--auto" in Game.launch_options():
 		player.autopilot = true  # debug: let the AI drive the player car
 	# One line per race in the log (adb logcat -s godot) is enough to replay it.
-	print("RACE seed=%d city=%s reverse=%s env=%s laps=%d diff=%d assist=%s handling=%s car=%s" % [
+	print("RACE seed=%d city=%s reverse=%s env=%s laps=%d diff=%d assist=%s handling=%s car=%s model=%s" % [
 		seed_value, city_id, str(bool(Game.race_setting("reverse"))), env_id, race.laps, int(Game.race_setting("diff")),
-		str(Settings.assist), handling, str(Game.race_opts.car)])
+		str(Settings.assist), handling, str(Game.race_opts.car), str(Game.race_opts.model)])
 	_build_race_visuals()
 
 

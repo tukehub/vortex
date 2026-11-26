@@ -14,19 +14,19 @@ const LEAVE := 7     # host -> all: slot that dropped, first tick a bot drives i
 const REFUSE := 8    # host -> client: why (full, started, version)
 
 ## Bump when the simulation or this format changes: peers must match.
-const VERSION := 1
+const VERSION := 2
 
 
-static func hello(name: String, car := "") -> PackedByteArray:
-	return _dict(HELLO, {"name": name, "car": car, "version": VERSION})
+static func hello(name: String, car := "", model := "") -> PackedByteArray:
+	return _dict(HELLO, {"name": name, "car": car, "model": model, "version": VERSION})
 
 
 static func welcome(slot: int) -> PackedByteArray:
 	return PackedByteArray([WELCOME, slot])
 
 
-static func lobby(names: Array, cars: Array = []) -> PackedByteArray:
-	return _dict(LOBBY, {"names": names, "cars": cars})
+static func lobby(names: Array, cars: Array = [], models: Array = []) -> PackedByteArray:
+	return _dict(LOBBY, {"names": names, "cars": cars, "models": models})
 
 
 static func start(config: Dictionary) -> PackedByteArray:
