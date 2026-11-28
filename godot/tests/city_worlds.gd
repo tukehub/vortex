@@ -166,7 +166,7 @@ func _ready() -> void:
 				"vlora_house": "VloreHeritage/VloraHouseFacade", "muradie_mosque": "VloreHeritage/MuradieMasonry",
 				"petro_marko": "VloreCivic/PetroMarkoTheatre", "skela_roundabout": "VloreCivic/SkelaPlantedIsland",
 				"lungomare_gateway": "VloreCivic/LungomareTwinWings", "waterfront_courts": "WaterfrontCourts/CourtSurfacesAndFixtures",
-				"vlore_municipality": "VloreCivic/MunicipalityFacade"}
+				"vlore_municipality": "VloreCivic/MunicipalityFacade", "lungomare_paragliders": "Paragliders/Paraglider0"}
 			for id: String in expected:
 				var root := marks.get_node(id) as Node3D
 				assert(root.get_node_or_null(str(expected[id])) != null, "Vlorë landmark model missing: " + id)
@@ -181,7 +181,21 @@ func _ready() -> void:
 				var off := 8.0 if id == "flagpole_big" else 20.0
 				assert(d > scene.track.half_w + off and d < 70.0, "landmark off the road and in sight of it: " + id)
 			var flag := marks.get_node("flagpole_big/GreatFlag") as MeshInstance3D
-			assert((flag.material_override as ShaderMaterial).get_shader_parameter("use_tex"), "the great flag shows the eagle")
+			# The great flag: the national flag's texture (5:7) on a rippling cloth.
+			var cloth := flag.material_override as ShaderMaterial
+			var eagle := cloth.get_shader_parameter("flag_tex") as Texture2D
+			assert(eagle != null and absf(float(eagle.get_width()) / eagle.get_height() - 1.4) < 0.01, "the great flag shows the eagle at 5:7")
+			assert(is_equal_approx(float(cloth.get_shader_parameter("width")) / float(cloth.get_shader_parameter("height")), 1.4))
+			# Paragliders circle high over the seafront and move.
+			var flock := marks.get_node("lungomare_paragliders/Paragliders") as Paragliders
+			assert(flock.gliders.size() >= 5, "paragliders over Lungomare")
+			var before := flock.gliders[0].global_position
+			flock._place(30.0)
+			assert(flock.gliders[0].global_position.distance_to(before) > 20.0, "the paragliders fly")
+			for glider in flock.gliders:
+				var g := glider.global_position
+				assert(g.y - scene.terrain.height_at(g.x, g.z) > 60.0, "paragliders fly high")
+				assert(scene.track.dist_to(g.x, g.z) < 700.0, "paragliders in sight of the road")
 			_test_vlore_circuit(scene, marks)
 			print("VLORE LANDMARKS: stadium facade ", snappedf(gap, 0.1), " m from the race line")
 		elif not FileAccess.file_exists("res://assets/cities/%s/water_near.bin" % city.id):

@@ -248,6 +248,11 @@ func load_anchors(anchors: Array, terrain: Terrain = null, track: RaceTrack = nu
 			castle.build(terrain)
 		elif str(anchor.id) == "flagpole_big":
 			_great_flag(root)
+		elif str(anchor.id) == "lungomare_paragliders":
+			var flock := Paragliders.new()
+			flock.name = "Paragliders"
+			root.add_child(flock)
+			flock.build()
 		elif str(anchor.id) in ["national_museum", "prime_minister"]:
 			var civic := preload("res://scripts/world/civic_landmarks.gd").new()
 			civic.name = "CivicLandmark"
@@ -535,26 +540,60 @@ func _clocktower(root: Node3D) -> void:
 	root.add_child(hardware)
 
 
-## The great flag on Sheshi i Flamurit: a 32 m mast flying the national flag.
+## The great flag on Sheshi i Flamurit: a 32 m tapered steel mast on a
+## stepped stone plinth, flying an 11.2 x 8 m national flag (5:7) that
+## ripples from the hoist in the sea breeze (shaders/flag_cloth.gdshader).
+const GREAT_FLAG_SIZE := Vector2(11.2, 8.0)
+const GREAT_MAST := 32.0
+
+
 func _great_flag(root: Node3D) -> void:
 	var st := LandmarkKit.begin()
-	LandmarkKit.box(st, Vector3(0, -0.6, 0), Vector3(3.2, 1.6, 3.2), Color(0.78, 0.76, 0.72))
-	LandmarkKit.tube(st, Vector3(0, 0, 0), Vector3(0, 32.0, 0), 0.32, 0.16, Color(0.75, 0.76, 0.77), 10)
-	LandmarkKit.sphere(st, Vector3(0, 32.2, 0), Vector3(0.3, 0.3, 0.3), Color(0.8, 0.65, 0.25))
-	root.add_child(LandmarkKit.mesh_node(st, LandmarkKit.material(0.4, 0.6), "FlagMast", 2500.0))
-	var cloth := QuadMesh.new()
-	cloth.size = Vector2(10.0, 7.0)
-	cloth.subdivide_width = 16
-	cloth.subdivide_depth = 6
+	var stone := Color(0.80, 0.78, 0.73)
+	for step in 3:
+		var side := 4.6 - step * 1.0
+		LandmarkKit.box(st, Vector3(0, -0.55 + step * 0.32, 0), Vector3(side, 0.9, side), stone.darkened(0.04 * step))
+	LandmarkKit.tube(st, Vector3(0, 0.35, 0), Vector3(0, 1.6, 0), 0.62, 0.5, Color(0.62, 0.63, 0.64), 16)
+	LandmarkKit.tube(st, Vector3(0, 1.6, 0), Vector3(0, GREAT_MAST, 0), 0.34, 0.14, Color(0.78, 0.79, 0.80), 16)
+	LandmarkKit.tube(st, Vector3(0, GREAT_MAST, 0), Vector3(0, GREAT_MAST + 0.25, 0), 0.24, 0.24, Color(0.70, 0.71, 0.72), 12)
+	LandmarkKit.sphere(st, Vector3(0, GREAT_MAST + 0.62, 0), Vector3(0.36, 0.36, 0.36), Color(0.86, 0.68, 0.26), 8, 12)
+	# Halyard down the lee of the mast to its cleat.
+	LandmarkKit.tube(st, Vector3(0.2, 2.2, 0), Vector3(0.17, GREAT_MAST - 0.2, 0), 0.018, 0.018, Color(0.85, 0.85, 0.82), 4)
+	LandmarkKit.box(st, Vector3(0.36, 2.2, 0), Vector3(0.1, 0.42, 0.12), Color(0.35, 0.36, 0.38))
+	root.add_child(LandmarkKit.mesh_node(st, LandmarkKit.material(0.35, 0.65), "FlagMast", 2500.0))
 	var flag := MeshInstance3D.new()
 	flag.name = "GreatFlag"
-	flag.mesh = cloth
-	flag.position = Vector3(5.2, 27.8, 0)
+	flag.mesh = cloth_grid(GREAT_FLAG_SIZE, 44, 26)
+	flag.position = Vector3(0.18, GREAT_MAST - 0.35, 0)
 	var mat := ShaderMaterial.new()
-	mat.shader = preload("res://shaders/flag_wave.gdshader")
-	mat.set_shader_parameter("use_tex", true)
+	mat.shader = preload("res://shaders/flag_cloth.gdshader")
 	mat.set_shader_parameter("flag_tex", LandmarkKit.albanian_flag())
-	mat.set_shader_parameter("wave", 4.0)
+	mat.set_shader_parameter("width", GREAT_FLAG_SIZE.x)
+	mat.set_shader_parameter("height", GREAT_FLAG_SIZE.y)
 	flag.material_override = mat
 	flag.visibility_range_end = 2500.0
+	# The folds move a metre or two either way; keep it from being culled.
+	flag.extra_cull_margin = 3.0
 	root.add_child(flag)
+
+
+## A cloth grid in local XY: hoist edge at x = 0, fly to +x, top edge at
+## y = 0 down to -size.y; UV (0, 0) at the top of the hoist.
+static func cloth_grid(size: Vector2, columns: int, rows: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for j in rows + 1:
+		for i in columns + 1:
+			var uv := Vector2(float(i) / columns, float(j) / rows)
+			st.set_uv(uv)
+			st.set_normal(Vector3.BACK)
+			st.add_vertex(Vector3(uv.x * size.x, -uv.y * size.y, 0.0))
+	for j in rows:
+		for i in columns:
+			var a := j * (columns + 1) + i
+			var b := a + 1
+			var c := a + columns + 1
+			var d := c + 1
+			for index in [a, b, c, b, d, c]:
+				st.add_index(index)
+	return st.commit()

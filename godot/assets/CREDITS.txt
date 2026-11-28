@@ -29,6 +29,8 @@ Korçë — guri i Katedrales Ngjallja e Krishtit: Sandstone Blocks 05, Rob Tuyt
 Berat — zhavorri i Osumit: Dry River Pebbles; trarët, kornizat e dritareve dhe strehët: Dark Wooden Planks; tjegullat e vjetra të Mangalemit dhe Goricës: Roof 09. Dry River Pebbles dhe Dark Wooden Planks nga Amal Kumar, Roof 09 nga Rob Tuytel — Poly Haven, CC0 1.0. Dritaret e Beratit (assets/textures/berat_windows.png) janë pjekur nga Dark Wooden Planks me tools/build_berat_windows.py. Shtëpitë e Mangalemit, Goricës dhe Kalasë, kalaja, Ura e Goricës dhe lumi janë ndërtuar nga gjurmët në OpenStreetMap (© kontribuesit e OpenStreetMap, ODbL) dhe lartësitë Copernicus.
 Vlorë — Sheshi i Flamurit dhe bordurat e bulevardit të Muradies: Granite Tile 03; shkallët e rrumbullakëta dhe veshja e piramidës së Monumentit të Pavarësisë: Granite Tile. Të dyja nga Charlotte Baglioni — Poly Haven, CC0 1.0. Trotuaret, lëndina dhe hyrjet e rrugëve anësore të bulevardit janë vendosur sipas rrugëve dhe ndërtesave të qytetit (tools/pipeline/vlore_boulevard.py).
 Vlorë — Luani i shatërvanit te Rrapi: skulptura e luanit e dhënë për projektin, e praruar dhe e përshtatur me tools/build_luani.py. Valëzimi i detit dhe i lumenjve: Seamless looping waves heightmaps nga zookeeper — OpenGameArt, CC0 1.0 (tools/build_wave_normals.py).
+Flamuri shqiptar (flamujt e shesheve, Vlorë): shqiponja nga vizatimi vektorial shtetëror në Wikimedia Commons, File:Flag_of_Albania.svg, në domen publik; e kthyer në imazh me tools/build_albanian_flag.py.
+commons.wikimedia.org/wiki/File:Flag_of_Albania.svg
 Semaforët: “Traffic Light - Complex” nga Urban Mini Props Pack - Free; i kthyer dhe i thjeshtuar në rreth 5 600 trekëndësha për pajisje celulare.
 
 [b]Fotografia e pemës[/b]

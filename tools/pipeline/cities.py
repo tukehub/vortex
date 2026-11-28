@@ -188,6 +188,9 @@ CITIES = {
              'clear_half': (18, 27)},
             {'id': 'lungomare_gateway', 'll': (40.45228, 19.48812), 'yaw': 123,
              'clear_half': (29, 27)},
+            # Paragliders circling high over Lungomare and the shore road;
+            # local +X runs down the coast, +Z out over the bay.
+            {'id': 'lungomare_paragliders', 'll': (40.4477952, 19.4902893), 'yaw': -67},
             {'id': 'waterfront_courts', 'll': (40.42871, 19.49157), 'yaw': -33,
              'offset_x': 20, 'offset_y': 1.15, 'offset_z': 21, 'clear_half': (60, 77)},
             {'id': 'vlore_municipality', 'll': (40.47458, 19.49335), 'yaw': -32,
